@@ -26,21 +26,59 @@ const getUnitsForRace = (race: string) => {
 const getDefaultArmy = (race: string) => {
   const units = getUnitsForRace(race);
   const army: Army = {};
-  units.forEach(unit => { army[unit] = 10; });
+  // Get TC and ATC units for this race
+  const tcUnits = Object.keys(BUILDING_DATA['Training Center']?.unit_production?.[race] || {});
+  const atcUnits = Object.keys(BUILDING_DATA['Advanced Training Center']?.unit_production?.[race] || {});
+  units.forEach(unit => {
+    if (tcUnits.includes(unit)) {
+      army[unit] = 10;
+    } else if (atcUnits.includes(unit)) {
+      army[unit] = 0;
+    } else {
+      army[unit] = 10; // fallback for any other units
+    }
+  });
   return army;
 };
 
 // ArmyInput component: allows user to set quantities for all unit types
-const ArmyInput = ({ armyName, army, setArmy, units }: { armyName: string; army: Army; setArmy: (a: Army) => void; units: string[] }) => {
+const ArmyInput = ({ armyName, army, setArmy, units, buildings, race }: { armyName: string; army: Army; setArmy: (a: Army) => void; units: string[]; buildings?: any; race?: string }) => {
   // Handler for changing unit count
   const handleChange = (unit: string, value: string) => {
     const count = Math.max(0, parseInt(value) || 0);
     setArmy({ ...army, [unit]: count });
   };
+  // Unit production estimate summary (if buildings and race are provided)
+  const getUnitProductionSummary = () => {
+    if (!buildings || !race) return '';
+    const unitCounts: Record<string, number> = {};
+    const tc = buildings['Training Center'] || 0;
+    const atc = buildings['Advanced Training Center'] || 0;
+    const castle = buildings['Castle'] || 0;
+    const tcProd = BUILDING_DATA['Training Center']?.unit_production?.[race] || {};
+    for (const [unit, v] of Object.entries(tcProd)) {
+      unitCounts[unit] = Math.floor(tc / v.per_building) * v.per_day;
+    }
+    const atcProd = BUILDING_DATA['Advanced Training Center']?.unit_production?.[race] || {};
+    for (const [unit, v] of Object.entries(atcProd)) {
+      unitCounts[unit] = (unitCounts[unit] || 0) + Math.floor(atc / v.per_building) * v.per_day;
+    }
+    for (const unit of Object.keys({ ...tcProd, ...atcProd })) {
+      unitCounts[unit] = (unitCounts[unit] || 0) + castle;
+    }
+    const summary = Object.entries(unitCounts)
+      .filter(([_, n]) => n > 0)
+      .map(([unit, n]) => `${n} ${unit}`)
+      .join(', ');
+    return summary ? `You can currently train ${summary} per day.` : '';
+  };
 
   return (
     <div className="p-4 bg-gray-800 rounded-lg mb-4">
       <h3 className="text-lg font-semibold mb-2">{armyName} Composition</h3>
+      {buildings && race && (
+        <p className="text-sm text-purple-300 mb-2">{getUnitProductionSummary()}</p>
+      )}
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
@@ -594,14 +632,6 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
     <div className="p-4 bg-gray-800 rounded-lg mb-4">
       <h3 className="text-lg font-semibold mb-2">Buildings</h3>
       <p className="text-sm text-purple-300 mb-2">Your builders will work the best they can in order to build {Math.floor((population && population['Building']) ? population['Building'] / 150 : 0)} buildings per day.</p>
-      <div className="mb-2 text-sm">
-        <span className={overMax ? 'text-red-400 font-bold' : ''}>
-          Buildings (excluding Castles): {buildingsUsed} / {maxBuildings} (Ratio total: {ratioSum.toFixed(2)} / 10)
-        </span>
-        {overMax && <span className="text-red-400 ml-2">Ratio total cannot exceed 10 (excluding Castle).</span>}
-        <br />
-        <span>Castles: {currentCastles} / {maxCastles} (up to {castleCap} allowed by land)</span>
-      </div>
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
@@ -1147,6 +1177,8 @@ export default function MainApp() {
               army={yourArmy}
               setArmy={setYourArmy}
               units={getUnitsForRace(yourRace)}
+              buildings={yourBuildings}
+              race={yourRace}
             />
             <PopulationAssignment
               population={yourPopulation}
