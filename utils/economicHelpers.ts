@@ -3,26 +3,30 @@ import { MARKET_PRICES } from '../data/marketPrices';
 import { Army } from './calculatePhaseDamage';
 
 /**
- * Calculates the total initial gold cost for a single unit, including equipment.
+ * Get total initial gold cost for a unit and race.
+ * @param unitName - The name of the unit (must exist in UNIT_DATA[race])
+ * @param race - The race key (lowercase)
  */
-export function getUnitTotalInitialGoldCost(unitName: string): number {
-  const unit = UNIT_DATA[unitName];
+export function getUnitTotalInitialGoldCost(unitName: string, race: string): number {
+  const unit = UNIT_DATA[race][unitName];
   if (!unit) return 0;
   return (
-    unit.base_gold_cost +
-    (unit.equipment_iron_cost * MARKET_PRICES.iron) +
-    (unit.equipment_wood_cost * MARKET_PRICES.wood) +
-    unit.equipment_gold_cost
+    (unit.base_gold_cost || 0) +
+    (unit.equipment_iron_cost || 0) +
+    (unit.equipment_wood_cost || 0) +
+    (unit.equipment_gold_cost || 0)
   );
 }
 
 /**
- * Calculates the Total Effective Gold Cost (TEGC) for a single unit for 48 hours (2 days).
+ * Get TEGC for a unit and race.
+ * @param unitName - The name of the unit (must exist in UNIT_DATA[race])
+ * @param race - The race key (lowercase)
  */
-export function getUnitTEGC(unitName: string): number {
-  const unit = UNIT_DATA[unitName];
+export function getUnitTEGC(unitName: string, race: string): number {
+  const unit = UNIT_DATA[race][unitName];
   if (!unit) return 0;
-  const initial = getUnitTotalInitialGoldCost(unitName);
+  const initial = getUnitTotalInitialGoldCost(unitName, race);
   const upkeep = (unit.upkeep.gold * 2) + (unit.upkeep.food * 2 * MARKET_PRICES.food);
   return initial + upkeep;
 }
@@ -30,10 +34,10 @@ export function getUnitTEGC(unitName: string): number {
 /**
  * Calculates the total initial gold cost for an entire army.
  */
-export function getArmyTotalInitialGoldCost(army: Army): number {
+export function getArmyTotalInitialGoldCost(army: Army, race: string): number {
   let total = 0;
   for (const [unit, count] of Object.entries(army)) {
-    total += getUnitTotalInitialGoldCost(unit) * count;
+    total += getUnitTotalInitialGoldCost(unit, race) * count;
   }
   return total;
 }
@@ -41,10 +45,10 @@ export function getArmyTotalInitialGoldCost(army: Army): number {
 /**
  * Calculates the Total Effective Gold Cost (TEGC) for an entire army for 48 hours.
  */
-export function getArmyTEGC(army: Army): number {
+export function getArmyTEGC(army: Army, race: string): number {
   let total = 0;
   for (const [unit, count] of Object.entries(army)) {
-    total += getUnitTEGC(unit) * count;
+    total += getUnitTEGC(unit, race) * count;
   }
   return total;
 }
@@ -56,9 +60,10 @@ export function getArmyTEGC(army: Army): number {
  */
 export function getUnitEfficiencyRatios(
   unitName: string,
-  effectiveStats: { melee: number; short: number; range: number; defense: number }
+  effectiveStats: { melee: number; short: number; range: number; defense: number },
+  race: string
 ): { goldPerAttack: number | null, goldPerDefense: number | null, goldPerRanged: number | null } {
-  const tegc = getUnitTEGC(unitName);
+  const tegc = getUnitTEGC(unitName, race);
   const goldPerAttack = effectiveStats.melee > 0 ? tegc / effectiveStats.melee : null;
   const goldPerDefense = effectiveStats.defense > 0 ? tegc / effectiveStats.defense : null;
   const goldPerRanged = effectiveStats.range > 0 ? tegc / effectiveStats.range : null;

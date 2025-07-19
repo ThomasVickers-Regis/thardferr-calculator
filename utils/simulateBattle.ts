@@ -46,7 +46,9 @@ export function simulateBattle(
   strategyEnemy: StrategyName | null,
   maxRounds: number = 20,
   yourBuildings: any = {},
-  enemyBuildings: any = {}
+  enemyBuildings: any = {},
+  yourRace: string = 'dwarf',
+  enemyRace: string = 'dwarf'
 ): BattleOutcome {
   let yourArmy = { ...yourInitialArmy };
   let enemyArmy = { ...enemyInitialArmy };
@@ -86,7 +88,9 @@ export function simulateBattle(
       strategyEnemy,
       ksDifferenceFactor,
       yourBuildings,
-      enemyBuildings
+      enemyBuildings,
+      yourRace,
+      enemyRace
     );
     // Update armies
     yourArmy = { ...roundResult.yourArmy };

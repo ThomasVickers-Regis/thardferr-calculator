@@ -14,8 +14,9 @@ export interface EffectiveUnitStats {
 }
 
 /**
- * Calculates a unit's effective stats for a specific battle, applying all modifiers.
- * @param unitName - The name of the unit (must exist in UNIT_DATA)
+ * Get effective unit stats for a given unit and race.
+ * @param unitName - The name of the unit (must exist in UNIT_DATA[race])
+ * @param race - The race key (lowercase)
  * @param techLevels - Object of technology levels
  * @param activeStrategy - The name of the active strategy
  * @param isAttacker - Whether this unit is attacking (for KS difference factor)
@@ -24,125 +25,141 @@ export interface EffectiveUnitStats {
  */
 export function getEffectiveUnitStats(
   unitName: string,
-  techLevels: TechLevels,
-  activeStrategy: StrategyName | null,
-  isAttacker: boolean,
+  race: string,
+  techLevels: TechLevels = {},
+  strategy: StrategyName | null = null,
+  isAttacker: boolean = true,
   ksDifferenceFactor: number = 1
-): EffectiveUnitStats {
-  const base = UNIT_DATA[unitName];
-  if (!base) throw new Error(`Unit not found: ${unitName}`);
-
-  // Start with base stats
-  let melee = base.melee;
-  let short = base.short;
-  let range = base.range;
-  let defense = base.defense;
+): UnitStats {
+  const raceKey = race?.toLowerCase() || 'dwarf';
+  const base = UNIT_DATA[raceKey]?.[unitName];
+  if (!base) {
+    console.warn(`Unknown unit: ${unitName} for race: ${raceKey}. Using default stats.`);
+    // Return default stats to prevent crashes
+    return {
+      melee: 0,
+      short: 0,
+      range: 0,
+      defense: 0,
+      base_gold_cost: 0,
+      equipment_iron_cost: 0,
+      equipment_wood_cost: 0,
+      equipment_gold_cost: 0,
+      upkeep: { gold: 0, food: 0 }
+    };
+  }
+  let stats = { ...base };
+  // Apply Sharper Blades tech (flat +1 melee per level for blade units)
+  const sharperBladesLevel = techLevels['Sharper Blades'] || 0;
+  if (sharperBladesLevel > 0 && base.weaponType === 'blade') {
+    stats.melee += sharperBladesLevel;
+  }
 
   // --- Ranged Base Effectiveness ---
   // All range and short attacks are dealt at 50% effectiveness before tech/strategy
-  range *= 0.5;
-  short *= 0.5;
+  stats.range *= 0.5;
+  stats.short *= 0.5;
 
   // --- Technology Modifiers ---
   // Sharper Blades (melee)
   const sharperBladesLvl = techLevels['Sharper Blades Structure'] || 0;
   if (sharperBladesLvl > 0) {
     const percent = TECHNOLOGY_DATA['Sharper Blades Structure'].levels[String(sharperBladesLvl)]?.damage_increase_percent || 0;
-    melee *= 1 + percent;
+    stats.melee *= 1 + percent;
   }
   // Improved Range Structure (range/short)
   const improvedRangeLvl = techLevels['Improved Range Structure'] || 0;
   if (improvedRangeLvl > 0) {
     const percent = TECHNOLOGY_DATA['Improved Range Structure'].levels[String(improvedRangeLvl)]?.damage_increase_percent || 0;
-    range *= 1 + percent;
-    short *= 1 + percent;
+    stats.range *= 1 + percent;
+    stats.short *= 1 + percent;
   }
   // Hardening (defense)
   const hardeningLvl = techLevels['Hardening'] || 0;
   if (hardeningLvl > 0) {
     const percent = TECHNOLOGY_DATA['Hardening'].levels[String(hardeningLvl)]?.defense_increase_percent || 0;
-    defense *= 1 + percent;
+    stats.defense *= 1 + percent;
   }
 
   // --- Strategy Modifiers ---
-  if (activeStrategy) {
-    const strat = STRATEGY_DATA[activeStrategy];
+  if (strategy) {
+    const strat = STRATEGY_DATA[strategy];
     if (strat) {
       // Example: Archer Protection
-      if (activeStrategy === 'Archer Protection') {
-        if (unitName.toLowerCase().includes('infantry')) melee *= 0.5;
-        if (unitName.toLowerCase().includes('archer')) range -= melee; // Simplified
+      if (strategy === 'Archer Protection') {
+        if (unitName.toLowerCase().includes('infantry')) stats.melee *= 0.5;
+        if (unitName.toLowerCase().includes('archer')) stats.range -= stats.melee; // Simplified
       }
       // Infantry Attack
-      if (activeStrategy === 'Infantry Attack') {
-        if (unitName.toLowerCase().includes('infantry')) melee *= 2.5;
+      if (strategy === 'Infantry Attack') {
+        if (unitName.toLowerCase().includes('infantry')) stats.melee *= 2.5;
         // Other units' damages reduced (not specified)
       }
       // Quick Retreat
-      if (activeStrategy === 'Quick Retreat') {
-        melee *= 0.5;
-        short *= 0.5;
-        range *= 0.5;
+      if (strategy === 'Quick Retreat') {
+        stats.melee *= 0.5;
+        stats.short *= 0.5;
+        stats.range *= 0.5;
       }
       // Anti-Cavalry
-      if (activeStrategy === 'Anti-Cavalry') {
-        if (unitName.toLowerCase().includes('pikeman')) melee *= 3.5;
-        melee *= 0.9;
-        short *= 0.9;
-        range *= 0.9;
+      if (strategy === 'Anti-Cavalry') {
+        if (unitName.toLowerCase().includes('pikeman')) stats.melee *= 3.5;
+        stats.melee *= 0.9;
+        stats.short *= 0.9;
+        stats.range *= 0.9;
       }
       // Dwarf Shield Line
-      if (activeStrategy === 'Dwarf Shield Line') {
-        melee *= 0.9;
-        if (unitName.toLowerCase().includes('shieldbearer')) melee *= 2;
+      if (strategy === 'Dwarf Shield Line') {
+        stats.melee *= 0.9;
+        if (unitName.toLowerCase().includes('shieldbearer')) stats.melee *= 2;
       }
       // Elf Energy Gathering
-      if (activeStrategy === 'Elf Energy Gathering') {
+      if (strategy === 'Elf Energy Gathering') {
         if (unitName.toLowerCase().includes('mage')) {
-          defense += 2;
-          melee *= 2;
-          range += 4;
+          stats.defense += 2;
+          stats.melee *= 2;
+          stats.range += 4;
         }
       }
       // Gnome Far Fighting
-      if (activeStrategy === 'Gnome Far Fighting') {
-        range *= 2;
-        short *= 2;
+      if (strategy === 'Gnome Far Fighting') {
+        stats.range *= 2;
+        stats.short *= 2;
       }
       // Human Charging!
-      if (activeStrategy === 'Human Charging!') {
+      if (strategy === 'Human Charging!') {
         if (unitName.toLowerCase().includes('knight')) {
-          melee *= 1.5;
+          stats.melee *= 1.5;
         }
       }
       // Orc Surrounding
-      if (activeStrategy === 'Orc Surrounding') {
+      if (strategy === 'Orc Surrounding') {
         if (unitName.toLowerCase().includes('shadow warrior')) {
-          defense += 2;
+          stats.defense += 2;
           // All Shadow Warrior damages dealt in Short-ranged phase (handled in battle logic)
         }
       }
       // Orc Berserker
-      if (activeStrategy === 'Orc Berserker') {
-        melee += 3;
-        short += 3;
-        range += 3;
-        defense *= 0.5;
+      if (strategy === 'Orc Berserker') {
+        stats.melee += 3;
+        stats.short += 3;
+        stats.range += 3;
+        stats.defense *= 0.5;
       }
     }
   }
 
   // --- KS Difference Factor (Bottomfeeding) ---
-  melee *= ksDifferenceFactor;
-  short *= ksDifferenceFactor;
-  range *= ksDifferenceFactor;
-  defense *= ksDifferenceFactor;
+  stats.melee *= ksDifferenceFactor;
+  stats.short *= ksDifferenceFactor;
+  stats.range *= ksDifferenceFactor;
+  stats.defense *= ksDifferenceFactor;
 
   // Clamp to 0 minimum
-  melee = Math.max(0, melee);
-  short = Math.max(0, short);
-  range = Math.max(0, range);
-  defense = Math.max(0, defense);
+  stats.melee = Math.max(0, stats.melee);
+  stats.short = Math.max(0, stats.short);
+  stats.range = Math.max(0, stats.range);
+  stats.defense = Math.max(0, stats.defense);
 
-  return { melee, short, range, defense };
+  return stats;
 } 

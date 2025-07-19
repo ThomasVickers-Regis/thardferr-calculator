@@ -23,7 +23,9 @@ export function calculatePhaseDamage(
   ksDifferenceFactor: number = 1,
   attackerBuildings: any = {},
   defenderBuildings: any = {},
-  isAttacker: boolean = false
+  isAttacker: boolean = false,
+  attackerRace: string = 'dwarf',
+  defenderRace: string = 'dwarf'
 ): Record<string, number> {
   // Clone defendingArmy to track losses
   const losses: Record<string, number> = {};
@@ -55,8 +57,8 @@ export function calculatePhaseDamage(
   // For each attacking unit type
   for (const [attackerName, attackerCount] of Object.entries(attackingArmy)) {
     if (attackerCount <= 0) continue;
-    // Get effective stats for this attacker
-    const attackerStats = getEffectiveUnitStats(attackerName, techLevels, activeStrategy, true, ksDifferenceFactor);
+          // Get effective stats for this attacker
+      const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, activeStrategy, true, ksDifferenceFactor);
     // Determine attack value for this phase
     let attackValue = 0;
     if (phaseType === 'range') attackValue = attackerStats.range;
@@ -78,8 +80,8 @@ export function calculatePhaseDamage(
         }
         rand -= defendingArmy[name];
       }
-      // Get effective defense for this defender
-      const defenderStats = getEffectiveUnitStats(defenderName, {}, null, false, ksDifferenceFactor); // Defenders' tech/strategy not applied here for simplicity
+              // Get effective defense for this defender
+        const defenderStats = getEffectiveUnitStats(defenderName, defenderRace, {}, null, false, ksDifferenceFactor); // Defenders' tech/strategy not applied here for simplicity
       const defenseValue = defenderStats.defense;
       // Probabilistic kill chance
       let killChance = 0.2;

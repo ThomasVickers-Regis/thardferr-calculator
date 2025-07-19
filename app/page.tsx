@@ -5,7 +5,7 @@ import { Army } from '../utils/calculatePhaseDamage';
 import { TechLevels, StrategyName } from '../utils/getEffectiveUnitStats';
 import '../app/globals.css';
 import { UNIT_DATA } from '../data/unitData';
-import { TECHNOLOGY_DATA } from '../data/technologyData';
+import { TECHNOLOGY_DATA, TECHNOLOGY_TREES, RACE_UNIQUE_TECHS } from '../data/technologyData';
 import { STRATEGY_DATA } from '../data/strategyData';
 import { getArmyTotalInitialGoldCost, getArmyTEGC } from '../utils/economicHelpers';
 import { getEffectiveUnitStats } from '../utils/getEffectiveUnitStats';
@@ -18,17 +18,17 @@ const RACES = ["Dwarf", "Elf", "Gnome", "Human", "Orc", "Undead"];
 // Helper: map race to units (based on unit names)
 const getUnitsForRace = (race: string) => {
   const lower = race.toLowerCase();
-  return Object.entries(UNIT_DATA)
-    .filter(([unit]) => unit.toLowerCase().startsWith(lower))
-    .map(([unit]) => unit);
+  return Object.keys(UNIT_DATA[lower] || {});
 };
+
 // Add getDefaultArmy above MainApp
 const getDefaultArmy = (race: string) => {
-  const units = getUnitsForRace(race);
+  const lower = race.toLowerCase();
+  const units = getUnitsForRace(lower);
   const army: Army = {};
   // Get TC and ATC units for this race
-  const tcUnits = Object.keys(BUILDING_DATA['Training Center']?.unit_production?.[race] || {});
-  const atcUnits = Object.keys(BUILDING_DATA['Advanced Training Center']?.unit_production?.[race] || {});
+  const tcUnits = Object.keys(BUILDING_DATA['Training Center']?.unit_production?.[lower] || {});
+  const atcUnits = Object.keys(BUILDING_DATA['Advanced Training Center']?.unit_production?.[lower] || {});
   units.forEach(unit => {
     if (tcUnits.includes(unit)) {
       army[unit] = 10;
@@ -42,7 +42,10 @@ const getDefaultArmy = (race: string) => {
 };
 
 // ArmyInput component: allows user to set quantities for all unit types
-const ArmyInput = ({ armyName, army, setArmy, units, buildings, race }: { armyName: string; army: Army; setArmy: (a: Army) => void; units: string[]; buildings?: any; race?: string }) => {
+const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels }: { armyName: string; army: Army; setArmy: (a: Army) => void; units: string[]; buildings?: any; race?: string; techLevels?: any }) => {
+  // Ensure race is lowercase and defined
+  const raceKey = race?.toLowerCase() || 'dwarf';
+  
   // Handler for changing unit count
   const handleChange = (unit: string, value: string) => {
     const count = Math.max(0, parseInt(value) || 0);
@@ -55,11 +58,11 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race }: { armyNa
     const tc = buildings['Training Center'] || 0;
     const atc = buildings['Advanced Training Center'] || 0;
     const castle = buildings['Castle'] || 0;
-    const tcProd = BUILDING_DATA['Training Center']?.unit_production?.[race] || {};
+    const tcProd = BUILDING_DATA['Training Center']?.unit_production?.[raceKey] || {};
     for (const [unit, v] of Object.entries(tcProd)) {
       unitCounts[unit] = Math.floor(tc / v.per_building) * v.per_day;
     }
-    const atcProd = BUILDING_DATA['Advanced Training Center']?.unit_production?.[race] || {};
+    const atcProd = BUILDING_DATA['Advanced Training Center']?.unit_production?.[raceKey] || {};
     for (const [unit, v] of Object.entries(atcProd)) {
       unitCounts[unit] = (unitCounts[unit] || 0) + Math.floor(atc / v.per_building) * v.per_day;
     }
@@ -73,9 +76,16 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race }: { armyNa
     return summary ? `You can currently train ${summary} per day.` : '';
   };
 
+  // Melee tech bonus display
+  const sharperBladesLevel = techLevels?.['Sharper Blades'] || 0;
+  const sharperBladesBonus = sharperBladesLevel > 0 ? `+${sharperBladesLevel} melee to all blade units` : '';
+
   return (
     <div className="p-4 bg-gray-800 rounded-lg mb-4">
       <h3 className="text-lg font-semibold mb-2">{armyName} Composition</h3>
+      {sharperBladesLevel > 0 && (
+        <p className="text-xs text-green-300 mb-1">Sharper Blades: {sharperBladesBonus}</p>
+      )}
       {buildings && race && (
         <p className="text-sm text-purple-300 mb-2">{getUnitProductionSummary()}</p>
       )}
@@ -93,7 +103,8 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race }: { armyNa
           </thead>
           <tbody>
             {units.map(unit => {
-              const stats = UNIT_DATA[unit];
+              const stats = UNIT_DATA[raceKey]?.[unit];
+              if (!stats) return null; // Skip if unit not found for this race
               return (
                 <tr key={unit} className="even:bg-gray-700">
                   <td className="p-2 font-medium" title={unit}>{unit}</td>
@@ -121,13 +132,16 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race }: { armyNa
     </div>
   );
 };
+
 // Utility: Calculate KS (Kingdom Strength) based on army and buildings
 function calculateKS(army: Army, buildings: any, population: any, techLevels: any, strategy: any, race: string) {
+  const raceKey = race?.toLowerCase() || 'dwarf';
   let ks = 0;
   // Units: 2.5 KS per unit
   for (const [unit, count] of Object.entries(army)) {
-    if (count > 0 && UNIT_DATA[unit]) {
-      ks += 2.5 * count;
+    const unitCount = typeof count === 'number' ? count : parseInt(String(count)) || 0;
+    if (unitCount > 0 && UNIT_DATA[raceKey]?.[unit]) {
+      ks += 2.5 * unitCount;
     }
   }
   // Buildings: 3 KS per building (except Castles)
@@ -148,8 +162,9 @@ function calculateKS(army: Army, buildings: any, population: any, techLevels: an
   // No population bonus for now
   return Math.round(ks);
 }
+
 // KingdomStatsInput component: allows user to set kingdom stats, tech levels, and strategy
-const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLevels, strategy, setStrategy, calculatedPopulation }: any) => {
+const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLevels, strategy, setStrategy, calculatedPopulation, race }: any) => {
   // Handler for stat changes
   const handleStatChange = (field: string, value: string) => {
     setStats({ ...stats, [field]: parseInt(value) || 0 });
@@ -218,24 +233,115 @@ const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLe
       </div>
       <div className="mb-4">
         <label className="block text-sm font-medium mb-1">Technologies</label>
-        <div className="grid grid-cols-1 gap-2">
-          {Object.entries(TECHNOLOGY_DATA).map(([tech, data]) => (
-            <div key={tech} className="flex items-center gap-2">
-              <span className="w-40" title={data.description}>{tech}</span>
-              <select
-                className="p-1 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                value={techLevels[tech] || 0}
-                onChange={e => handleTechChange(tech, e.target.value)}
-                title={`Set level for ${tech}`}
-              >
-                <option value={0}>0</option>
-                {Object.keys(data.levels).map(level => (
-                  <option key={level} value={level}>{level}</option>
-                ))}
-              </select>
-            </div>
-          ))}
+        {/* Render combat techs (flat stat upgrades) */}
+        <div className="mb-2">
+          <div className="font-semibold text-purple-300 mb-1">Combat Technologies</div>
+          <table className="min-w-full text-xs mb-2">
+            <thead>
+              <tr className="bg-gray-700">
+                <th className="p-1 text-left">Name</th>
+                <th className="p-1 text-left">Effect</th>
+                <th className="p-1 text-left">Level</th>
+                <th className="p-1 text-left">Max</th>
+              </tr>
+            </thead>
+            <tbody>
+              {['Sharper Blades', 'Tougher Light Armor', 'Tougher Caragous Armor', 'Improve Bow Range'].map(tech => {
+                const data = TECHNOLOGY_DATA[tech];
+                if (!data) return null;
+                const maxLevel = typeof data.maxLevel === 'number' ? data.maxLevel : (Object.keys(data.levels).length || 1);
+                const currentLevel = techLevels[tech] || 0;
+                return (
+                  <tr key={tech} className="even:bg-gray-700">
+                    <td className="p-1 font-medium">{tech}</td>
+                    <td className="p-1">{data.description}</td>
+                    <td className="p-1">
+                      <input
+                        type="number"
+                        min={0}
+                        max={maxLevel}
+                        className="w-12 p-1 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        value={currentLevel}
+                        onChange={e => setTechLevels({ ...techLevels, [tech]: Math.max(0, Math.min(Number(e.target.value), maxLevel || 1)) })}
+                        title={`Set level for ${tech}`}
+                      />
+                    </td>
+                    <td className="p-1">{maxLevel}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+        {/* Render technology trees */}
+        {Object.entries(TECHNOLOGY_TREES).map(([treeName, techs]) => (
+          <div key={treeName} className="mb-2">
+            <div className="font-semibold text-purple-300 mb-1">{treeName.replace('Tree', 'Tree ')}</div>
+            <table className="min-w-full text-xs mb-2">
+              <thead>
+                <tr className="bg-gray-700">
+                  <th className="p-1 text-left">Name</th>
+                  <th className="p-1 text-left">Effect</th>
+                  <th className="p-1 text-left">Level</th>
+                  <th className="p-1 text-left">Cost</th>
+                  <th className="p-1 text-left">Research Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {techs.map((tech, idx) => {
+                  const prevTech = techs[idx - 1];
+                  const canResearch = idx === 0 || (prevTech && (techLevels[prevTech.name] || 0) >= 1);
+                  const isMultiLevel = tech.maxLevel && tech.maxLevel > 1;
+                  const currentLevel = techLevels[tech.name] || 0;
+                  return (
+                    <tr key={tech.name} className="even:bg-gray-700">
+                      <td className="p-1 font-medium">{tech.name}</td>
+                      <td className="p-1">{tech.effect}</td>
+                      <td className="p-1">
+                        {isMultiLevel ? (
+                          <input
+                            type="number"
+                            min={0}
+                            max={tech.maxLevel}
+                            className="w-12 p-1 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            value={currentLevel}
+                            onChange={e => {
+                              const val = Math.max(0, Math.min(Number(e.target.value), tech.maxLevel));
+                              setTechLevels({ ...techLevels, [tech.name]: val });
+                            }}
+                            disabled={!canResearch}
+                            title={`Set level for ${tech.name}`}
+                          />
+                        ) : (
+                          <input
+                            type="checkbox"
+                            checked={currentLevel >= 1}
+                            onChange={e => setTechLevels({ ...techLevels, [tech.name]: e.target.checked ? 1 : 0 })}
+                            disabled={!canResearch}
+                            title={`Research ${tech.name}`}
+                          />
+                        )}
+                        {isMultiLevel && ` / ${tech.maxLevel}`}
+                      </td>
+                      <td className="p-1">{tech.cost.toLocaleString()}</td>
+                      <td className="p-1">{tech.researchTime}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ))}
+        {/* Render race-unique tech */}
+        {race && RACE_UNIQUE_TECHS[race] && (
+          <div className="mb-2">
+            <div className="font-semibold text-purple-300 mb-1">Unique Technology</div>
+            <div className="bg-gray-700 rounded p-2">
+              <div className="font-medium">{RACE_UNIQUE_TECHS[race].name}</div>
+              <div className="text-xs">{RACE_UNIQUE_TECHS[race].effect}</div>
+            </div>
+          </div>
+        )}
       </div>
       <div className="mb-2">
         <label className="block text-sm font-medium mb-1">Strategy</label>
@@ -254,6 +360,7 @@ const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLe
     </div>
   );
 };
+
 const BattleSimulationDisplay = ({ battleOutcome }: { battleOutcome: BattleOutcome | null }) => {
   if (!battleOutcome) {
     return (
@@ -348,17 +455,19 @@ const BattleSimulationDisplay = ({ battleOutcome }: { battleOutcome: BattleOutco
     </div>
   );
 };
+
 // EconomicSummary component: shows total cost, upkeep, and TEGC for an army
-const EconomicSummary = ({ army, kingdomStats }: { army: Army; kingdomStats: KingdomStats }) => {
+const EconomicSummary = ({ army, kingdomStats, race }: { army: Army; kingdomStats: KingdomStats; race: string }) => {
+  const raceKey = race?.toLowerCase() || 'dwarf';
   // Calculate total initial gold cost and TEGC
-  const totalInitialGold = getArmyTotalInitialGoldCost(army);
-  const totalTEGC = getArmyTEGC(army);
+  const totalInitialGold = getArmyTotalInitialGoldCost(army, raceKey);
+  const totalTEGC = getArmyTEGC(army, raceKey);
   // Calculate total upkeep for 48 hours
   let totalGoldUpkeep = 0;
   let totalFoodUpkeep = 0;
   for (const [unit, count] of Object.entries(army)) {
     if (count > 0) {
-      const unitData = UNIT_DATA[unit];
+      const unitData = UNIT_DATA[raceKey][unit];
       if (unitData) {
         totalGoldUpkeep += (unitData.upkeep.gold * 2) * count;
         totalFoodUpkeep += (unitData.upkeep.food * 2) * count;
@@ -390,12 +499,14 @@ const EconomicSummary = ({ army, kingdomStats }: { army: Army; kingdomStats: Kin
     </div>
   );
 };
+
 // UnitEfficiencyTable component: shows efficiency ratios for all units
-const UnitEfficiencyTable = ({ techLevels, strategy }: { techLevels: any; strategy: any }) => {
+const UnitEfficiencyTable = ({ techLevels, strategy, race }: { techLevels: any; strategy: any; race: string }) => {
+  const raceKey = race?.toLowerCase() || 'dwarf';
   // Calculate efficiency for all units
-  const unitRows = Object.entries(UNIT_DATA).map(([unit, stats]) => {
-    const effectiveStats = getEffectiveUnitStats(unit, techLevels, strategy, true, 1);
-    const ratios = getUnitEfficiencyRatios(unit, effectiveStats);
+  const unitRows = Object.entries(UNIT_DATA[raceKey] || {}).map(([unit, stats]) => {
+    const effectiveStats = getEffectiveUnitStats(unit, raceKey, techLevels, strategy, true, 1);
+    const ratios = getUnitEfficiencyRatios(unit, effectiveStats, raceKey);
     return {
       unit,
       ...ratios,
@@ -944,6 +1055,9 @@ const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }
 };
 
 const ProjectedProduction = ({ population, buildings, army, land, race }: any) => {
+  // Ensure race is lowercase and defined
+  const raceKey = race?.toLowerCase() || 'dwarf';
+  
   // Helper: get number from buildings
   const get = (b: string) => typeof buildings[b] === 'number' ? buildings[b] : parseInt(buildings[b] || '0', 10) || 0;
   // Calculate max available population from buildings (for gold and upkeep)
@@ -1022,10 +1136,10 @@ const ProjectedProduction = ({ population, buildings, army, land, race }: any) =
   let foodUpkeepUnits = 0;
   let goldUpkeepUnits = 0;
   for (const [unit, count] of Object.entries(army)) {
-    const n = typeof count === 'number' ? count : parseInt(count as string) || 0;
-    if (n > 0 && UNIT_DATA[unit]) {
-      foodUpkeepUnits += UNIT_DATA[unit].upkeep.food * n;
-      goldUpkeepUnits += UNIT_DATA[unit].upkeep.gold * n;
+    const unitCount = typeof count === 'number' ? count : parseInt(String(count)) || 0;
+    if (unitCount > 0 && UNIT_DATA[raceKey]?.[unit]) {
+      foodUpkeepUnits += UNIT_DATA[raceKey][unit].upkeep.food * unitCount;
+      goldUpkeepUnits += UNIT_DATA[raceKey][unit].upkeep.gold * unitCount;
     }
   }
   const foodUpkeep = foodUpkeepPop + foodUpkeepUnits;
@@ -1093,6 +1207,8 @@ export default function MainApp() {
   // Add population state for each kingdom
   const [yourPopulation, setYourPopulation] = useState<any>({});
   const [enemyPopulation, setEnemyPopulation] = useState<any>({});
+  // Add a race state at the top of the component, e.g.:
+  const [race, setRace] = useState<string>('dwarf'); // default to dwarf
 
   // Handler for simulating the battle
   const handleSimulateBattle = () => {
@@ -1105,7 +1221,11 @@ export default function MainApp() {
       yourStrategy,
       enemyTechLevels,
       enemyStrategy,
-      20 // maxRounds
+      20, // maxRounds
+      yourBuildings,
+      enemyBuildings,
+      yourRace,
+      enemyRace
     );
     setBattleOutcome(outcome);
   };
@@ -1171,7 +1291,7 @@ export default function MainApp() {
               </select>
             </div>
             {/* Move KingdomStatsInput above ArmyInput */}
-            <KingdomStatsInput kingdomName="Your Kingdom" stats={yourKingdomStats} setStats={setYourKingdomStats} techLevels={yourTechLevels} setTechLevels={setYourTechLevels} strategy={yourStrategy} setStrategy={setYourStrategy} calculatedPopulation={yourTotalPop} />
+            <KingdomStatsInput kingdomName="Your Kingdom" stats={yourKingdomStats} setStats={setYourKingdomStats} techLevels={yourTechLevels} setTechLevels={setYourTechLevels} strategy={yourStrategy} setStrategy={setYourStrategy} calculatedPopulation={yourTotalPop} race={yourRace} />
             <ArmyInput
               armyName="Your Army"
               army={yourArmy}
@@ -1179,6 +1299,7 @@ export default function MainApp() {
               units={getUnitsForRace(yourRace)}
               buildings={yourBuildings}
               race={yourRace}
+              techLevels={yourTechLevels}
             />
             <PopulationAssignment
               population={yourPopulation}
@@ -1208,7 +1329,8 @@ export default function MainApp() {
               race={yourRace}
               population={yourPopulation}
             />
-            <EconomicSummary army={yourArmy} kingdomStats={yourKingdomStats} />
+            <EconomicSummary army={yourArmy} kingdomStats={yourKingdomStats} race={yourRace} />
+            <UnitEfficiencyTable techLevels={yourTechLevels} strategy={yourStrategy} race={yourRace} />
           </div>
           <div>
             <h2 className="text-xl font-semibold mb-2">Enemy Army</h2>
@@ -1227,7 +1349,7 @@ export default function MainApp() {
               </select>
             </div>
             {/* Move KingdomStatsInput above ArmyInput */}
-            <KingdomStatsInput kingdomName="Enemy Kingdom" stats={enemyKingdomStats} setStats={setEnemyKingdomStats} techLevels={enemyTechLevels} setTechLevels={setEnemyTechLevels} strategy={enemyStrategy} setStrategy={setEnemyStrategy} calculatedPopulation={enemyTotalPop} />
+            <KingdomStatsInput kingdomName="Enemy Kingdom" stats={enemyKingdomStats} setStats={setEnemyKingdomStats} techLevels={enemyTechLevels} setTechLevels={setEnemyTechLevels} strategy={enemyStrategy} setStrategy={setEnemyStrategy} calculatedPopulation={enemyTotalPop} race={enemyRace} />
             <ArmyInput
               armyName="Enemy Army"
               army={enemyArmy}
@@ -1262,7 +1384,8 @@ export default function MainApp() {
               race={enemyRace}
               population={enemyPopulation}
             />
-            <EconomicSummary army={enemyArmy} kingdomStats={enemyKingdomStats} />
+            <EconomicSummary army={enemyArmy} kingdomStats={enemyKingdomStats} race={enemyRace} />
+            <UnitEfficiencyTable techLevels={enemyTechLevels} strategy={enemyStrategy} race={enemyRace} />
           </div>
         </div>
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
@@ -1274,7 +1397,6 @@ export default function MainApp() {
           </button>
         </div>
         <BattleSimulationDisplay battleOutcome={battleOutcome} />
-        <UnitEfficiencyTable techLevels={yourTechLevels} strategy={yourStrategy} />
       </div>
     </main>
   );
