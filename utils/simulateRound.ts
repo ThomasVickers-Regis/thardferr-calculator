@@ -29,7 +29,9 @@ export function simulateRound(
   strategyYour: StrategyName | null,
   techLevelsEnemy: TechLevels,
   strategyEnemy: StrategyName | null,
-  ksDifferenceFactor: number = 1
+  ksDifferenceFactor: number = 1,
+  yourBuildings: any = {},
+  enemyBuildings: any = {}
 ): RoundResult {
   // Deep clone armies to avoid mutating input
   let yourArmyState: Army = JSON.parse(JSON.stringify(yourArmy));
@@ -46,7 +48,10 @@ export function simulateRound(
       phase,
       techLevelsEnemy,
       strategyEnemy,
-      ksDifferenceFactor
+      ksDifferenceFactor,
+      enemyBuildings,
+      yourBuildings,
+      false // enemy is attacker
     );
     const enemyLosses = calculatePhaseDamage(
       yourArmyState,
@@ -54,7 +59,10 @@ export function simulateRound(
       phase,
       techLevelsYour,
       strategyYour,
-      ksDifferenceFactor
+      ksDifferenceFactor,
+      yourBuildings,
+      enemyBuildings,
+      true // your side is attacker
     );
     // Apply losses to yourArmyState
     for (const [unit, lost] of Object.entries(yourLosses)) {

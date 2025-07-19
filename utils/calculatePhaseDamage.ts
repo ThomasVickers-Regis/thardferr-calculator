@@ -20,12 +20,37 @@ export function calculatePhaseDamage(
   phaseType: PhaseType,
   techLevels: TechLevels,
   activeStrategy: StrategyName | null,
-  ksDifferenceFactor: number = 1
+  ksDifferenceFactor: number = 1,
+  attackerBuildings: any = {},
+  defenderBuildings: any = {},
+  isAttacker: boolean = false
 ): Record<string, number> {
   // Clone defendingArmy to track losses
   const losses: Record<string, number> = {};
   const defenderUnitNames = Object.keys(defendingArmy).filter(u => defendingArmy[u] > 0);
   if (defenderUnitNames.length === 0) return losses;
+
+  // Track total damage reduction from buildings
+  let buildingDamageReduction = 0;
+  let perUnitCap = 0;
+  const totalDefenders = defenderUnitNames.reduce((sum, u) => sum + defendingArmy[u], 0);
+  if (phaseType === 'range' && defenderBuildings['Guard Towers']) {
+    // Guard Towers: -40 per tower, max 2 per unit (max 80 per unit)
+    const towers = defenderBuildings['Guard Towers'] || 0;
+    perUnitCap = 80;
+    buildingDamageReduction = Math.min(towers * 40, totalDefenders * perUnitCap);
+  }
+  if (phaseType === 'melee' && defenderBuildings['Medical Center']) {
+    // Medical Center: -50 per center on attack (max 1 per unit), -75 per center on defense (max 2 per unit)
+    const med = defenderBuildings['Medical Center'] || 0;
+    if (isAttacker) {
+      perUnitCap = 50;
+      buildingDamageReduction = Math.min(med * 50, totalDefenders * perUnitCap);
+    } else {
+      perUnitCap = 150;
+      buildingDamageReduction = Math.min(med * 75, totalDefenders * perUnitCap);
+    }
+  }
 
   // For each attacking unit type
   for (const [attackerName, attackerCount] of Object.entries(attackingArmy)) {
@@ -71,6 +96,18 @@ export function calculatePhaseDamage(
           if (idx !== -1) defenderUnitNames.splice(idx, 1);
         }
       }
+    }
+  }
+  // Apply building-based damage reduction to total losses (as a flat reduction, distributed across units)
+  if (buildingDamageReduction > 0) {
+    // Distribute reduction across units proportionally
+    let reductionLeft = buildingDamageReduction;
+    const unitNames = Object.keys(losses);
+    for (const unit of unitNames) {
+      if (reductionLeft <= 0) break;
+      const reduc = Math.min(losses[unit] || 0, Math.floor(reductionLeft / unitNames.length));
+      losses[unit] = Math.max(0, (losses[unit] || 0) - reduc);
+      reductionLeft -= reduc;
     }
   }
   return losses;

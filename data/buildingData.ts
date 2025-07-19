@@ -11,6 +11,7 @@ export type BuildingData = {
   production_per_day?: number | null;
   per_race_bonus?: { [race: string]: any };
   unit_production?: { [race: string]: { [unit: string]: { per_building: number; per_day: number } } };
+  effect?: string;
 };
 
 export const BUILDING_DATA: Record<string, BuildingData> = {
@@ -69,7 +70,8 @@ export const BUILDING_DATA: Record<string, BuildingData> = {
   },
   "Guard Towers": {
     cost: { gold: 1200, iron: 15, wood: 75 },
-    defense_bonus: 40
+    defense_bonus: 40,
+    effect: 'Reduces ranged attack by 40 damage per tower (max 2 per unit).'
   },
   House: {
     cost: { gold: 1050, iron: 0, wood: 50 },
@@ -81,7 +83,8 @@ export const BUILDING_DATA: Record<string, BuildingData> = {
   },
   "Medical Center": {
     cost: { gold: 3000, iron: 10, wood: 50 },
-    healing_percent: 20
+    healing_percent: 20,
+    effect: 'Reduces close combat (melee) damage by 50 per center on attack (max 1 per unit), 75 per center on defense (max 2 per unit), and heals up to 20% of wounded units per center per land.'
   },
   Mill: {
     cost: { gold: 450, iron: 0, wood: 50 },

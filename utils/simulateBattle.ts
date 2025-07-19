@@ -44,7 +44,9 @@ export function simulateBattle(
   strategyYour: StrategyName | null,
   techLevelsEnemy: TechLevels,
   strategyEnemy: StrategyName | null,
-  maxRounds: number = 20
+  maxRounds: number = 20,
+  yourBuildings: any = {},
+  enemyBuildings: any = {}
 ): BattleOutcome {
   let yourArmy = { ...yourInitialArmy };
   let enemyArmy = { ...enemyInitialArmy };
@@ -82,7 +84,9 @@ export function simulateBattle(
       strategyYour,
       techLevelsEnemy,
       strategyEnemy,
-      ksDifferenceFactor
+      ksDifferenceFactor,
+      yourBuildings,
+      enemyBuildings
     );
     // Update armies
     yourArmy = { ...roundResult.yourArmy };

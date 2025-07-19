@@ -566,6 +566,30 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
     }, 0);
   const overMax = ratioSum > 10;
 
+  // Helper to get building details for display
+  const getBuildingDetails = (b: string) => {
+    const data = BUILDING_DATA[b];
+    if (!data) return '';
+    let details = [];
+    if (data.optimal_workers) details.push(`Optimal workers: ${data.optimal_workers}`);
+    if (data.production_per_day) details.push(`Production/day: ${data.production_per_day}`);
+    if (data.housing && Object.keys(data.housing).length > 0) {
+      details.push(`Housing: ` + Object.entries(data.housing).map(([type, n]) => `${n} ${type}`).join(', '));
+    }
+    if (data.per_race_bonus && data.per_race_bonus[race]) {
+      const bonus = data.per_race_bonus[race];
+      if (bonus.production_per_day) details.push(`(${race} bonus: ${bonus.production_per_day} per day)`);
+      if (bonus.housing) details.push(`(${race} bonus: ${bonus.housing} housing)`);
+    }
+    if (data.defense_bonus) details.push(`Defense bonus: ${data.defense_bonus}`);
+    if (data.healing_percent) details.push(`Healing: ${data.healing_percent}%`);
+    if (data.unit_production && data.unit_production[race]) {
+      const up = data.unit_production[race];
+      details.push('Unit production: ' + Object.entries(up).map(([unit, v]) => `${unit}: 1 per ${v.per_building} ${b}`).join(', '));
+    }
+    return details.join('; ');
+  };
+
   return (
     <div className="p-4 bg-gray-800 rounded-lg mb-4">
       <h3 className="text-lg font-semibold mb-2">Buildings</h3>
@@ -583,6 +607,7 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
           <thead>
             <tr className="bg-gray-700">
               <th className="p-2 text-left">Building</th>
+              <th className="p-2 text-left">Details</th>
               <th className="p-2 text-left">Ratio</th>
               <th className="p-2 text-left">Count</th>
             </tr>
@@ -608,6 +633,7 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
               return (
                 <tr key={b} className="even:bg-gray-700">
                   <td className="p-2 font-medium" title={b}>{b}</td>
+                  <td className="p-2 text-xs text-gray-400" title={getBuildingDetails(b)}>{getBuildingDetails(b)}</td>
                   <td className="p-2">
                     <input
                       type="number"
