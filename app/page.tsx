@@ -22,6 +22,13 @@ const getUnitsForRace = (race: string) => {
     .filter(([unit]) => unit.toLowerCase().startsWith(lower))
     .map(([unit]) => unit);
 };
+// Add getDefaultArmy above MainApp
+const getDefaultArmy = (race: string) => {
+  const units = getUnitsForRace(race);
+  const army: Army = {};
+  units.forEach(unit => { army[unit] = 10; });
+  return army;
+};
 
 // ArmyInput component: allows user to set quantities for all unit types
 const ArmyInput = ({ armyName, army, setArmy, units }: { armyName: string; army: Army; setArmy: (a: Army) => void; units: string[] }) => {
@@ -61,7 +68,7 @@ const ArmyInput = ({ armyName, army, setArmy, units }: { armyName: string; army:
                       type="number"
                       min={0}
                       className="w-20 p-1 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      value={army[unit] || ''}
+                      value={army[unit] !== undefined ? army[unit] : 0}
                       onChange={e => handleChange(unit, e.target.value)}
                       title={`Set number of ${unit}`}
                     />
@@ -77,29 +84,34 @@ const ArmyInput = ({ armyName, army, setArmy, units }: { armyName: string; army:
   );
 };
 // Utility: Calculate KS (Kingdom Strength) based on army and buildings
-function calculateKS(army: Army, buildings: any) {
-  // Simple: sum of all unit attack + defense
+function calculateKS(army: Army, buildings: any, population: any, techLevels: any, strategy: any, race: string) {
   let ks = 0;
+  // Units: 2.5 KS per unit
   for (const [unit, count] of Object.entries(army)) {
     if (count > 0 && UNIT_DATA[unit]) {
-      const stats = UNIT_DATA[unit];
-      ks += (stats.melee + stats.short + stats.range + stats.defense) * count;
+      ks += 2.5 * count;
     }
   }
-  // Add building bonuses (example values, adjust as needed)
+  // Buildings: 3 KS per building (except Castles)
   if (buildings) {
-    ks += (buildings['Castle'] || 0) * 50;
-    ks += (buildings['House'] || 0) * 2;
-    ks += (buildings['Training Center'] || 0) * 10;
-    ks += (buildings['Advanced Training Center'] || 0) * 20;
-    ks += (buildings['Guard House'] || 0) * 5;
-    ks += (buildings['Medical Center'] || 0) * 5;
-    // Add more building effects as needed
+    for (const [b, count] of Object.entries(buildings)) {
+      if (b === 'Castle') continue;
+      ks += 3 * (typeof count === 'number' ? count : 0);
+    }
+    // Castles: 1500 KS each
+    ks += (buildings['Castle'] || 0) * 1500;
   }
+  // Tech levels: 1000 KS per level
+  if (techLevels) {
+    for (const lvl of Object.values(techLevels)) {
+      ks += 1000 * (typeof lvl === 'number' ? lvl : parseInt(lvl as string) || 0);
+    }
+  }
+  // No population bonus for now
   return Math.round(ks);
 }
 // KingdomStatsInput component: allows user to set kingdom stats, tech levels, and strategy
-const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLevels, strategy, setStrategy }: any) => {
+const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLevels, strategy, setStrategy, calculatedPopulation }: any) => {
   // Handler for stat changes
   const handleStatChange = (field: string, value: string) => {
     setStats({ ...stats, [field]: parseInt(value) || 0 });
@@ -148,9 +160,9 @@ const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLe
             type="number"
             min={0}
             className="w-full p-1 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
-            value={stats.Population || ''}
-            onChange={e => handleStatChange('Population', e.target.value)}
-            title="Total population"
+            value={calculatedPopulation}
+            readOnly
+            title="Total population (auto-calculated from buildings)"
           />
         </div>
         <div>
@@ -405,15 +417,21 @@ const UnitEfficiencyTable = ({ techLevels, strategy }: { techLevels: any; strate
 
 // BuildingTable component: shows and edits building counts for a kingdom
 const BuildingTable = ({ buildings, setBuildings, land, castles, race, population }: any) => {
-  // List of building keys (order: Castle, House, ATC, TC, then others)
+  // List of building keys in in-game order
   const buildingOrder = [
-    'Castle',
-    'House',
     'Advanced Training Center',
+    'Castle',
+    'Farm',
+    'Forge',
+    'Guard House',
+    'Guard Towers',
+    'House',
+    'Market',
+    'Medical Center',
+    'Mill',
+    'Mine',
+    'School',
     'Training Center',
-    ...Object.keys(BUILDING_DATA).filter(
-      b => !['Castle', 'House', 'Advanced Training Center', 'Training Center'].includes(b)
-    )
   ];
 
   // State for ratios and manual overrides
@@ -432,10 +450,11 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
   // Helper: get default ratio for a building
   function getDefaultRatio(b: string) {
     if (b === 'Castle') return 1 / (land || 20);
-    if (b === 'House') return 20 / (land || 20);
+    if (b === 'House') return 2;
+    if (b === 'Guard House') return 0.5;
     if (b === 'Advanced Training Center') return 5 / (land || 20);
     if (b === 'Training Center') return 5 / (land || 20);
-    if (b === 'Medical Center' || b === 'Guard House') return 0;
+    if (b === 'Medical Center') return 0;
     return 10 / (land || 20);
   }
 
@@ -997,8 +1016,8 @@ const ProjectedProduction = ({ population, buildings, army, land, race }: any) =
 
 export default function MainApp() {
   // State for both armies
-  const [yourArmy, setYourArmy] = useState<Army>({});
-  const [enemyArmy, setEnemyArmy] = useState<Army>({});
+  const [yourArmy, setYourArmy] = useState<Army>(() => getDefaultArmy(RACES[0]));
+  const [enemyArmy, setEnemyArmy] = useState<Army>(() => getDefaultArmy(RACES[0]));
   // State for kingdom stats (set default Land: 20, Castles: 1)
   const [yourKingdomStats, setYourKingdomStats] = useState<KingdomStats>({ KS: 100, Land: 20, Castles: 1 });
   const [enemyKingdomStats, setEnemyKingdomStats] = useState<KingdomStats>({ KS: 100, Land: 20, Castles: 1 });
@@ -1037,20 +1056,20 @@ export default function MainApp() {
 
   // Auto-calculate KS for your kingdom
   useEffect(() => {
-    const newKS = calculateKS(yourArmy, yourBuildings);
+    const newKS = calculateKS(yourArmy, yourBuildings, yourPopulation, yourTechLevels, yourStrategy, yourRace);
     if (yourKingdomStats.KS !== newKS) {
       setYourKingdomStats({ ...yourKingdomStats, KS: newKS });
     }
     // eslint-disable-next-line
-  }, [yourArmy, yourBuildings]);
+  }, [yourArmy, yourBuildings, yourPopulation, yourTechLevels, yourStrategy, yourRace]);
   // Auto-calculate KS for enemy kingdom
   useEffect(() => {
-    const newKS = calculateKS(enemyArmy, enemyBuildings);
+    const newKS = calculateKS(enemyArmy, enemyBuildings, enemyPopulation, enemyTechLevels, enemyStrategy, enemyRace);
     if (enemyKingdomStats.KS !== newKS) {
       setEnemyKingdomStats({ ...enemyKingdomStats, KS: newKS });
     }
     // eslint-disable-next-line
-  }, [enemyArmy, enemyBuildings]);
+  }, [enemyArmy, enemyBuildings, enemyPopulation, enemyTechLevels, enemyStrategy, enemyRace]);
 
   // Calculate total population for each kingdom
   const calcTotalPop = (buildings: any) => {
@@ -1065,6 +1084,14 @@ export default function MainApp() {
   };
   const yourTotalPop = calcTotalPop(yourBuildings);
   const enemyTotalPop = calcTotalPop(enemyBuildings);
+
+  // When race changes, reset army to 0 for all units of that race
+  useEffect(() => {
+    setYourArmy(getDefaultArmy(yourRace));
+  }, [yourRace]);
+  useEffect(() => {
+    setEnemyArmy(getDefaultArmy(enemyRace));
+  }, [enemyRace]);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 text-gray-100 font-sans p-4 flex flex-col items-center" style={{ fontFamily: 'Inter, sans-serif' }}>
@@ -1088,7 +1115,7 @@ export default function MainApp() {
               </select>
             </div>
             {/* Move KingdomStatsInput above ArmyInput */}
-            <KingdomStatsInput kingdomName="Your Kingdom" stats={yourKingdomStats} setStats={setYourKingdomStats} techLevels={yourTechLevels} setTechLevels={setYourTechLevels} strategy={yourStrategy} setStrategy={setYourStrategy} />
+            <KingdomStatsInput kingdomName="Your Kingdom" stats={yourKingdomStats} setStats={setYourKingdomStats} techLevels={yourTechLevels} setTechLevels={setYourTechLevels} strategy={yourStrategy} setStrategy={setYourStrategy} calculatedPopulation={yourTotalPop} />
             <ArmyInput
               armyName="Your Army"
               army={yourArmy}
@@ -1142,7 +1169,7 @@ export default function MainApp() {
               </select>
             </div>
             {/* Move KingdomStatsInput above ArmyInput */}
-            <KingdomStatsInput kingdomName="Enemy Kingdom" stats={enemyKingdomStats} setStats={setEnemyKingdomStats} techLevels={enemyTechLevels} setTechLevels={setEnemyTechLevels} strategy={enemyStrategy} setStrategy={setEnemyStrategy} />
+            <KingdomStatsInput kingdomName="Enemy Kingdom" stats={enemyKingdomStats} setStats={setEnemyKingdomStats} techLevels={enemyTechLevels} setTechLevels={setEnemyTechLevels} strategy={enemyStrategy} setStrategy={setEnemyStrategy} calculatedPopulation={enemyTotalPop} />
             <ArmyInput
               armyName="Enemy Army"
               army={enemyArmy}
