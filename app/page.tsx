@@ -1389,6 +1389,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                       <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
                                       <div>Effective: <span className="text-purple-400 font-bold">{stats.defense.toFixed(1)}</span></div>
                                       <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? (stats.defense / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
+                                      <div>Total Defense: <span className="text-purple-400 font-bold">{(stats.defense * count).toFixed(1)}</span></div>
                                     </div>
                                   </div>
                                 </div>
@@ -1488,6 +1489,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                       <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
                                       <div>Effective: <span className="text-purple-400 font-bold">{stats.defense.toFixed(1)}</span></div>
                                       <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? (stats.defense / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
+                                      <div>Total Defense: <span className="text-purple-400 font-bold">{(stats.defense * count).toFixed(1)}</span></div>
                                     </div>
                                   </div>
                                 </div>
@@ -1506,144 +1508,150 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                         <div className="bg-gray-800 p-4 rounded">
                           <div className="text-red-400 font-medium mb-3 border-b border-gray-600 pb-2 text-lg">Your Army Analysis:</div>
                           <div className="space-y-3 text-sm">
-                            {Object.keys(UNIT_DATA[yourRace.toLowerCase()] || {}).map((unit) => {
-                              const lost = phaseLog.yourLosses[unit] || 0;
-                              const startCount = phaseLog.yourArmyAtStart?.[unit] || 0;
-                              const endCount = startCount - lost;
-                              const stats = getEffectiveUnitStats(unit, yourRace, yourTechLevels, yourStrategy, true, 1);
-                              const baseStats = UNIT_DATA[yourRace.toLowerCase()]?.[unit];
-                              const damageEntry = (phaseLog.yourDamageLog || []).find(d => d.unitName === unit);
-                              
-                              return (
-                                <div key={unit} className="border border-gray-700 p-3 rounded bg-gray-750">
-                                  <div className="flex justify-between items-center mb-2">
-                                    <span className="text-gray-200 font-bold text-base">{unit}</span>
-                                    <span className={`font-bold text-lg ${lost > 0 ? 'text-red-400' : 'text-gray-500'}`}>
-                                      {lost > 0 ? `-${lost}` : '0'}
-                                    </span>
-                                  </div>
-                                  
-                                  {/* Unit Status */}
-                                  <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
-                                    <div className="bg-gray-700 p-1 rounded text-center">
-                                      <div className="text-gray-400">Started</div>
-                                      <div className="text-blue-300 font-bold">{startCount}</div>
+                            {Object.keys(UNIT_DATA[yourRace.toLowerCase()] || {})
+                              .filter(unit => (phaseLog.yourArmyAtStart?.[unit] || 0) > 0)
+                              .map((unit) => {
+                                const lost = phaseLog.yourLosses[unit] || 0;
+                                const startCount = phaseLog.yourArmyAtStart?.[unit] || 0;
+                                const endCount = startCount - lost;
+                                const stats = getEffectiveUnitStats(unit, yourRace, yourTechLevels, yourStrategy, true, 1);
+                                const baseStats = UNIT_DATA[yourRace.toLowerCase()]?.[unit];
+                                const damageEntry = (phaseLog.yourDamageLog || []).find(d => d.unitName === unit);
+                                
+                                return (
+                                  <div key={unit} className="border border-gray-700 p-3 rounded bg-gray-750">
+                                    <div className="flex justify-between items-center mb-2">
+                                      <span className="text-gray-200 font-bold text-base">{unit}</span>
+                                      <span className={`font-bold text-lg ${lost > 0 ? 'text-red-400' : 'text-gray-500'}`}>
+                                        {lost > 0 ? `-${lost}` : '0'}
+                                      </span>
                                     </div>
-                                    <div className="bg-gray-700 p-1 rounded text-center">
-                                      <div className="text-gray-400">Ended</div>
-                                      <div className="text-green-400 font-bold">{endCount}</div>
-                                    </div>
-                                    <div className="bg-gray-700 p-1 rounded text-center">
-                                      <div className="text-gray-400">Loss Rate</div>
-                                      <div className="text-yellow-400 font-bold">{startCount > 0 ? Math.round((lost / startCount) * 100) : 0}%</div>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Damage Details */}
-                                  {damageEntry && (
-                                    <div className="bg-gray-700 p-2 rounded mb-2">
-                                      <div className="text-gray-300 font-medium mb-1">Damage Analysis:</div>
-                                      <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div>Received: <span className="text-red-300 font-bold">{damageEntry.damageReceived}</span></div>
-                                        <div>Mitigated: <span className="text-green-400 font-bold">{damageEntry.damageMitigated}</span></div>
-                                        <div>Final: <span className="text-yellow-400 font-bold">{damageEntry.finalDamage}</span></div>
-                                        <div>Lost: <span className="text-red-400 font-bold">{damageEntry.unitsLost}</span></div>
+                                    
+                                    {/* Unit Status */}
+                                    <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
+                                      <div className="bg-gray-700 p-1 rounded text-center">
+                                        <div className="text-gray-400">Started</div>
+                                        <div className="text-blue-300 font-bold">{startCount}</div>
                                       </div>
-                                      {damageEntry.buildingEffects.length > 0 && (
-                                        <div className="mt-2 pt-2 border-t border-gray-600">
-                                          <div className="text-gray-400 text-xs">Effects:</div>
-                                          {damageEntry.buildingEffects.map((effect, i) => (
-                                            <div key={i} className="text-green-300 text-xs">• {effect}</div>
-                                          ))}
-                                        </div>
-                                      )}
+                                      <div className="bg-gray-700 p-1 rounded text-center">
+                                        <div className="text-gray-400">Ended</div>
+                                        <div className="text-green-400 font-bold">{endCount}</div>
+                                      </div>
+                                      <div className="bg-gray-700 p-1 rounded text-center">
+                                        <div className="text-gray-400">Loss Rate</div>
+                                        <div className="text-yellow-400 font-bold">{startCount > 0 ? Math.round((lost / startCount) * 100) : 0}%</div>
+                                      </div>
                                     </div>
-                                  )}
-                                  
-                                  {/* Defense Stats */}
-                                  <div className="bg-gray-700 p-2 rounded">
-                                    <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                      <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
-                                      <div>Effective: <span className="text-purple-400 font-bold">{stats.defense.toFixed(1)}</span></div>
-                                      <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? (stats.defense / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
+                                    
+                                    {/* Damage Details */}
+                                    {damageEntry && (
+                                      <div className="bg-gray-700 p-2 rounded mb-2">
+                                        <div className="text-gray-300 font-medium mb-1">Damage Analysis:</div>
+                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                          <div>Received: <span className="text-red-300 font-bold">{damageEntry.damageReceived}</span></div>
+                                          <div>Mitigated: <span className="text-green-400 font-bold">{damageEntry.damageMitigated}</span></div>
+                                          <div>Final: <span className="text-yellow-400 font-bold">{damageEntry.finalDamage}</span></div>
+                                          <div>Lost: <span className="text-red-400 font-bold">{damageEntry.unitsLost}</span></div>
+                                        </div>
+                                        {damageEntry.buildingEffects.length > 0 && (
+                                          <div className="mt-2 pt-2 border-t border-gray-600">
+                                            <div className="text-gray-400 text-xs">Effects:</div>
+                                            {damageEntry.buildingEffects.map((effect, i) => (
+                                              <div key={i} className="text-green-300 text-xs">• {effect}</div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                    
+                                    {/* Defense Stats */}
+                                    <div className="bg-gray-700 p-2 rounded">
+                                      <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
+                                        <div>Effective: <span className="text-purple-400 font-bold">{stats.defense.toFixed(1)}</span></div>
+                                        <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? (stats.defense / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
+                                        <div>Total Defense: <span className="text-purple-400 font-bold">{(stats.defense * startCount).toFixed(1)}</span></div>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
                           </div>
                         </div>
                         
                         <div className="bg-gray-800 p-4 rounded">
                           <div className="text-green-400 font-medium mb-3 border-b border-gray-600 pb-2 text-lg">Enemy Army Analysis:</div>
                           <div className="space-y-3 text-sm">
-                            {Object.keys(UNIT_DATA[enemyRace.toLowerCase()] || {}).map((unit) => {
-                              const lost = phaseLog.enemyLosses[unit] || 0;
-                              const startCount = phaseLog.enemyArmyAtStart?.[unit] || 0;
-                              const endCount = startCount - lost;
-                              const stats = getEffectiveUnitStats(unit, enemyRace, enemyTechLevels, enemyStrategy, false, 1);
-                              const baseStats = UNIT_DATA[enemyRace.toLowerCase()]?.[unit];
-                              const damageEntry = (phaseLog.enemyDamageLog || []).find(d => d.unitName === unit);
-                              
-                              return (
-                                <div key={unit} className="border border-gray-700 p-3 rounded bg-gray-750">
-                                  <div className="flex justify-between items-center mb-2">
-                                    <span className="text-gray-200 font-bold text-base">{unit}</span>
-                                    <span className={`font-bold text-lg ${lost > 0 ? 'text-green-400' : 'text-gray-500'}`}>
-                                      {lost > 0 ? `-${lost}` : '0'}
-                                    </span>
-                                  </div>
-                                  
-                                  {/* Unit Status */}
-                                  <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
-                                    <div className="bg-gray-700 p-1 rounded text-center">
-                                      <div className="text-gray-400">Started</div>
-                                      <div className="text-red-300 font-bold">{startCount}</div>
+                            {Object.keys(UNIT_DATA[enemyRace.toLowerCase()] || {})
+                              .filter(unit => (phaseLog.enemyArmyAtStart?.[unit] || 0) > 0)
+                              .map((unit) => {
+                                const lost = phaseLog.enemyLosses[unit] || 0;
+                                const startCount = phaseLog.enemyArmyAtStart?.[unit] || 0;
+                                const endCount = startCount - lost;
+                                const stats = getEffectiveUnitStats(unit, enemyRace, enemyTechLevels, enemyStrategy, false, 1);
+                                const baseStats = UNIT_DATA[enemyRace.toLowerCase()]?.[unit];
+                                const damageEntry = (phaseLog.enemyDamageLog || []).find(d => d.unitName === unit);
+                                
+                                return (
+                                  <div key={unit} className="border border-gray-700 p-3 rounded bg-gray-750">
+                                    <div className="flex justify-between items-center mb-2">
+                                      <span className="text-gray-200 font-bold text-base">{unit}</span>
+                                      <span className={`font-bold text-lg ${lost > 0 ? 'text-green-400' : 'text-gray-500'}`}>
+                                        {lost > 0 ? `-${lost}` : '0'}
+                                      </span>
                                     </div>
-                                    <div className="bg-gray-700 p-1 rounded text-center">
-                                      <div className="text-gray-400">Ended</div>
-                                      <div className="text-green-400 font-bold">{endCount}</div>
-                                    </div>
-                                    <div className="bg-gray-700 p-1 rounded text-center">
-                                      <div className="text-gray-400">Loss Rate</div>
-                                      <div className="text-yellow-400 font-bold">{startCount > 0 ? Math.round((lost / startCount) * 100) : 0}%</div>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Damage Details */}
-                                  {damageEntry && (
-                                    <div className="bg-gray-700 p-2 rounded mb-2">
-                                      <div className="text-gray-300 font-medium mb-1">Damage Analysis:</div>
-                                      <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div>Received: <span className="text-red-300 font-bold">{damageEntry.damageReceived}</span></div>
-                                        <div>Mitigated: <span className="text-green-400 font-bold">{damageEntry.damageMitigated}</span></div>
-                                        <div>Final: <span className="text-yellow-400 font-bold">{damageEntry.finalDamage}</span></div>
-                                        <div>Lost: <span className="text-green-400 font-bold">{damageEntry.unitsLost}</span></div>
+                                    
+                                    {/* Unit Status */}
+                                    <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
+                                      <div className="bg-gray-700 p-1 rounded text-center">
+                                        <div className="text-gray-400">Started</div>
+                                        <div className="text-red-300 font-bold">{startCount}</div>
                                       </div>
-                                      {damageEntry.buildingEffects.length > 0 && (
-                                        <div className="mt-2 pt-2 border-t border-gray-600">
-                                          <div className="text-gray-400 text-xs">Effects:</div>
-                                          {damageEntry.buildingEffects.map((effect, i) => (
-                                            <div key={i} className="text-green-300 text-xs">• {effect}</div>
-                                          ))}
-                                        </div>
-                                      )}
+                                      <div className="bg-gray-700 p-1 rounded text-center">
+                                        <div className="text-gray-400">Ended</div>
+                                        <div className="text-green-400 font-bold">{endCount}</div>
+                                      </div>
+                                      <div className="bg-gray-700 p-1 rounded text-center">
+                                        <div className="text-gray-400">Loss Rate</div>
+                                        <div className="text-yellow-400 font-bold">{startCount > 0 ? Math.round((lost / startCount) * 100) : 0}%</div>
+                                      </div>
                                     </div>
-                                  )}
-                                  
-                                  {/* Defense Stats */}
-                                  <div className="bg-gray-700 p-2 rounded">
-                                    <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                      <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
-                                      <div>Effective: <span className="text-purple-400 font-bold">{stats.defense.toFixed(1)}</span></div>
-                                      <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? (stats.defense / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
+                                    
+                                    {/* Damage Details */}
+                                    {damageEntry && (
+                                      <div className="bg-gray-700 p-2 rounded mb-2">
+                                        <div className="text-gray-300 font-medium mb-1">Damage Analysis:</div>
+                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                          <div>Received: <span className="text-red-300 font-bold">{damageEntry.damageReceived}</span></div>
+                                          <div>Mitigated: <span className="text-green-400 font-bold">{damageEntry.damageMitigated}</span></div>
+                                          <div>Final: <span className="text-yellow-400 font-bold">{damageEntry.finalDamage}</span></div>
+                                          <div>Lost: <span className="text-green-400 font-bold">{damageEntry.unitsLost}</span></div>
+                                        </div>
+                                        {damageEntry.buildingEffects.length > 0 && (
+                                          <div className="mt-2 pt-2 border-t border-gray-600">
+                                            <div className="text-gray-400 text-xs">Effects:</div>
+                                            {damageEntry.buildingEffects.map((effect, i) => (
+                                              <div key={i} className="text-green-300 text-xs">• {effect}</div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                    
+                                    {/* Defense Stats */}
+                                    <div className="bg-gray-700 p-2 rounded">
+                                      <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
+                                        <div>Effective: <span className="text-purple-400 font-bold">{stats.defense.toFixed(1)}</span></div>
+                                        <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? (stats.defense / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
+                                        <div>Total Defense: <span className="text-purple-400 font-bold">{(stats.defense * startCount).toFixed(1)}</span></div>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
                           </div>
                         </div>
                       </div>
