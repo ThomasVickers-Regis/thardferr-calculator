@@ -788,12 +788,13 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
     return gained;
   };
 
-  const yourCasualties = calculateCasualties(originalYourArmy, finalYourArmy);
+  // Calculate casualties using army state before healing was applied
+  const yourCasualties = calculateCasualties(originalYourArmy, battleOutcome.finalYourArmyBeforeHealing);
   
   // For enemy casualties, use the scaled army as the starting point (not the original)
   const enemyCasualties = battleLog.length > 0 
-    ? calculateCasualties(battleLog[0].enemyArmy, finalEnemyArmy)  // Use scaled army from first round
-    : calculateCasualties(originalEnemyArmy, finalEnemyArmy);      // Fallback to original if no battle log
+    ? calculateCasualties(battleLog[0].enemyArmy, battleOutcome.finalEnemyArmyBeforeHealing)
+    : calculateCasualties(originalEnemyArmy, battleOutcome.finalEnemyArmyBeforeHealing);
   const landResults = calculateLandGainLoss();
   const buildingGains = simulateBuildingGains();
 
@@ -960,8 +961,8 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                             <div className="bg-gray-700 p-3 rounded">
                               <div className="text-gray-300 font-medium mb-2">Army Stats:</div>
                               <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div className="capitalize">{phaseLog.phase}: <span className="font-bold text-blue-400">{yourPhaseStats.attack}</span></div>
-                                <div>Defense: <span className="font-bold text-blue-400">{yourPhaseStats.defense}</span></div>
+                                <div className="capitalize">{phaseLog.phase}: <span className="font-bold text-blue-400">{isNaN(yourPhaseStats.attack) ? 0 : yourPhaseStats.attack}</span></div>
+                                <div>Defense: <span className="font-bold text-blue-400">{isNaN(yourPhaseStats.defense) ? 0 : yourPhaseStats.defense}</span></div>
                               </div>
                               {yourPhaseStats.modifiers.length > 0 && (
                                 <div className="mt-2 pt-2 border-t border-gray-600">
@@ -1005,8 +1006,8 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                         </div>
                                       </div>
                                       <div className="text-right">
-                                        <div className="text-blue-400 font-bold">{attackValue.toFixed(1)}</div>
-                                        <div className="text-gray-400 text-xs">{totalDamage.toFixed(0)}</div>
+                                                                          <div className="text-blue-400 font-bold">{isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)}</div>
+                                  <div className="text-gray-400 text-xs">{isNaN(totalDamage) ? '0' : totalDamage.toFixed(0)}</div>
                                       </div>
                                     </div>
                                   );
@@ -1029,7 +1030,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                     return (
                                       <div key={unit} className="flex justify-between items-center">
                                         <span className="text-gray-300">{unit}</span>
-                                        <span className="font-bold text-blue-400">{count} × {attackValue.toFixed(1)} = {(count as number * attackValue).toFixed(1)}</span>
+                                        <span className="font-bold text-blue-400">{count} × {isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)} = {isNaN(count as number * attackValue) ? '0.0' : (count as number * attackValue).toFixed(1)}</span>
                                       </div>
                                     );
                                   }
@@ -1047,8 +1048,8 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                             <div className="bg-gray-700 p-3 rounded">
                               <div className="text-gray-300 font-medium mb-2">Army Stats:</div>
                               <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div className="capitalize">{phaseLog.phase}: <span className="font-bold text-red-400">{enemyPhaseStats.attack}</span></div>
-                                <div>Defense: <span className="font-bold text-red-400">{enemyPhaseStats.defense}</span></div>
+                                <div className="capitalize">{phaseLog.phase}: <span className="font-bold text-red-400">{isNaN(enemyPhaseStats.attack) ? 0 : enemyPhaseStats.attack}</span></div>
+                                <div>Defense: <span className="font-bold text-red-400">{isNaN(enemyPhaseStats.defense) ? 0 : enemyPhaseStats.defense}</span></div>
                               </div>
                               {enemyPhaseStats.modifiers.length > 0 && (
                                 <div className="mt-2 pt-2 border-t border-gray-600">
@@ -1111,8 +1112,8 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                         </div>
                                       </div>
                                       <div className="text-right">
-                                        <div className="text-red-400 font-bold">{attackValue.toFixed(1)}</div>
-                                        <div className="text-gray-400 text-xs">{totalDamage.toFixed(0)}</div>
+                                                                          <div className="text-red-400 font-bold">{isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)}</div>
+                                  <div className="text-gray-400 text-xs">{isNaN(totalDamage) ? '0' : totalDamage.toFixed(0)}</div>
                                       </div>
                                     </div>
                                   );
@@ -1135,7 +1136,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                     return (
                                       <div key={unit} className="flex justify-between items-center">
                                         <span className="text-gray-300">{unit}</span>
-                                        <span className="font-bold text-red-400">{count} × {attackValue.toFixed(1)} = {(count as number * attackValue).toFixed(1)}</span>
+                                        <span className="font-bold text-red-400">{count} × {isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)} = {isNaN(count as number * attackValue) ? '0.0' : (count as number * attackValue).toFixed(1)}</span>
                                       </div>
                                     );
                                   }
@@ -1219,7 +1220,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                     <div className="bg-gray-700 p-2 rounded mb-2">
                                       <div className="text-gray-300 font-medium mb-1">{phaseLog.phase.toUpperCase()} Attack:</div>
                                       <div className="text-xs">
-                                        {count} × {attackValue.toFixed(1)} = <span className="text-blue-300 font-bold">{totalDamage.toFixed(1)}</span> total damage
+                                        {count} × {isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)} = <span className="text-blue-300 font-bold">{isNaN(totalDamage) ? '0.0' : totalDamage.toFixed(1)}</span> total damage
                                       </div>
                                     </div>
                                   )}
@@ -1318,7 +1319,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                     <div className="bg-gray-700 p-2 rounded mb-2">
                                       <div className="text-gray-300 font-medium mb-1">{phaseLog.phase.toUpperCase()} Attack:</div>
                                       <div className="text-xs">
-                                        {count} × {attackValue.toFixed(1)} = <span className="text-red-300 font-bold">{totalDamage.toFixed(1)}</span> total damage
+                                        {count} × {isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)} = <span className="text-red-300 font-bold">{isNaN(totalDamage) ? '0.0' : totalDamage.toFixed(1)}</span> total damage
                                       </div>
                                     </div>
                                   )}
@@ -2350,7 +2351,11 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
 
   // Helper: get default ratio for a building
   function getDefaultRatio(b: string) {
-    if (b === 'Castle') return 1 / (land || 20);
+    if (b === 'Castle') {
+      // For castles, use the current castle count from kingdom stats if available
+      const currentCastles = castles || 1;
+      return land ? currentCastles / land : 1 / (land || 20);
+    }
     if (b === 'House') return 2;
     if (b === 'Guard House') return 0.5;
     if (b === 'Guard Towers') return 0;
@@ -2382,6 +2387,9 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
     buildingOrder.forEach(b => {
       if (manualOverride[b]) {
         newBuildings[b] = buildings[b] || 0;
+      } else if (b === 'Castle') {
+        // For castles, always use the kingdom stats castle count
+        newBuildings[b] = castles || 1;
       } else {
         // Use existing ratio if available, otherwise use default
         const ratioToUse = currentRatios[b] !== undefined ? currentRatios[b] : (ratios[b] !== undefined ? ratios[b] : getDefaultRatio(b));

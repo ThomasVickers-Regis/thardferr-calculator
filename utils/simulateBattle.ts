@@ -19,6 +19,8 @@ export interface BattleOutcome {
   rounds: number;
   finalYourArmy: Army;
   finalEnemyArmy: Army;
+  finalYourArmyBeforeHealing: Army;
+  finalEnemyArmyBeforeHealing: Army;
   battleLog: BattleLogEntry[];
 }
 
@@ -69,6 +71,8 @@ export function simulateBattle(
       garrisonEfficiency = 0.75; // 75% for medium castle count
     } else if (enemyCastles >= 2) {
       garrisonEfficiency = 0.80; // 80% for low castle count
+    } else if (enemyCastles === 1) {
+      garrisonEfficiency = 0.90; // 90% for single castle (less aggressive scaling)
     }
     
     console.log(`Castle scaling applied: ${enemyCastles} castles = ${garrisonEfficiency * 100}% efficiency`);
@@ -79,10 +83,6 @@ export function simulateBattle(
       enemyArmy[unit] = Math.floor(count * garrisonEfficiency);
       console.log(`${unit}: ${originalCount} → ${enemyArmy[unit]} (${garrisonEfficiency * 100}% scaling)`);
     }
-    
-
- 
-
   }
   
   // Store the scaled enemy army as the "initial" army for retreat calculations
@@ -214,6 +214,10 @@ export function simulateBattle(
     }
   }
 
+  // Store army state before healing for casualty calculations
+  const yourArmyBeforeHealing = { ...yourArmy };
+  const enemyArmyBeforeHealing = { ...enemyArmy };
+  
   // End Phase: Apply healing from Medical Centers after battle is complete
   const yourHealing: Record<string, number> = {};
   const enemyHealing: Record<string, number> = {};
@@ -285,6 +289,8 @@ export function simulateBattle(
     rounds: round - 1,
     finalYourArmy: yourArmy,
     finalEnemyArmy: enemyArmy,
+    finalYourArmyBeforeHealing: yourArmyBeforeHealing,
+    finalEnemyArmyBeforeHealing: enemyArmyBeforeHealing,
     battleLog
   };
 } 
