@@ -1864,7 +1864,10 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-gray-400 mt-2">You cannot exceed 10 buildings per land (excluding Castle). Castles do not count toward the building cap. Max castles: floor(land / 7) + 1. Ratios are buildings per land (e.g., 2.00 = 2 per land).</p>
+      <p className="text-sm text-purple-300 mt-2">
+        Land: {land || 0} | Buildings: {buildingsUsed}/{maxBuildings} | Castles: {currentCastles}/{castleCap} | Ratio: {ratioSum.toFixed(2)}/10.00 {overMax ? '(OVER MAX!)' : ''}
+      </p>
+      <p className="text-xs text-gray-400 mt-1">You cannot exceed 10 buildings per land (excluding Castle). Castles do not count toward the building cap. Max castles: floor(land / 7) + 1. Ratios are buildings per land (e.g., 2.00 = 2 per land).</p>
     </div>
   );
 };
