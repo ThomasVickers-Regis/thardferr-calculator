@@ -252,7 +252,7 @@ export function calculatePhaseDamage(
   
   // Infantry Attack: Infantry defense loss redistributed as defense to other units
   let redistributionBonuses: Record<string, number> = {};
-  if (processedArmyStrategy === 'Infantry Attack' && phaseType === 'melee') {
+  if (processedArmyStrategy === 'Infantry Attack') {
     const raceKey = defenderRace.toLowerCase();
     const armyForRedistribution = originalDefendingArmy || defendingArmy;
     let totalInfantryDefenseLoss = 0;
@@ -297,7 +297,7 @@ export function calculatePhaseDamage(
     // Apply Infantry Attack redistribution bonus to non-infantry units
     let redistributionMitigation = 0;
     let appliedRedistributionBonus = 0;
-    if (processedArmyStrategy === 'Infantry Attack' && phaseType === 'melee' && !isInfantryUnit(defenderName, defenderRace)) {
+    if (processedArmyStrategy === 'Infantry Attack' && !isInfantryUnit(defenderName, defenderRace)) {
       const beforeRedistribution = effectiveDefense;
       const bonus = redistributionBonuses[defenderName] || 0;
       effectiveDefense += bonus;
@@ -360,7 +360,7 @@ export function calculatePhaseDamage(
       damageMitigated: (totalDamage > 0 ? (buildingDefenseBonus * defenderCount) + (damageShare - effectiveDamage) : 0) + redistributionMitigation,
       finalDamage: effectiveDamage,
       unitsLost: losses[defenderName],
-      buildingEffects: buildingEffects,
+      buildingEffects: buildingEffects, // keep the property name for compatibility
       trueEffectiveDefense: effectiveDefense,
       appliedRedistributionBonus: appliedRedistributionBonus
     });

@@ -1363,7 +1363,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                       </div>
                                       {damageEntry.buildingEffects.length > 0 && (
                                         <div className="mt-2 pt-2 border-t border-gray-600">
-                                          <div className="text-gray-400 text-xs">Building Effects:</div>
+                                          <div className="text-gray-400 text-xs">Effects:</div>
                                           {damageEntry.buildingEffects.map((effect, i) => (
                                             <div key={i} className="text-green-300 text-xs">• {effect}</div>
                                           ))}
@@ -1462,7 +1462,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                       </div>
                                       {damageEntry.buildingEffects.length > 0 && (
                                         <div className="mt-2 pt-2 border-t border-gray-600">
-                                          <div className="text-gray-400 text-xs">Building Effects:</div>
+                                          <div className="text-gray-400 text-xs">Effects:</div>
                                           {damageEntry.buildingEffects.map((effect, i) => (
                                             <div key={i} className="text-green-300 text-xs">• {effect}</div>
                                           ))}
@@ -1551,7 +1551,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                       </div>
                                       {damageEntry.buildingEffects.length > 0 && (
                                         <div className="mt-2 pt-2 border-t border-gray-600">
-                                          <div className="text-gray-400 text-xs">Building Effects:</div>
+                                          <div className="text-gray-400 text-xs">Effects:</div>
                                           {damageEntry.buildingEffects.map((effect, i) => (
                                             <div key={i} className="text-green-300 text-xs">• {effect}</div>
                                           ))}
@@ -1623,7 +1623,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                       </div>
                                       {damageEntry.buildingEffects.length > 0 && (
                                         <div className="mt-2 pt-2 border-t border-gray-600">
-                                          <div className="text-gray-400 text-xs">Building Effects:</div>
+                                          <div className="text-gray-400 text-xs">Effects:</div>
                                           {damageEntry.buildingEffects.map((effect, i) => (
                                             <div key={i} className="text-green-300 text-xs">• {effect}</div>
                                           ))}
