@@ -283,7 +283,7 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
         
       case 'Quick Retreat':
         abilities.push({ text: 'All units: -50% attack', isPositive: false });
-        abilities.push({ text: 'Victory chance: -50%', isPositive: false });
+        abilities.push({ text: 'Retreats if army falls below 35% of original strength (normal: 17.5%)', isPositive: true });
         break;
         
       case 'Anti-Cavalry':
@@ -733,7 +733,7 @@ const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLe
   );
 };
 
-const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, enemyTechLevels, enemyStrategy, yourRace, enemyRace, originalYourArmy, originalEnemyArmy }: { 
+const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, enemyTechLevels, enemyStrategy, yourRace, enemyRace, originalYourArmy, originalEnemyArmy, yourBuildings = {}, enemyBuildings = {} }: { 
   battleOutcome: BattleOutcome | null;
   yourTechLevels: any;
   yourStrategy: any;
@@ -743,6 +743,8 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
   enemyRace: string;
   originalYourArmy: Army;
   originalEnemyArmy: Army;
+  yourBuildings?: any;
+  enemyBuildings?: any;
 }) => {
   if (!battleOutcome) {
     return (
@@ -767,7 +769,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
   };
 
   // Calculate phase-specific stats for an army
-  const calculatePhaseStats = (army: any, race: string, techLevels: any = {}, strategy: any = null, isAttacker: boolean = true, phase: string) => {
+  const calculatePhaseStats = (army: any, race: string, techLevels: any = {}, strategy: any = null, isAttacker: boolean = true, phase: string, buildings: any = {}) => {
     let totalAttack = 0;
     let totalDefense = 0;
     const modifiers: string[] = [];
@@ -872,7 +874,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
     }
 
     // Add building effects
-    if (phase === 'range') {
+    if (phase === 'range' && buildings && buildings['Guard Towers'] > 0) {
       buildingEffects.push('Guard Towers: Reduces ranged attacks by 40 damages per tower (max 2 damages per unit)');
     }
     if (phase === 'melee') {
@@ -1056,8 +1058,8 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
 
                 {entry.roundResult.phaseLogs.map((phaseLog, pIdx) => {
                   // Calculate phase-specific stats (skip for end phase)
-                  const yourPhaseStats = phaseLog.phase !== 'end' ? calculatePhaseStats(entry.yourArmy, yourRace, yourTechLevels, yourStrategy, true, phaseLog.phase) : { attack: 0, defense: 0, modifiers: [], buildingEffects: [] };
-                  const enemyPhaseStats = phaseLog.phase !== 'end' ? calculatePhaseStats(entry.enemyArmy, enemyRace, enemyTechLevels, enemyStrategy, false, phaseLog.phase) : { attack: 0, defense: 0, modifiers: [], buildingEffects: [] };
+                  const yourPhaseStats = phaseLog.phase !== 'end' ? calculatePhaseStats(entry.yourArmy, yourRace, yourTechLevels, yourStrategy, true, phaseLog.phase, yourBuildings) : { attack: 0, defense: 0, modifiers: [], buildingEffects: [] };
+                  const enemyPhaseStats = phaseLog.phase !== 'end' ? calculatePhaseStats(entry.enemyArmy, enemyRace, enemyTechLevels, enemyStrategy, false, phaseLog.phase, enemyBuildings) : { attack: 0, defense: 0, modifiers: [], buildingEffects: [] };
                   
                   return (
                     <div key={pIdx} className="mb-4 p-3 bg-gray-700 rounded border border-gray-600">
@@ -1305,8 +1307,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                         </div>
                       </div>
                       )}
-                      
-                      {/* Detailed Army Status - Skip for End phase */}
+                      Detailed Army Status - Skip for End phase
                       {phaseLog.phase !== 'end' && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                         {/* Your Army Details */}
@@ -1359,7 +1360,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                         <div>Received: <span className="text-red-300 font-bold">{damageEntry.damageReceived}</span></div>
                                         <div>Mitigated: <span className="text-green-400 font-bold">{damageEntry.damageMitigated}</span></div>
                                         <div>Final: <span className="text-yellow-400 font-bold">{damageEntry.finalDamage}</span></div>
-                                        <div>Lost: <span className="text-red-400 font-bold">{damageEntry.unitsLost}</span></div>
+                                        <div>Total Effective Defense: <span className="text-blue-300 font-bold">{((damageEntry.damageMitigated || 0) + (stats.defense * count)).toFixed(1)}</span></div>
                                       </div>
                                       {damageEntry.buildingEffects.length > 0 && (
                                         <div className="mt-2 pt-2 border-t border-gray-600">
@@ -1373,14 +1374,33 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                   )}
                                   
                                   {/* Attack Stats */}
-                                  {attackValue > 0 && (
-                                    <div className="bg-gray-700 p-2 rounded mb-2">
-                                      <div className="text-gray-300 font-medium mb-1">{phaseLog.phase.toUpperCase()} Attack:</div>
-                                      <div className="text-xs">
-                                        {count} × {isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)} = <span className="text-blue-300 font-bold">{isNaN(totalDamage) ? '0.0' : totalDamage.toFixed(1)}</span> total damage
+                                  <div className="bg-gray-700 p-2 rounded mb-2">
+                                    <div className="text-gray-300 font-medium mb-1">Attack Stats:</div>
+                                    {phaseLog.phase === 'melee' && (
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>Melee: <span className="text-red-300">{baseStats?.melee || 0}</span></div>
+                                        <div>Effective: <span className="text-red-400 font-bold">{stats.melee?.toFixed(1)}</span></div>
+                                        <div>Multiplier: <span className="text-red-300">{baseStats?.melee ? (stats.melee / baseStats.melee).toFixed(2) : '1.00'}x</span></div>
+                                        <div>Total: <span className="text-red-400 font-bold">{(stats.melee * count).toFixed(1)}</span></div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
+                                    {phaseLog.phase === 'short' && (
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>Short: <span className="text-orange-300">{baseStats?.short || 0}</span></div>
+                                        <div>Effective: <span className="text-orange-400 font-bold">{stats.short?.toFixed(1)}</span></div>
+                                        <div>Multiplier: <span className="text-orange-300">{baseStats?.short ? (stats.short / baseStats.short).toFixed(2) : '1.00'}x</span></div>
+                                        <div>Total: <span className="text-orange-400 font-bold">{(stats.short * count).toFixed(1)}</span></div>
+                                      </div>
+                                    )}
+                                    {phaseLog.phase === 'range' && (
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>Range: <span className="text-blue-300">{baseStats?.range || 0}</span></div>
+                                        <div>Effective: <span className="text-blue-400 font-bold">{stats.range?.toFixed(1)}</span></div>
+                                        <div>Multiplier: <span className="text-blue-300">{baseStats?.range ? (stats.range / baseStats.range).toFixed(2) : '1.00'}x</span></div>
+                                        <div>Total: <span className="text-blue-400 font-bold">{(stats.range * count).toFixed(1)}</span></div>
+                                      </div>
+                                    )}
+                                  </div>
                                   
                                   {/* Defense Stats */}
                                   <div className="bg-gray-700 p-2 rounded">
@@ -1473,14 +1493,33 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                   )}
                                   
                                   {/* Attack Stats */}
-                                  {attackValue > 0 && (
-                                    <div className="bg-gray-700 p-2 rounded mb-2">
-                                      <div className="text-gray-300 font-medium mb-1">{phaseLog.phase.toUpperCase()} Attack:</div>
-                                      <div className="text-xs">
-                                        {count} × {isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)} = <span className="text-red-300 font-bold">{isNaN(totalDamage) ? '0.0' : totalDamage.toFixed(1)}</span> total damage
+                                  <div className="bg-gray-700 p-2 rounded mb-2">
+                                    <div className="text-gray-300 font-medium mb-1">Attack Stats:</div>
+                                    {phaseLog.phase === 'melee' && (
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>Melee: <span className="text-red-300">{baseStats?.melee || 0}</span></div>
+                                        <div>Effective: <span className="text-red-400 font-bold">{stats.melee?.toFixed(1)}</span></div>
+                                        <div>Multiplier: <span className="text-red-300">{baseStats?.melee ? (stats.melee / baseStats.melee).toFixed(2) : '1.00'}x</span></div>
+                                        <div>Total: <span className="text-red-400 font-bold">{(stats.melee * count).toFixed(1)}</span></div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
+                                    {phaseLog.phase === 'short' && (
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>Short: <span className="text-orange-300">{baseStats?.short || 0}</span></div>
+                                        <div>Effective: <span className="text-orange-400 font-bold">{stats.short?.toFixed(1)}</span></div>
+                                        <div>Multiplier: <span className="text-orange-300">{baseStats?.short ? (stats.short / baseStats.short).toFixed(2) : '1.00'}x</span></div>
+                                        <div>Total: <span className="text-orange-400 font-bold">{(stats.short * count).toFixed(1)}</span></div>
+                                      </div>
+                                    )}
+                                    {phaseLog.phase === 'range' && (
+                                      <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div>Range: <span className="text-blue-300">{baseStats?.range || 0}</span></div>
+                                        <div>Effective: <span className="text-blue-400 font-bold">{stats.range?.toFixed(1)}</span></div>
+                                        <div>Multiplier: <span className="text-blue-300">{baseStats?.range ? (stats.range / baseStats.range).toFixed(2) : '1.00'}x</span></div>
+                                        <div>Total: <span className="text-blue-400 font-bold">{(stats.range * count).toFixed(1)}</span></div>
+                                      </div>
+                                    )}
+                                  </div>
                                   
                                   {/* Defense Stats */}
                                   <div className="bg-gray-700 p-2 rounded">
@@ -1500,162 +1539,6 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                       </div>
                       )}
 
-
-
-                      {/* Combined Damage Analysis and Phase Losses - Skip for End phase */}
-                      {phaseLog.phase !== 'end' && (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-gray-800 p-4 rounded">
-                          <div className="text-red-400 font-medium mb-3 border-b border-gray-600 pb-2 text-lg">Your Army Analysis:</div>
-                          <div className="space-y-3 text-sm">
-                            {Object.keys(UNIT_DATA[yourRace.toLowerCase()] || {})
-                              .filter(unit => (phaseLog.yourArmyAtStart?.[unit] || 0) > 0)
-                              .map((unit) => {
-                                const lost = phaseLog.yourLosses[unit] || 0;
-                                const startCount = phaseLog.yourArmyAtStart?.[unit] || 0;
-                                const endCount = startCount - lost;
-                                const stats = getEffectiveUnitStats(unit, yourRace, yourTechLevels, yourStrategy, true, 1);
-                                const baseStats = UNIT_DATA[yourRace.toLowerCase()]?.[unit];
-                                const damageEntry = (phaseLog.yourDamageLog || []).find(d => d.unitName === unit);
-                                
-                                return (
-                                  <div key={unit} className="border border-gray-700 p-3 rounded bg-gray-750">
-                                    <div className="flex justify-between items-center mb-2">
-                                      <span className="text-gray-200 font-bold text-base">{unit}</span>
-                                      <span className={`font-bold text-lg ${lost > 0 ? 'text-red-400' : 'text-gray-500'}`}>
-                                        {lost > 0 ? `-${lost}` : '0'}
-                                      </span>
-                                    </div>
-                                    
-                                    {/* Unit Status */}
-                                    <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
-                                      <div className="bg-gray-700 p-1 rounded text-center">
-                                        <div className="text-gray-400">Started</div>
-                                        <div className="text-blue-300 font-bold">{startCount}</div>
-                                      </div>
-                                      <div className="bg-gray-700 p-1 rounded text-center">
-                                        <div className="text-gray-400">Ended</div>
-                                        <div className="text-green-400 font-bold">{endCount}</div>
-                                      </div>
-                                      <div className="bg-gray-700 p-1 rounded text-center">
-                                        <div className="text-gray-400">Loss Rate</div>
-                                        <div className="text-yellow-400 font-bold">{startCount > 0 ? Math.round((lost / startCount) * 100) : 0}%</div>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Damage Details */}
-                                    {damageEntry && (
-                                      <div className="bg-gray-700 p-2 rounded mb-2">
-                                        <div className="text-gray-300 font-medium mb-1">Damage Analysis:</div>
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                          <div>Received: <span className="text-red-300 font-bold">{damageEntry.damageReceived}</span></div>
-                                          <div>Mitigated: <span className="text-green-400 font-bold">{damageEntry.damageMitigated}</span></div>
-                                          <div>Final: <span className="text-yellow-400 font-bold">{damageEntry.finalDamage}</span></div>
-                                          <div>Lost: <span className="text-red-400 font-bold">{damageEntry.unitsLost}</span></div>
-                                        </div>
-                                        {damageEntry.buildingEffects.length > 0 && (
-                                          <div className="mt-2 pt-2 border-t border-gray-600">
-                                            <div className="text-gray-400 text-xs">Effects:</div>
-                                            {damageEntry.buildingEffects.map((effect, i) => (
-                                              <div key={i} className="text-green-300 text-xs">• {effect}</div>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                    
-                                    {/* Defense Stats */}
-                                    <div className="bg-gray-700 p-2 rounded">
-                                      <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
-                                      <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
-                                        <div>Effective: <span className="text-purple-400 font-bold">{stats.defense.toFixed(1)}</span></div>
-                                        <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? (stats.defense / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
-                                        <div>Total Defense: <span className="text-purple-400 font-bold">{(stats.defense * startCount).toFixed(1)}</span></div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        </div>
-                        
-                        <div className="bg-gray-800 p-4 rounded">
-                          <div className="text-green-400 font-medium mb-3 border-b border-gray-600 pb-2 text-lg">Enemy Army Analysis:</div>
-                          <div className="space-y-3 text-sm">
-                            {Object.keys(UNIT_DATA[enemyRace.toLowerCase()] || {})
-                              .filter(unit => (phaseLog.enemyArmyAtStart?.[unit] || 0) > 0)
-                              .map((unit) => {
-                                const lost = phaseLog.enemyLosses[unit] || 0;
-                                const startCount = phaseLog.enemyArmyAtStart?.[unit] || 0;
-                                const endCount = startCount - lost;
-                                const stats = getEffectiveUnitStats(unit, enemyRace, enemyTechLevels, enemyStrategy, false, 1);
-                                const baseStats = UNIT_DATA[enemyRace.toLowerCase()]?.[unit];
-                                const damageEntry = (phaseLog.enemyDamageLog || []).find(d => d.unitName === unit);
-                                
-                                return (
-                                  <div key={unit} className="border border-gray-700 p-3 rounded bg-gray-750">
-                                    <div className="flex justify-between items-center mb-2">
-                                      <span className="text-gray-200 font-bold text-base">{unit}</span>
-                                      <span className={`font-bold text-lg ${lost > 0 ? 'text-green-400' : 'text-gray-500'}`}>
-                                        {lost > 0 ? `-${lost}` : '0'}
-                                      </span>
-                                    </div>
-                                    
-                                    {/* Unit Status */}
-                                    <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
-                                      <div className="bg-gray-700 p-1 rounded text-center">
-                                        <div className="text-gray-400">Started</div>
-                                        <div className="text-red-300 font-bold">{startCount}</div>
-                                      </div>
-                                      <div className="bg-gray-700 p-1 rounded text-center">
-                                        <div className="text-gray-400">Ended</div>
-                                        <div className="text-green-400 font-bold">{endCount}</div>
-                                      </div>
-                                      <div className="bg-gray-700 p-1 rounded text-center">
-                                        <div className="text-gray-400">Loss Rate</div>
-                                        <div className="text-yellow-400 font-bold">{startCount > 0 ? Math.round((lost / startCount) * 100) : 0}%</div>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Damage Details */}
-                                    {damageEntry && (
-                                      <div className="bg-gray-700 p-2 rounded mb-2">
-                                        <div className="text-gray-300 font-medium mb-1">Damage Analysis:</div>
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                          <div>Received: <span className="text-red-300 font-bold">{damageEntry.damageReceived}</span></div>
-                                          <div>Mitigated: <span className="text-green-400 font-bold">{damageEntry.damageMitigated}</span></div>
-                                          <div>Final: <span className="text-yellow-400 font-bold">{damageEntry.finalDamage}</span></div>
-                                          <div>Lost: <span className="text-green-400 font-bold">{damageEntry.unitsLost}</span></div>
-                                        </div>
-                                        {damageEntry.buildingEffects.length > 0 && (
-                                          <div className="mt-2 pt-2 border-t border-gray-600">
-                                            <div className="text-gray-400 text-xs">Effects:</div>
-                                            {damageEntry.buildingEffects.map((effect, i) => (
-                                              <div key={i} className="text-green-300 text-xs">• {effect}</div>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                    
-                                    {/* Defense Stats */}
-                                    <div className="bg-gray-700 p-2 rounded">
-                                      <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
-                                      <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
-                                        <div>Effective: <span className="text-purple-400 font-bold">{stats.defense.toFixed(1)}</span></div>
-                                        <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? (stats.defense / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
-                                        <div>Total Defense: <span className="text-purple-400 font-bold">{(stats.defense * startCount).toFixed(1)}</span></div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        </div>
-                      </div>
-                      )}
                     </div>
                   );
                 })}
@@ -3638,6 +3521,8 @@ export default function MainApp() {
           enemyRace={enemyRace}
           originalYourArmy={yourArmy}
           originalEnemyArmy={enemyArmy}
+          yourBuildings={yourBuildings}
+          enemyBuildings={enemyBuildings}
         />
       </div>
     </main>

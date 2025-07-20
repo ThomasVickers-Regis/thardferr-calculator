@@ -107,8 +107,8 @@ export function simulateBattle(
     const enemyRemainingPercent = enemyInitialTotal > 0 ? (enemyTotalUnits / enemyInitialTotal) * 100 : 0;
     
     // Determine retreat thresholds based on strategies
-    const yourRetreatThreshold = strategyYour === 'Quick Retreat' ? 40 : 20;
-    const enemyRetreatThreshold = strategyEnemy === 'Quick Retreat' ? 40 : 20;
+    const yourRetreatThreshold = strategyYour === 'Quick Retreat' ? 35 : 17.5;
+    const enemyRetreatThreshold = strategyEnemy === 'Quick Retreat' ? 35 : 17.5;
     
     // Check for retreat conditions
     if (yourRemainingPercent < yourRetreatThreshold && enemyRemainingPercent < enemyRetreatThreshold) {
@@ -201,8 +201,8 @@ export function simulateBattle(
 
     
     // Determine retreat thresholds based on strategies
-    const yourRetreatThreshold = strategyYour === 'Quick Retreat' ? 40 : 20;
-    const enemyRetreatThreshold = strategyEnemy === 'Quick Retreat' ? 40 : 20;
+    const yourRetreatThreshold = strategyYour === 'Quick Retreat' ? 35 : 17.5;
+    const enemyRetreatThreshold = strategyEnemy === 'Quick Retreat' ? 35 : 17.5;
     
     // Check for retreat conditions
     if (yourRemainingPercent < yourRetreatThreshold && enemyRemainingPercent < enemyRetreatThreshold) {

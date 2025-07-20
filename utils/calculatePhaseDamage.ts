@@ -179,11 +179,12 @@ export function calculatePhaseDamage(
 
   // Calculate building bonuses (distributed per unit)
   let buildingDefenseBonus = 0;
-  const totalDefenders = defenderUnitNames.reduce((sum, u) => sum + defendingArmy[u], 0);
+  // Only count living units (count > 0) for mitigation division
+  const totalDefenders = defenderUnitNames.reduce((sum, u) => sum + (defendingArmy[u] > 0 ? defendingArmy[u] : 0), 0);
   
 
   
-  if (phaseType === 'range' && defenderBuildings['Guard Towers']) {
+  if (phaseType === 'range' && defenderBuildings['Guard Towers'] && defenderBuildings['Guard Towers'] > 0) {
     const towers = defenderBuildings['Guard Towers'] || 0;
     // Distribute tower defense across all units (max 2 damage reduction per unit)
     const maxReductionPerUnit = 2;
@@ -310,54 +311,56 @@ export function calculatePhaseDamage(
     // Apply immunity to defense calculation
     effectiveDefense = effectiveDefense * (1 - immunityPercent / 100);
 
-    // Calculate damage share for this unit
+    // Calculate raw damage share BEFORE mitigation (i.e., before buildingDefenseBonus is applied)
+    // To do this, we need to recalculate what the unit's share would have been if totalDamage was based on totalOffense - totalDefense (no buildingDefenseBonus)
+    let rawTotalDamage = 0;
+    if (totalOffense > totalDefense) {
+      rawTotalDamage = totalOffense - totalDefense;
+    } else {
+      const relativeStrength = totalOffense / totalDefense;
+      rawTotalDamage = totalOffense * relativeStrength * 1.2;
+    }
+    const rawDamageShare = totalDefenders > 0 ? (defenderCount / totalDefenders) * rawTotalDamage : 0;
+    // Apply immunity to raw damage
+    const rawEffectiveDamage = rawDamageShare * (1 - immunityPercent / 100);
+
+    // Calculate damage share for this unit (after mitigation)
     const damageShare = totalDefenders > 0 ? (defenderCount / totalDefenders) * totalDamage : 0;
-    
     // Apply immunity to damage
     const effectiveDamage = damageShare * (1 - immunityPercent / 100);
-    
-      // Calculate units lost using a hybrid approach
-  let unitsLost = 0;
-  if (effectiveDamage > 0) {
-    // Method 1: Traditional damage/defense per unit
-    const damagePerKill = effectiveDefense;
-    const traditionalLosses = Math.floor(effectiveDamage / damagePerKill);
-    
-    // Method 2: Proportional casualties based on damage ratio
-    const totalArmyDefense = totalDefense + buildingDefenseBonus;
-    const damageRatio = totalDamage / totalArmyDefense;
-    const proportionalLosses = Math.floor(defenderCount * damageRatio * 0.5); // 50% of proportional
-    
-    // Use the higher of the two methods
-    unitsLost = Math.max(traditionalLosses, proportionalLosses);
-    
-    // Ensure at least 1 unit dies if there's significant damage (unless immunity prevents it)
-    if (effectiveDamage >= damagePerKill * 0.3 && unitsLost === 0 && immunityPercent < 100) {
-      unitsLost = 1;
-    }
-    
-    unitsLost = Math.min(unitsLost, defenderCount); // Can't lose more than we have
-  }
-    
-    losses[defenderName] = unitsLost;
-    
 
-    
-    // Create damage log entry with immunity info
-    const totalArmySize = Object.values(defendingArmy).reduce((sum, count) => sum + count, 0);
-    
+    // Calculate units lost using a hybrid approach
+    let unitsLost = 0;
+    if (effectiveDamage > 0) {
+      // Method 1: Traditional damage/defense per unit
+      const damagePerKill = effectiveDefense;
+      const traditionalLosses = Math.floor(effectiveDamage / damagePerKill);
+      // Method 2: Proportional casualties based on damage ratio
+      const totalArmyDefense = totalDefense + buildingDefenseBonus;
+      const damageRatio = totalDamage / totalArmyDefense;
+      const proportionalLosses = Math.floor(defenderCount * damageRatio * 0.5); // 50% of proportional
+      // Use the higher of the two methods
+      unitsLost = Math.max(traditionalLosses, proportionalLosses);
+      // Ensure at least 1 unit dies if there's significant damage (unless immunity prevents it)
+      if (effectiveDamage >= damagePerKill * 0.3 && unitsLost === 0 && immunityPercent < 100) {
+        unitsLost = 1;
+      }
+      unitsLost = Math.min(unitsLost, defenderCount); // Can't lose more than we have
+    }
+    losses[defenderName] = unitsLost;
+
     // Only show building effects if damage was actually received
-    if (totalDamage > 0 && buildingDefenseBonus > 0) {
+    if (totalDamage > 0 && buildingDefenseBonus > 0 && ((phaseType === 'range' && defenderBuildings['Guard Towers'] && defenderBuildings['Guard Towers'] > 0) || (phaseType === 'melee' && defenderBuildings['Medical Center'] && defenderBuildings['Medical Center'] > 0))) {
       buildingEffects.push(`Building bonus: -${buildingDefenseBonus.toFixed(1)} damage per unit`);
     }
     if (immunityPercent > 0) {
       buildingEffects.push(`${immunityPercent}% immunity applied`);
     }
-    
+
     damageLog.push({
       unitName: defenderName,
-      damageReceived: damageShare,
-      damageMitigated: (totalDamage > 0 ? (buildingDefenseBonus * defenderCount) + (damageShare - effectiveDamage) : 0) + redistributionMitigation,
+      damageReceived: rawEffectiveDamage,
+      damageMitigated: Math.max(0, rawEffectiveDamage - effectiveDamage),
       finalDamage: effectiveDamage,
       unitsLost: losses[defenderName],
       buildingEffects: buildingEffects, // keep the property name for compatibility
