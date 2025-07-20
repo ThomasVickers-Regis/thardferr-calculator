@@ -100,7 +100,7 @@ export function simulateBattle(
   let winner: BattleOutcome['winner'] = 'draw';
 
   while (round <= maxRounds) {
-    // Check if either army should retreat (lost 20% of total strength)
+    // Check if either army should retreat (lost 20% of total strength, or 40% for Quick Retreat)
     const yourTotalUnits = Object.values(yourArmy).reduce((sum, v) => sum + v, 0);
     const enemyTotalUnits = Object.values(enemyArmy).reduce((sum, v) => sum + v, 0);
     const yourInitialTotal = Object.values(yourInitialArmy).reduce((sum, v) => sum + v, 0);
@@ -109,14 +109,18 @@ export function simulateBattle(
     const yourRemainingPercent = yourInitialTotal > 0 ? (yourTotalUnits / yourInitialTotal) * 100 : 0;
     const enemyRemainingPercent = enemyInitialTotal > 0 ? (enemyTotalUnits / enemyInitialTotal) * 100 : 0;
     
-    // Check for retreat conditions (below 20% forces remaining)
-    if (yourRemainingPercent < 20 && enemyRemainingPercent < 20) {
+    // Determine retreat thresholds based on strategies
+    const yourRetreatThreshold = strategyYour === 'Quick Retreat' ? 40 : 20;
+    const enemyRetreatThreshold = strategyEnemy === 'Quick Retreat' ? 40 : 20;
+    
+    // Check for retreat conditions
+    if (yourRemainingPercent < yourRetreatThreshold && enemyRemainingPercent < enemyRetreatThreshold) {
       winner = 'draw';
       break;
-    } else if (yourRemainingPercent < 20) {
+    } else if (yourRemainingPercent < yourRetreatThreshold) {
       winner = 'enemyArmy';
       break;
-    } else if (enemyRemainingPercent < 20) {
+    } else if (enemyRemainingPercent < enemyRetreatThreshold) {
       winner = 'yourArmy';
       break;
     }
@@ -184,12 +188,16 @@ export function simulateBattle(
     
 
     
-    // Check for retreat conditions (below 20% forces remaining)
-    if (yourRemainingPercent < 20 && enemyRemainingPercent < 20) {
+    // Determine retreat thresholds based on strategies
+    const yourRetreatThreshold = strategyYour === 'Quick Retreat' ? 40 : 20;
+    const enemyRetreatThreshold = strategyEnemy === 'Quick Retreat' ? 40 : 20;
+    
+    // Check for retreat conditions
+    if (yourRemainingPercent < yourRetreatThreshold && enemyRemainingPercent < enemyRetreatThreshold) {
       winner = 'draw';
-    } else if (yourRemainingPercent < 20) {
+    } else if (yourRemainingPercent < yourRetreatThreshold) {
       winner = 'enemyArmy';
-    } else if (enemyRemainingPercent < 20) {
+    } else if (enemyRemainingPercent < enemyRetreatThreshold) {
       winner = 'yourArmy';
     } else {
       // Fallback: Check if either army is completely eliminated

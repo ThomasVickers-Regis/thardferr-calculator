@@ -132,6 +132,11 @@ export const BUILDING_DATA: Record<string, BuildingData> = {
         "Orc Rusher": { per_building: 3, per_day: 1 },
         "Orc Slother": { per_building: 2, per_day: 1 },
         "Orc Slinger": { per_building: 3, per_day: 1 }
+      },
+      Undead: {
+        "Undead Skeleton": { per_building: 3, per_day: 1 },
+        "Undead Zombie": { per_building: 4, per_day: 1 },
+        "Undead Archer": { per_building: 3, per_day: 1 }
       }
     }
   }

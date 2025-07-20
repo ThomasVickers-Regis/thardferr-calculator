@@ -60,10 +60,10 @@ export const TECHNOLOGY_DATA: Record<string, TechnologyData> = {
     researchTime: 100,
     levels: { "1": {}, "2": {}, "3": {}, "4": {} }
   },
-  "Tougher Caragous Armor": {
-    description: "Increases defence of units wearing a Caragous Armor.",
+  "Tougher Heavy Armor": {
+    description: "Increases defence of units wearing Heavy Armor.",
     stat: 'defense',
-    armorType: 'caragous',
+    armorType: 'heavy',
     flat_bonus: 1,
     maxLevel: 2,
     cost: 120000,

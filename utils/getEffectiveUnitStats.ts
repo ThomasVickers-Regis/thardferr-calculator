@@ -49,35 +49,37 @@ export function getEffectiveUnitStats(
     };
   }
   let stats = { ...base };
-  // Apply Sharper Blades tech (flat +1 melee per level for blade units)
+  // Apply Combat Technologies (flat stat bonuses)
+  
+  // Sharper Blades: +1 melee per level for blade units
   const sharperBladesLevel = techLevels['Sharper Blades'] || 0;
   if (sharperBladesLevel > 0 && base.weaponType === 'blade') {
     stats.melee += sharperBladesLevel;
+  }
+  
+  // Tougher Light Armor: +1 defense per level for light armor units
+  const tougherLightArmorLevel = techLevels['Tougher Light Armor'] || 0;
+  if (tougherLightArmorLevel > 0 && base.armorType === 'light') {
+    stats.defense += tougherLightArmorLevel;
+  }
+  
+  // Tougher Heavy Armor: +1 defense per level for heavy armor units
+  const tougherHeavyArmorLevel = techLevels['Tougher Heavy Armor'] || 0;
+  if (tougherHeavyArmorLevel > 0 && base.armorType === 'heavy') {
+    stats.defense += tougherHeavyArmorLevel;
+  }
+  
+  // Improve Bow Range: +50% range per level for bow units
+  const improveBowRangeLevel = techLevels['Improve Bow Range'] || 0;
+  if (improveBowRangeLevel > 0 && base.weaponType === 'bow') {
+    stats.range += stats.range * (improveBowRangeLevel * 0.5); // +50% per level
   }
 
   // --- Ranged Base Effectiveness ---
   // Base stats are used as-is (no automatic 50% reduction)
 
   // --- Technology Modifiers ---
-  // Sharper Blades (melee)
-  const sharperBladesLvl = techLevels['Sharper Blades Structure'] || 0;
-  if (sharperBladesLvl > 0) {
-    const percent = TECHNOLOGY_DATA['Sharper Blades Structure'].levels[String(sharperBladesLvl)]?.damage_increase_percent || 0;
-    stats.melee *= 1 + percent;
-  }
-  // Improved Range Structure (range/short)
-  const improvedRangeLvl = techLevels['Improved Range Structure'] || 0;
-  if (improvedRangeLvl > 0) {
-    const percent = TECHNOLOGY_DATA['Improved Range Structure'].levels[String(improvedRangeLvl)]?.damage_increase_percent || 0;
-    stats.range *= 1 + percent;
-    stats.short *= 1 + percent;
-  }
-  // Hardening (defense)
-  const hardeningLvl = techLevels['Hardening'] || 0;
-  if (hardeningLvl > 0) {
-    const percent = TECHNOLOGY_DATA['Hardening'].levels[String(hardeningLvl)]?.defense_increase_percent || 0;
-    stats.defense *= 1 + percent;
-  }
+  // Add any percentage-based technologies here if they exist in the data
 
   // --- Strategy Modifiers ---
   if (strategy) {

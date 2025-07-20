@@ -22,18 +22,72 @@ const getUnitsForRace = (race: string) => {
 };
 
 // Add getDefaultArmy above MainApp
+// Default army: 10 TC units, 0 ATC units, 10 other units per race
 const getDefaultArmy = (race: string) => {
   const lower = race.toLowerCase();
   const units = getUnitsForRace(lower);
   const army: Army = {};
+  
+  // Map race key to building data format (capitalized)
+  const buildingRaceKey = lower.charAt(0).toUpperCase() + lower.slice(1);
+  
   // Get TC and ATC units for this race
-  const tcUnits = Object.keys(BUILDING_DATA['Training Center']?.unit_production?.[lower] || {});
-  const atcUnits = Object.keys(BUILDING_DATA['Advanced Training Center']?.unit_production?.[lower] || {});
+  const tcUnits = Object.keys(BUILDING_DATA['Training Center']?.unit_production?.[buildingRaceKey] || {});
+  const atcUnits = Object.keys(BUILDING_DATA['Advanced Training Center']?.unit_production?.[buildingRaceKey] || {});
+  
+  // Map building unit names to unit data names
+  const mapUnitName = (buildingUnitName: string) => {
+    const nameMap: Record<string, string> = {
+      'Dwarf Hammer Wheilder': 'HammerWheilder',
+      'Dwarf Axe Man': 'AxeMan',
+      'Dwarf Light Crossbowman': 'LightCrossbowman',
+      'Dwarf Heavy Crossbowman': 'HeavyCrossbowman',
+      'Dwarf Shieldbearer': 'Shieldbearer',
+      'Dwarf Runner': 'Runner',
+      'Elf Swordman': 'Swordman',
+      'Elf Lanceman': 'Lanceman',
+      'Elf Caragous': 'Caragous',
+      'Elf Archer': 'Archer',
+      'Elf Elite Archer': 'EliteArcher',
+      'Elf Mage': 'Mage',
+      'Gnome Infantry': 'Infantry',
+      'Gnome Militia': 'Militia',
+      'Gnome Rider': 'Rider',
+      'Gnome Rock Thrower': 'RockThrower',
+      'Gnome Catapult': 'Catapult',
+      'Gnome Balista': 'Balista',
+      'Human Infantry': 'Infantry',
+      'Human Pikeman': 'Pikeman',
+      'Human Archer': 'Archer',
+      'Human Knight': 'Knight',
+      'Human Heavy Infantry': 'HeavyInfantry',
+      'Human Mounted Archer': 'MountedArcher',
+      'Orc Rusher': 'Rusher',
+      'Orc Slother': 'Slother',
+      'Orc Slinger': 'Slinger',
+      'Orc Shadow Warrior': 'ShadowWarrior',
+      'Orc Wolf Master': 'WolfMaster',
+      'Orc Axe Thrower': 'AxeThrower',
+      'Undead Skeleton': 'SkeletalLegion',
+      'Undead Zombie': 'SkeletalLegion',
+      'Undead Archer': 'PhantomArcher',
+      'Undead Dark Knight': 'DarkKnight',
+      'Undead Abomination Caragous': 'AbominationCaragous',
+      'Undead Wraith Rider': 'WraithRider',
+      'Undead Wraith Pikeman': 'WraithPikeman'
+    };
+    return nameMap[buildingUnitName] || buildingUnitName.replace(/^(Dwarf|Elf|Gnome|Human|Orc|Undead)\s+/, '');
+  };
+  
+  // Map the building unit names to unit data names
+  const mappedTcUnits = tcUnits.map(mapUnitName);
+  const mappedAtcUnits = atcUnits.map(mapUnitName);
+  
   units.forEach(unit => {
-    if (tcUnits.includes(unit)) {
-      army[unit] = 10;
-    } else if (atcUnits.includes(unit)) {
-      army[unit] = 0;
+    if (mappedTcUnits.includes(unit)) {
+      army[unit] = 10; // Training Center units start with 10
+    } else if (mappedAtcUnits.includes(unit)) {
+      army[unit] = 0; // Advanced Training Center units start with 0
     } else {
       army[unit] = 10; // fallback for any other units
     }
@@ -48,31 +102,112 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
   
   // Handler for changing unit count
   const handleChange = (unit: string, value: string) => {
-    const count = Math.max(0, parseInt(value) || 0);
+    let count = Math.max(0, parseInt(value) || 0);
+    
+    // Apply Guard House cap if buildings are provided
+    if (buildings && buildings['Guard House']) {
+      const guardHouses = buildings['Guard House'];
+      const maxUnits = guardHouses * 40;
+      const currentTotal = Object.values(army).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
+      const otherUnits = currentTotal - (army[unit] || 0);
+      const maxForThisUnit = Math.max(0, maxUnits - otherUnits);
+      
+      if (count > maxForThisUnit) {
+        count = maxForThisUnit;
+      }
+    }
+    
     setArmy({ ...army, [unit]: count });
   };
   // Unit production estimate summary (if buildings and race are provided)
   const getUnitProductionSummary = () => {
     if (!buildings || !race) return '';
     const unitCounts: Record<string, number> = {};
-    const tc = buildings['Training Center'] || 0;
-    const atc = buildings['Advanced Training Center'] || 0;
-    const castle = buildings['Castle'] || 0;
-    const tcProd = BUILDING_DATA['Training Center']?.unit_production?.[raceKey] || {};
+    // Try different ways to access the buildings
+    const tc = buildings['Training Center'] || buildings['training center'] || buildings['TrainingCenter'] || 0;
+    const atc = buildings['Advanced Training Center'] || buildings['advanced training center'] || buildings['AdvancedTrainingCenter'] || 0;
+    const castle = buildings['Castle'] || buildings['castle'] || 0;
+    
+    // Debug: Log the building counts
+    console.log('Debug - Buildings:', buildings);
+    console.log('Debug - Building keys:', Object.keys(buildings));
+    console.log('Debug - TC:', tc, 'ATC:', atc, 'Castle:', castle);
+    console.log('Debug - Race:', race, 'RaceKey:', raceKey);
+    
+    // Map building data unit names to unit data names
+    const mapUnitName = (buildingUnitName: string) => {
+      // Remove race prefix and fix common naming differences
+      const nameMap: Record<string, string> = {
+        'Dwarf Hammer Wheilder': 'HammerWheilder',
+        'Dwarf Axe Man': 'AxeMan',
+        'Dwarf Light Crossbowman': 'LightCrossbowman',
+        'Dwarf Heavy Crossbowman': 'HeavyCrossbowman',
+        'Dwarf Shieldbearer': 'Shieldbearer',
+        'Dwarf Runner': 'Runner',
+        'Elf Swordman': 'Swordman',
+        'Elf Lanceman': 'Lanceman',
+        'Elf Caragous': 'Caragous',
+        'Elf Archer': 'Archer',
+        'Elf Elite Archer': 'EliteArcher',
+        'Elf Mage': 'Mage',
+        'Gnome Infantry': 'Infantry',
+        'Gnome Militia': 'Militia',
+        'Gnome Rider': 'Rider',
+        'Gnome Rock Thrower': 'RockThrower',
+        'Gnome Catapult': 'Catapult',
+        'Gnome Balista': 'Balista',
+        'Human Infantry': 'Infantry',
+        'Human Pikeman': 'Pikeman',
+        'Human Archer': 'Archer',
+        'Human Knight': 'Knight',
+        'Human Heavy Infantry': 'HeavyInfantry',
+        'Human Mounted Archer': 'MountedArcher',
+        'Orc Rusher': 'Rusher',
+        'Orc Slother': 'Slother',
+        'Orc Slinger': 'Slinger',
+        'Orc Shadow Warrior': 'ShadowWarrior',
+        'Orc Wolf Master': 'WolfMaster',
+        'Orc Axe Thrower': 'AxeThrower',
+        'Undead Skeleton': 'SkeletalLegion',
+        'Undead Zombie': 'SkeletalLegion', // Assuming this maps to SkeletalLegion
+        'Undead Archer': 'PhantomArcher',
+        'Undead Dark Knight': 'DarkKnight',
+        'Undead Abomination Caragous': 'AbominationCaragous',
+        'Undead Wraith Rider': 'WraithRider',
+        'Undead Wraith Pikeman': 'WraithPikeman'
+      };
+      return nameMap[buildingUnitName] || buildingUnitName.replace(/^(Dwarf|Elf|Gnome|Human|Orc|Undead)\s+/, '');
+    };
+    
+    // Map race key to building data format (capitalized)
+    const buildingRaceKey = raceKey.charAt(0).toUpperCase() + raceKey.slice(1);
+    
+    const tcProd = BUILDING_DATA['Training Center']?.unit_production?.[buildingRaceKey] || {};
+    console.log('Debug - TC Production data:', tcProd);
     for (const [unit, v] of Object.entries(tcProd)) {
-      unitCounts[unit] = Math.floor(tc / v.per_building) * v.per_day;
+      const mappedUnit = mapUnitName(unit);
+      unitCounts[mappedUnit] = Math.floor(tc / v.per_building) * v.per_day;
     }
-    const atcProd = BUILDING_DATA['Advanced Training Center']?.unit_production?.[raceKey] || {};
+    const atcProd = BUILDING_DATA['Advanced Training Center']?.unit_production?.[buildingRaceKey] || {};
+    console.log('Debug - ATC Production data:', atcProd);
     for (const [unit, v] of Object.entries(atcProd)) {
-      unitCounts[unit] = (unitCounts[unit] || 0) + Math.floor(atc / v.per_building) * v.per_day;
+      const mappedUnit = mapUnitName(unit);
+      unitCounts[mappedUnit] = (unitCounts[mappedUnit] || 0) + Math.floor(atc / v.per_building) * v.per_day;
     }
     for (const unit of Object.keys({ ...tcProd, ...atcProd })) {
-      unitCounts[unit] = (unitCounts[unit] || 0) + castle;
+      const mappedUnit = mapUnitName(unit);
+      unitCounts[mappedUnit] = (unitCounts[mappedUnit] || 0) + castle;
     }
     const summary = Object.entries(unitCounts)
       .filter(([_, n]) => n > 0)
       .map(([unit, n]) => `${n} ${unit}`)
       .join(', ');
+    
+    // Debug: Log the unit counts and summary
+    console.log('Debug - Unit counts:', unitCounts);
+    console.log('Debug - Summary:', summary);
+    console.log('Debug - Final return:', summary ? `You can currently train ${summary} per day.` : '');
+    
     return summary ? `You can currently train ${summary} per day.` : '';
   };
 
@@ -80,14 +215,84 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
   const sharperBladesLevel = techLevels?.['Sharper Blades'] || 0;
   const sharperBladesBonus = sharperBladesLevel > 0 ? `+${sharperBladesLevel} melee to all blade units` : '';
 
+  // Guard House cap display
+  const guardHouses = buildings?.['Guard House'] || 0;
+  const maxUnits = guardHouses * 40;
+  const currentTotal = Object.values(army).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
+
+  // Generate race-specific unit abilities and special rules
+  const getRaceSpecificInfo = () => {
+    const raceLower = race?.toLowerCase() || 'dwarf';
+    const info: string[] = [];
+    
+    // Dwarf abilities
+    if (raceLower === 'dwarf') {
+      info.push('Shieldbearer: Protects army from ranged attacks (based on army ratio)');
+      info.push('Runner: Attacks in short-range phase with throwing axes');
+      info.push('Hammer Wielder: High melee damage, feared by other races');
+      info.push('Axe Man: Most powerful dwarf unit, high defense');
+    }
+    
+    // Elf abilities
+    if (raceLower === 'elf') {
+      info.push('Mage: Invisible to melee attacks (only ranged can damage)');
+      info.push('Lanceman: Double damage vs mounted units');
+      info.push('Caragous: Attack/defense scales with army percentage');
+      info.push('Caragous: Mounted unit (vulnerable to pikemen)');
+    }
+    
+    // Gnome abilities
+    if (raceLower === 'gnome') {
+      info.push('Infantry: Double damage vs mounted units');
+      info.push('Catapult: Requires 5 men to operate');
+      info.push('Balista: Requires 4 men to operate');
+      info.push('Rider: Best gnomish melee fighter');
+    }
+    
+    // Human abilities
+    if (raceLower === 'human') {
+      info.push('Pikeman: Double damage vs mounted units');
+      info.push('Knight: Short-range charge attack');
+      info.push('Mounted Archer: Mounted unit (vulnerable to pikemen)');
+    }
+    
+    // Orc abilities
+    if (raceLower === 'orc') {
+      info.push('Shadow Warrior: Hiding ability (immune to melee when hidden)');
+      info.push('Rusher: Short-range attack with wolf mount');
+      info.push('Slother: Short-range attack with wolf mount');
+      info.push('Wolf Master: Controls wolf mounts for short-range attacks');
+    }
+    
+    // Undead abilities
+    if (raceLower === 'undead') {
+      info.push('Skeleton: Immune to ranged attacks');
+      info.push('Wraith units: No food upkeep');
+      info.push('Abomination Caragous: Mounted unit (vulnerable to pikemen)');
+    }
+    
+    return info;
+  };
+
+  const raceSpecificInfo = getRaceSpecificInfo();
+
   return (
     <div className="p-4 bg-gray-800 rounded-lg mb-4">
       <h3 className="text-lg font-semibold mb-2">{armyName} Composition</h3>
       {sharperBladesLevel > 0 && (
-        <p className="text-xs text-green-300 mb-1">Sharper Blades: {sharperBladesBonus}</p>
+        <p className="text-sm text-purple-300 mb-1">Sharper Blades: {sharperBladesBonus}</p>
+      )}
+      {guardHouses > 0 && (
+        <p className="text-sm text-purple-300 mb-1">Guard Houses: {currentTotal}/{maxUnits} units (40 per Guard House)</p>
       )}
       {buildings && race && (
-        <p className="text-sm text-purple-300 mb-2">{getUnitProductionSummary()}</p>
+        <p className="text-sm text-purple-300 mb-2">
+          {getUnitProductionSummary() || 'No Training Centers or Advanced Training Centers built'}
+          <br />
+          <span className="text-xs text-gray-400">
+            Debug: TC={buildings['Training Center'] || buildings['training center'] || buildings['TrainingCenter'] || 0}, ATC={buildings['Advanced Training Center'] || buildings['advanced training center'] || buildings['AdvancedTrainingCenter'] || 0}
+          </span>
+        </p>
       )}
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
@@ -103,23 +308,51 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
           </thead>
           <tbody>
             {units.map(unit => {
-              const stats = UNIT_DATA[raceKey]?.[unit];
-              if (!stats) return null; // Skip if unit not found for this race
+              const baseStats = UNIT_DATA[raceKey]?.[unit];
+              if (!baseStats) return null; // Skip if unit not found for this race
+              
+              // Get effective stats including technology bonuses
+              const effectiveStats = getEffectiveUnitStats(unit, raceKey, techLevels || {}, null, true, 1);
+              
               return (
                 <tr key={unit} className="even:bg-gray-700">
                   <td className="p-2 font-medium" title={unit}>{unit}</td>
-                  <td className="p-2">{stats.melee}</td>
-                  <td className="p-2">{stats.short}</td>
-                  <td className="p-2">{stats.range}</td>
-                  <td className="p-2">{stats.defense}</td>
+                  <td className="p-2">
+                    {baseStats.melee}
+                    {effectiveStats.melee > baseStats.melee && (
+                      <span className="text-green-400 ml-1">(+{Math.round(effectiveStats.melee - baseStats.melee)})</span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {baseStats.short}
+                    {effectiveStats.short > baseStats.short && (
+                      <span className="text-green-400 ml-1">(+{Math.round(effectiveStats.short - baseStats.short)})</span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {baseStats.range}
+                    {effectiveStats.range > baseStats.range && (
+                      <span className="text-green-400 ml-1">(+{Math.round(effectiveStats.range - baseStats.range)})</span>
+                    )}
+                  </td>
+                  <td className="p-2">
+                    {baseStats.defense}
+                    {effectiveStats.defense > baseStats.defense && (
+                      <span className="text-green-400 ml-1">(+{Math.round(effectiveStats.defense - baseStats.defense)})</span>
+                    )}
+                  </td>
                   <td className="p-2">
                     <input
                       type="number"
                       min={0}
-                      className="w-20 p-1 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className={`w-20 p-1 rounded bg-gray-900 text-gray-100 border focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                        guardHouses > 0 && currentTotal >= maxUnits && (army[unit] || 0) > 0 
+                          ? 'border-yellow-500' 
+                          : 'border-gray-600'
+                      }`}
                       value={army[unit] !== undefined ? army[unit] : 0}
                       onChange={e => handleChange(unit, e.target.value)}
-                      title={`Set number of ${unit}`}
+                      title={`Set number of ${unit}${guardHouses > 0 ? ` (Guard House cap: ${maxUnits} total units)` : ''}`}
                     />
                   </td>
                 </tr>
@@ -128,7 +361,16 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-gray-400 mt-2">Set a unit's count to 0 to remove it from your army.</p>
+      {raceSpecificInfo.length > 0 && (
+        <div className="mt-2">
+          <div className="text-xs text-gray-300">
+            <span className="font-medium">Special Abilities:</span>
+            {raceSpecificInfo.map((info, index) => (
+              <div key={index} className="ml-2">• {info}</div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -246,7 +488,7 @@ const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLe
               </tr>
             </thead>
             <tbody>
-              {['Sharper Blades', 'Tougher Light Armor', 'Tougher Caragous Armor', 'Improve Bow Range'].map(tech => {
+              {['Sharper Blades', 'Tougher Light Armor', 'Tougher Heavy Armor', 'Improve Bow Range'].map(tech => {
                 const data = TECHNOLOGY_DATA[tech];
                 if (!data) return null;
                 const maxLevel = typeof data.maxLevel === 'number' ? data.maxLevel : (Object.keys(data.levels).length || 1);
@@ -419,24 +661,28 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
       }
     }
 
-    // Add phase-specific tech/strategy modifiers
-    if (phase === 'melee' && techLevels['Sharper Blades Structure'] > 0) {
-      const level = techLevels['Sharper Blades Structure'];
-      const percent = TECHNOLOGY_DATA['Sharper Blades Structure'].levels[String(level)]?.damage_increase_percent || 0;
-      modifiers.push(`Sharper Blades +${Math.round(percent * 100)}% melee`);
+    // Add Combat Technologies modifiers
+    if (techLevels['Sharper Blades'] > 0) {
+      const level = techLevels['Sharper Blades'];
+      modifiers.push(`Sharper Blades: +${level} melee for blade units`);
     }
     
-    if ((phase === 'range' || phase === 'short') && techLevels['Improved Range Structure'] > 0) {
-      const level = techLevels['Improved Range Structure'];
-      const percent = TECHNOLOGY_DATA['Improved Range Structure'].levels[String(level)]?.damage_increase_percent || 0;
-      modifiers.push(`Improved Range +${Math.round(percent * 100)}% ${phase}`);
+    if (techLevels['Tougher Light Armor'] > 0) {
+      const level = techLevels['Tougher Light Armor'];
+      modifiers.push(`Tougher Light Armor: +${level} defense for light armor units`);
     }
     
-    if (techLevels['Hardening'] > 0) {
-      const level = techLevels['Hardening'];
-      const percent = TECHNOLOGY_DATA['Hardening'].levels[String(level)]?.defense_increase_percent || 0;
-      modifiers.push(`Hardening +${Math.round(percent * 100)}% defense`);
+    if (techLevels['Tougher Heavy Armor'] > 0) {
+      const level = techLevels['Tougher Heavy Armor'];
+      modifiers.push(`Tougher Heavy Armor: +${level} defense for heavy armor units`);
     }
+    
+    if (techLevels['Improve Bow Range'] > 0) {
+      const level = techLevels['Improve Bow Range'];
+      modifiers.push(`Improve Bow Range: +${Math.round(level * 50)}% range for bow units`);
+    }
+    
+    // Add any percentage-based technology modifiers here if they exist in the data
 
     // Add strategy effects
     if (strategy) {
@@ -448,6 +694,7 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
       }
       if (strategy === 'Quick Retreat') {
         modifiers.push('Quick Retreat: All attacks -50%');
+        modifiers.push('Quick Retreat: Retreat at 40% losses (vs 20% normal)');
       }
       if (strategy === 'Anti-Cavalry' && phase === 'melee') {
         modifiers.push('Anti-Cavalry: Pikemen +250% vs mounted');
@@ -1363,7 +1610,16 @@ const UnitEfficiencyTable = ({ techLevels, strategy, race }: { techLevels: any; 
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-gray-400 mt-2">Lower values are better. Top 3 units in each column are highlighted.</p>
+      <div className="mt-2 space-y-1">
+        <p className="text-xs text-gray-400">Lower values are better. Top 3 units in each column are highlighted.</p>
+        <div className="text-xs text-gray-300">
+          <span className="font-medium">Efficiency Notes:</span>
+          <div className="ml-2">• Gold/Attack: Total cost per effective melee damage</div>
+          <div className="ml-2">• Gold/Defense: Total cost per effective defense</div>
+          <div className="ml-2">• Gold/Ranged: Total cost per effective ranged damage</div>
+          <div className="ml-2">• TEGC includes 48 hours of upkeep costs</div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1405,6 +1661,7 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
     if (b === 'Castle') return 1 / (land || 20);
     if (b === 'House') return 2;
     if (b === 'Guard House') return 0.5;
+    if (b === 'Guard Towers') return 0;
     if (b === 'Advanced Training Center') return 5 / (land || 20);
     if (b === 'Training Center') return 5 / (land || 20);
     if (b === 'Medical Center') return 0;
@@ -1696,15 +1953,62 @@ const ProjectedWeaponsSummary = ({ race, blacksmithingEfficiency, population, bu
   return (
     <div className="p-4 bg-gray-800 rounded-lg mb-4">
       <h3 className="text-lg font-semibold mb-2">Armory Production</h3>
-      <span>
+      <p className="text-sm text-purple-300 mb-2">
         If your blacksmiths go to work right away, they will be able to build: {summary} per day.
-      </span>
+      </p>
     </div>
   );
 };
 
 // Update PopulationAssignment for Training, Building, Blacksmithing
+// Helper function to calculate optimal population assignments
+const calculateOptimalPopulation = (buildings: any, totalPop: number) => {
+  const optimal: any = {};
+  
+  // Calculate optimal for each job
+  for (const job of JOBS) {
+    if (job.key === 'Training' || job.key === 'Exploration') {
+      optimal[job.key] = 0; // These are set manually
+    } else if (job.key === 'Building') {
+      optimal[job.key] = (buildings['Building'] || 0) * 150;
+    } else if (job.key === 'Blacksmithing') {
+      optimal[job.key] = (buildings['Forge'] || 0) * 80;
+    } else if (job.key === 'Agriculture') {
+      optimal[job.key] = (buildings['Farm'] || 0) * 60;
+    } else {
+      const eff = JOB_EFFICIENCY[job.key];
+      if (eff) {
+        optimal[job.key] = (buildings[eff.building] || 0) * eff.optimal;
+      } else {
+        optimal[job.key] = 0;
+      }
+    }
+  }
+  
+  // Ensure we don't exceed total population
+  const totalOptimal = Object.values(optimal).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
+  if (totalOptimal > totalPop) {
+    // Scale down proportionally
+    const scale = totalPop / totalOptimal;
+    for (const job of JOBS) {
+      optimal[job.key] = Math.floor(optimal[job.key] * scale);
+    }
+  }
+  
+  return optimal;
+};
+
 const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }: any) => {
+  // Set optimal population assignments when component mounts or buildings change
+  useEffect(() => {
+    // Only set if population is empty (initial load) or if buildings have changed significantly
+    const currentTotal = Object.values(population).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
+    if (currentTotal === 0 && totalPop > 0) {
+      const optimalPopulation = calculateOptimalPopulation(buildings, totalPop);
+      setPopulation(optimalPopulation);
+    }
+  }, [buildings, totalPop, setPopulation]);
+
   // Calculate optimal/max per job
   const getJobMax = (job: string) => {
     if (job === 'Training' || job === 'Exploration') return totalPop;
@@ -1795,9 +2099,7 @@ const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }
   return (
     <div className="p-4 bg-gray-800 rounded-lg mb-4">
       <h3 className="text-lg font-semibold mb-2">Population Assignment</h3>
-      <div className="mb-2 text-sm">
-        <span>Total Assigned: {totalAssigned} / {totalPop}</span>
-      </div>
+      <p className="text-sm text-purple-300 mb-2">Total Assigned: {totalAssigned} / {totalPop}</p>
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
@@ -1853,7 +2155,28 @@ const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-gray-400 mt-2">Both Assigned and Efficiency are editable and kept in sync. Efficiency = assigned / buildings (rounded down). Blacksmithing: assigned/forges, Building: assigned/150, Training: 1:1.</p>
+      <div className="mt-2 space-y-1">
+        <div className="flex justify-between items-center">
+          <p className="text-xs text-gray-400">Both Assigned and Efficiency are editable and kept in sync.</p>
+          <button
+            onClick={() => {
+              const optimalPopulation = calculateOptimalPopulation(buildings, totalPop);
+              setPopulation(optimalPopulation);
+            }}
+            className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded transition"
+            title="Reset to optimal population assignments"
+          >
+            Reset to Optimal
+          </button>
+        </div>
+        <div className="text-xs text-gray-300">
+          <span className="font-medium">Efficiency Formula:</span>
+          <div className="ml-2">• Building: assigned/150 workers</div>
+          <div className="ml-2">• Blacksmithing: assigned/forges</div>
+          <div className="ml-2">• Training/Exploration: 1:1 ratio</div>
+          <div className="ml-2">• Others: assigned/buildings (rounded down)</div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1870,7 +2193,7 @@ const ProjectedProduction = ({ population, buildings, army, land, race }: any) =
     const n = typeof count === 'number' ? count : parseInt(count as string) || 0;
     if (b === 'House') maxPop += n * 100;
     else if (b === 'Castle') maxPop += n * 10;
-    else maxPop += n * 10;
+    else maxPop += n * 10;  // All other buildings provide 10 population each
   }
   const totalPop = Object.values(population).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
 
@@ -2058,7 +2381,7 @@ export default function MainApp() {
       const n = typeof count === 'number' ? count : parseInt(count as string) || 0;
       if (b === 'House') total += n * 100;
       else if (b === 'Castle') total += n * 10;
-      else total += n * 10;
+      else total += n * 10;  // All other buildings provide 10 population each
     }
     return total;
   };
@@ -2159,6 +2482,9 @@ export default function MainApp() {
               army={enemyArmy}
               setArmy={setEnemyArmy}
               units={getUnitsForRace(enemyRace)}
+              buildings={enemyBuildings}
+              race={enemyRace}
+              techLevels={enemyTechLevels}
             />
             <PopulationAssignment
               population={enemyPopulation}
