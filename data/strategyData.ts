@@ -92,5 +92,12 @@ export const STRATEGY_DATA: Record<string, StrategyData> = {
       all_units_damage_increase: 3,
       all_units_defense_divide_by: 2
     }
+  },
+  "Orc": {
+    type: "Orc Unique",
+    description: "Standard Orc strategy affecting Shadow Warrior immunity.",
+    effects: {
+      shadow_warrior_melee_immunity_reduction: 5 // Reduces from 80% to 75%
+    }
   }
 };

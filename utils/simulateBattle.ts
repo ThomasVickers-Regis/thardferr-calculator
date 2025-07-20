@@ -50,8 +50,43 @@ export function simulateBattle(
   yourRace: string = 'dwarf',
   enemyRace: string = 'dwarf'
 ): BattleOutcome {
-  let yourArmy = { ...yourInitialArmy };
+    let yourArmy = { ...yourInitialArmy };
   let enemyArmy = { ...enemyInitialArmy };
+  
+  // Apply Castle-Based Defense Scaling (from changelog)
+  // "Castle Based Defense Scaling, the more castles you have the fewer men you have to defend it (always at least 70%)"
+  const enemyCastles = enemyBuildings['Castle'] || 0;
+  
+
+  
+  if (enemyCastles > 0) {
+    // Calculate garrison efficiency based on castle count
+    // More castles = lower efficiency, but always at least 70%
+    let garrisonEfficiency = 1.0;
+    if (enemyCastles >= 10) {
+      garrisonEfficiency = 0.70; // 70% minimum as per changelog
+    } else if (enemyCastles >= 5) {
+      garrisonEfficiency = 0.75; // 75% for medium castle count
+    } else if (enemyCastles >= 2) {
+      garrisonEfficiency = 0.80; // 80% for low castle count
+    }
+    
+    console.log(`Castle scaling applied: ${enemyCastles} castles = ${garrisonEfficiency * 100}% efficiency`);
+    
+    // Apply garrison efficiency to all units
+    for (const [unit, count] of Object.entries(enemyArmy)) {
+      const originalCount = count;
+      enemyArmy[unit] = Math.floor(count * garrisonEfficiency);
+      console.log(`${unit}: ${originalCount} → ${enemyArmy[unit]} (${garrisonEfficiency * 100}% scaling)`);
+    }
+    
+
+ 
+
+  }
+  
+  // Store the scaled enemy army as the "initial" army for retreat calculations
+  const enemyInitialArmyForRetreat = { ...enemyArmy };
   const battleLog: BattleLogEntry[] = [];
 
   // Calculate KS difference factor (bottomfeeding)
@@ -65,7 +100,28 @@ export function simulateBattle(
   let winner: BattleOutcome['winner'] = 'draw';
 
   while (round <= maxRounds) {
-    // Check if either army is eliminated
+    // Check if either army should retreat (lost 20% of total strength)
+    const yourTotalUnits = Object.values(yourArmy).reduce((sum, v) => sum + v, 0);
+    const enemyTotalUnits = Object.values(enemyArmy).reduce((sum, v) => sum + v, 0);
+    const yourInitialTotal = Object.values(yourInitialArmy).reduce((sum, v) => sum + v, 0);
+    const enemyInitialTotal = Object.values(enemyInitialArmyForRetreat).reduce((sum, v) => sum + v, 0);
+    
+    const yourRemainingPercent = yourInitialTotal > 0 ? (yourTotalUnits / yourInitialTotal) * 100 : 0;
+    const enemyRemainingPercent = enemyInitialTotal > 0 ? (enemyTotalUnits / enemyInitialTotal) * 100 : 0;
+    
+    // Check for retreat conditions (below 20% forces remaining)
+    if (yourRemainingPercent < 20 && enemyRemainingPercent < 20) {
+      winner = 'draw';
+      break;
+    } else if (yourRemainingPercent < 20) {
+      winner = 'enemyArmy';
+      break;
+    } else if (enemyRemainingPercent < 20) {
+      winner = 'yourArmy';
+      break;
+    }
+    
+    // Fallback: Check if either army is completely eliminated
     const yourAlive = Object.values(yourArmy).some(v => v > 0);
     const enemyAlive = Object.values(enemyArmy).some(v => v > 0);
     if (!yourAlive && !enemyAlive) {
@@ -118,11 +174,36 @@ export function simulateBattle(
 
   // Final check for winner if maxRounds reached
   if (winner === 'draw') {
-    const yourAlive = Object.values(yourArmy).some(v => v > 0);
-    const enemyAlive = Object.values(enemyArmy).some(v => v > 0);
-    if (yourAlive && !enemyAlive) winner = 'yourArmy';
-    else if (!yourAlive && enemyAlive) winner = 'enemyArmy';
-    else winner = 'draw';
+    const yourTotalUnits = Object.values(yourArmy).reduce((sum, v) => sum + v, 0);
+    const enemyTotalUnits = Object.values(enemyArmy).reduce((sum, v) => sum + v, 0);
+    const yourInitialTotal = Object.values(yourInitialArmy).reduce((sum, v) => sum + v, 0);
+    const enemyInitialTotal = Object.values(enemyInitialArmyForRetreat).reduce((sum, v) => sum + v, 0);
+    
+    const yourRemainingPercent = yourInitialTotal > 0 ? (yourTotalUnits / yourInitialTotal) * 100 : 0;
+    const enemyRemainingPercent = enemyInitialTotal > 0 ? (enemyTotalUnits / enemyInitialTotal) * 100 : 0;
+    
+
+    
+    // Check for retreat conditions (below 20% forces remaining)
+    if (yourRemainingPercent < 20 && enemyRemainingPercent < 20) {
+      winner = 'draw';
+    } else if (yourRemainingPercent < 20) {
+      winner = 'enemyArmy';
+    } else if (enemyRemainingPercent < 20) {
+      winner = 'yourArmy';
+    } else {
+      // Fallback: Check if either army is completely eliminated
+      const yourAlive = Object.values(yourArmy).some(v => v > 0);
+      const enemyAlive = Object.values(enemyArmy).some(v => v > 0);
+      if (yourAlive && !enemyAlive) {
+        winner = 'yourArmy';
+      } else if (!yourAlive && enemyAlive) {
+        winner = 'enemyArmy';
+      } else {
+        // Both armies are alive (or both dead) - this should be a draw
+        winner = 'draw';
+      }
+    }
   }
 
   // End Phase: Apply healing from Medical Centers after battle is complete

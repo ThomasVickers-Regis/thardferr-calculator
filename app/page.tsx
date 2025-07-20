@@ -306,7 +306,7 @@ const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLe
                             className="w-12 p-1 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
                             value={currentLevel}
                             onChange={e => {
-                              const val = Math.max(0, Math.min(Number(e.target.value), tech.maxLevel));
+                              const val = Math.max(0, Math.min(Number(e.target.value), tech.maxLevel || 1));
                               setTechLevels({ ...techLevels, [tech.name]: val });
                             }}
                             disabled={!canResearch}
@@ -388,9 +388,8 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
     for (const [unit, initialCount] of Object.entries(initialArmy)) {
       const finalCount = finalArmy[unit] || 0;
       const lost = (initialCount as number) - finalCount;
-      if (lost > 0) {
-        casualties[unit] = lost;
-      }
+      // Show all units, even with 0 losses
+      casualties[unit] = lost;
     }
     return casualties;
   };
@@ -403,19 +402,20 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
     const buildingEffects: string[] = [];
 
     for (const [unit, count] of Object.entries(army)) {
-      if (count > 0) {
+      const unitCount = count as number;
+      if (unitCount > 0) {
         const effectiveStats = getEffectiveUnitStats(unit, race, techLevels, strategy, isAttacker, 1);
         
         // Only count relevant stats for this phase
         if (phase === 'range') {
-          totalAttack += effectiveStats.range * (count as number);
+          totalAttack += effectiveStats.range * unitCount;
         } else if (phase === 'short') {
-          totalAttack += effectiveStats.short * (count as number);
+          totalAttack += effectiveStats.short * unitCount;
         } else if (phase === 'melee') {
-          totalAttack += effectiveStats.melee * (count as number);
+          totalAttack += effectiveStats.melee * unitCount;
         }
         
-        totalDefense += effectiveStats.defense * (count as number);
+        totalDefense += effectiveStats.defense * unitCount;
       }
     }
 
@@ -488,9 +488,9 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
     };
   };
 
-  // Get initial armies from the first round (these are the armies at START of round 1)
-  const initialYourArmy = battleLog[0]?.yourArmy || {};
-  const initialEnemyArmy = battleLog[0]?.enemyArmy || {};
+  // Use original armies for display (before any scaling was applied)
+  const initialYourArmy = originalYourArmy;
+  const initialEnemyArmy = originalEnemyArmy;
 
   // Simulate land gain/loss based on battle outcome (attacker perspective)
   const calculateLandGainLoss = () => {
@@ -547,7 +547,11 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
   };
 
   const yourCasualties = calculateCasualties(originalYourArmy, finalYourArmy);
-  const enemyCasualties = calculateCasualties(originalEnemyArmy, finalEnemyArmy);
+  
+  // For enemy casualties, use the scaled army as the starting point (not the original)
+  const enemyCasualties = battleLog.length > 0 
+    ? calculateCasualties(battleLog[0].enemyArmy, finalEnemyArmy)  // Use scaled army from first round
+    : calculateCasualties(originalEnemyArmy, finalEnemyArmy);      // Fallback to original if no battle log
   const landResults = calculateLandGainLoss();
   const buildingGains = simulateBuildingGains();
 
@@ -820,6 +824,25 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                   ))}
                                 </div>
                               )}
+                              {/* Castle scaling note */}
+                              {battleLog[0]?.enemyArmy && (() => {
+                                const originalTotal = Object.values(originalEnemyArmy).reduce((sum, count) => sum + count, 0);
+                                const scaledTotal = Object.values(battleLog[0].enemyArmy).reduce((sum, count) => sum + count, 0);
+                                if (originalTotal > 0 && scaledTotal < originalTotal) {
+                                  const efficiency = Math.round((scaledTotal / originalTotal) * 100);
+                                  return (
+                                    <div className="mt-2 pt-2 border-t border-gray-600">
+                                      <div className="text-xs text-orange-300 font-bold">Castle Scaling Active:</div>
+                                      <div className="text-xs text-gray-300">• {efficiency}% of army defending (castle-based scaling applied)</div>
+                                      <div className="text-xs text-gray-300">• Enemy army reduced from {originalTotal} to {scaledTotal} units</div>
+                                      <div className="text-xs text-gray-300">• Unit counts shown are AFTER castle scaling</div>
+                                      <div className="text-xs text-yellow-300 font-bold">• Original: {Object.entries(originalEnemyArmy).map(([unit, count]) => `${count} ${unit}`).join(', ')}</div>
+                                      <div className="text-xs text-red-300 font-bold">• Scaled: {Object.entries(battleLog[0].enemyArmy).map(([unit, count]) => `${count} ${unit}`).join(', ')}</div>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </div>
                             
                             {/* Condensed Unit Summary */}
@@ -976,7 +999,18 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
 
                         {/* Enemy Army Details */}
                         <div className="bg-gray-800 p-4 rounded">
-                          <div className="font-medium text-red-300 mb-3 border-b border-gray-600 pb-2 text-lg">Enemy Army Details</div>
+                          <div className="font-medium text-red-300 mb-3 border-b border-gray-600 pb-2 text-lg">
+                            Enemy Army Details
+                            {battleLog[0]?.enemyArmy && (() => {
+                              const originalTotal = Object.values(originalEnemyArmy).reduce((sum, count) => sum + count, 0);
+                              const scaledTotal = Object.values(battleLog[0].enemyArmy).reduce((sum, count) => sum + count, 0);
+                              if (originalTotal > 0 && scaledTotal < originalTotal) {
+                                const efficiency = Math.round((scaledTotal / originalTotal) * 100);
+                                return <span className="text-xs text-orange-300 ml-2">({efficiency}% castle scaling)</span>;
+                              }
+                              return null;
+                            })()}
+                          </div>
                           <div className="space-y-3 text-sm">
                             {Object.entries(phaseLog.enemyArmyAtStart || entry.enemyArmy).filter(([_, v]) => v > 0).map(([unit, count]) => {
                               const stats = getEffectiveUnitStats(unit, enemyRace, enemyTechLevels, enemyStrategy, false, 1);
@@ -1973,7 +2007,7 @@ export default function MainApp() {
   const [enemyRace, setEnemyRace] = useState<string>(RACES[0]);
   // Add building state for each kingdom
   const [yourBuildings, setYourBuildings] = useState<any>({});
-  const [enemyBuildings, setEnemyBuildings] = useState<any>({});
+  const [enemyBuildings, setEnemyBuildings] = useState<any>({ Castle: 2 }); // Default 2 castles for testing castle scaling
   // Add population state for each kingdom
   const [yourPopulation, setYourPopulation] = useState<any>({});
   const [enemyPopulation, setEnemyPopulation] = useState<any>({});

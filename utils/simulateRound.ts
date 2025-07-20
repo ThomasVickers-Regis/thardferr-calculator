@@ -56,6 +56,8 @@ export function simulateRound(
   const initialEnemyArmy = enemyInitialArmy || enemyArmy;
   const phaseLogs: RoundResult['phaseLogs'] = [];
   const phases: PhaseType[] = ['range', 'short', 'melee'];
+  
+
 
   for (const phase of phases) {
     // Record army state at START of this phase
