@@ -78,6 +78,11 @@ export function simulateBattle(
       winner = 'yourArmy';
       break;
     }
+    
+    // Record army state at START of round
+    const roundStartYourArmy = { ...yourArmy };
+    const roundStartEnemyArmy = { ...enemyArmy };
+    
     // Simulate round
     const roundResult = simulateRound(
       yourArmy,
@@ -90,18 +95,24 @@ export function simulateBattle(
       yourBuildings,
       enemyBuildings,
       yourRace,
-      enemyRace
+      enemyRace,
+      yourKingdomStats.Land || 20,
+      enemyKingdomStats.Land || 20,
+      yourInitialArmy,
+      enemyInitialArmy
     );
-    // Update armies
-    yourArmy = { ...roundResult.yourArmy };
-    enemyArmy = { ...roundResult.enemyArmy };
-    // Log round
+    
+    // Log round with army state at START of round
     battleLog.push({
       round,
       roundResult,
-      yourArmy: { ...yourArmy },
-      enemyArmy: { ...enemyArmy }
+      yourArmy: roundStartYourArmy,
+      enemyArmy: roundStartEnemyArmy
     });
+    
+    // Update armies for next round
+    yourArmy = { ...roundResult.yourArmy };
+    enemyArmy = { ...roundResult.enemyArmy };
     round++;
   }
 
@@ -112,6 +123,72 @@ export function simulateBattle(
     if (yourAlive && !enemyAlive) winner = 'yourArmy';
     else if (!yourAlive && enemyAlive) winner = 'enemyArmy';
     else winner = 'draw';
+  }
+
+  // End Phase: Apply healing from Medical Centers after battle is complete
+  const yourHealing: Record<string, number> = {};
+  const enemyHealing: Record<string, number> = {};
+  
+  // Calculate healing for your army
+  if (yourBuildings['Medical Center'] && yourBuildings['Medical Center'] > 0) {
+    const medicalCenters = yourBuildings['Medical Center'];
+    const healingPercent = 20; // 20% of deaths are healed back
+    
+    // Check all units that were in the initial army
+    for (const [unit, originalCount] of Object.entries(yourInitialArmy)) {
+      if (originalCount > 0) {
+        const currentCount = yourArmy[unit] || 0;
+        const lostInBattle = originalCount - currentCount;
+        
+        if (lostInBattle > 0) {
+          const healed = Math.round(lostInBattle * (healingPercent / 100));
+          if (healed > 0) {
+            yourHealing[unit] = healed;
+            yourArmy[unit] = Math.min(originalCount, currentCount + healed);
+          }
+        }
+      }
+    }
+  }
+  
+  // Calculate healing for enemy army
+  if (enemyBuildings['Medical Center'] && enemyBuildings['Medical Center'] > 0) {
+    const medicalCenters = enemyBuildings['Medical Center'];
+    const healingPercent = 20; // 20% of deaths are healed back
+    
+    // Check all units that were in the initial army
+    for (const [unit, originalCount] of Object.entries(enemyInitialArmy)) {
+      if (originalCount > 0) {
+        const currentCount = enemyArmy[unit] || 0;
+        const lostInBattle = originalCount - currentCount;
+        
+        if (lostInBattle > 0) {
+          const healed = Math.round(lostInBattle * (healingPercent / 100));
+          if (healed > 0) {
+            enemyHealing[unit] = healed;
+            enemyArmy[unit] = Math.min(originalCount, currentCount + healed);
+          }
+        }
+      }
+    }
+  }
+  
+  // Add End phase to the last round's phase logs if healing occurred
+  if (Object.keys(yourHealing).length > 0 || Object.keys(enemyHealing).length > 0) {
+    if (battleLog.length > 0) {
+      const lastRound = battleLog[battleLog.length - 1];
+      lastRound.roundResult.phaseLogs.push({
+        phase: 'end',
+        yourLosses: {},
+        enemyLosses: {},
+        yourDamageLog: [],
+        enemyDamageLog: [],
+        yourArmyAtStart: { ...yourArmy },
+        enemyArmyAtStart: { ...enemyArmy },
+        yourHealing,
+        enemyHealing
+      });
+    }
   }
 
   return {

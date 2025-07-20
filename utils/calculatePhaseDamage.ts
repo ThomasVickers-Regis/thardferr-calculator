@@ -14,6 +14,15 @@ export type PhaseType = 'range' | 'short' | 'melee';
  * @param ksDifferenceFactor - Multiplier/divisor for bottomfeeding
  * @returns Object of losses for the defending army: { UnitName: numLost }
  */
+export interface DamageLog {
+  unitName: string;
+  damageReceived: number;
+  damageMitigated: number;
+  finalDamage: number;
+  unitsLost: number;
+  buildingEffects: string[];
+}
+
 export function calculatePhaseDamage(
   attackingArmy: Army,
   defendingArmy: Army,
@@ -26,39 +35,61 @@ export function calculatePhaseDamage(
   isAttacker: boolean = false,
   attackerRace: string = 'dwarf',
   defenderRace: string = 'dwarf'
-): Record<string, number> {
+): { losses: Record<string, number>; damageLog: DamageLog[] } {
   // Clone defendingArmy to track losses
   const losses: Record<string, number> = {};
+  const damageLog: DamageLog[] = [];
   const defenderUnitNames = Object.keys(defendingArmy).filter(u => defendingArmy[u] > 0);
-  if (defenderUnitNames.length === 0) return losses;
+  if (defenderUnitNames.length === 0) return { losses, damageLog };
 
-  // Track total damage reduction from buildings
-  let buildingDamageReduction = 0;
-  let perUnitCap = 0;
-  const totalDefenders = defenderUnitNames.reduce((sum, u) => sum + defendingArmy[u], 0);
-  if (phaseType === 'range' && defenderBuildings['Guard Towers']) {
-    // Guard Towers: -40 per tower, max 2 per unit (max 80 per unit)
-    const towers = defenderBuildings['Guard Towers'] || 0;
-    perUnitCap = 80;
-    buildingDamageReduction = Math.min(towers * 40, totalDefenders * perUnitCap);
+  // Track damage per unit
+  const damagePerUnit: Record<string, number> = {};
+  const buildingEffectsPerUnit: Record<string, string[]> = {};
+  
+  // Initialize damage tracking
+  for (const unit of defenderUnitNames) {
+    damagePerUnit[unit] = 0;
+    buildingEffectsPerUnit[unit] = [];
   }
+
+  // Calculate total defenders for building effects
+  const totalDefenders = defenderUnitNames.reduce((sum, u) => sum + defendingArmy[u], 0);
+
+  // Calculate building effects
+  if (phaseType === 'range' && defenderBuildings['Guard Towers']) {
+    const towers = defenderBuildings['Guard Towers'] || 0;
+    const maxReductionPerUnit = 2;
+    const totalReduction = Math.min(towers * 40, totalDefenders * maxReductionPerUnit);
+    const reductionPerUnit = totalDefenders > 0 ? totalReduction / totalDefenders : 0;
+    
+    for (const unit of defenderUnitNames) {
+      const unitCount = defendingArmy[unit];
+      const unitReduction = reductionPerUnit * unitCount;
+      buildingEffectsPerUnit[unit].push(`Guard Towers: -${unitReduction.toFixed(1)} damage (${towers} towers)`);
+    }
+  }
+  
   if (phaseType === 'melee' && defenderBuildings['Medical Center']) {
-    // Medical Center: -50 per center on attack (max 1 per unit), -75 per center on defense (max 2 per unit)
     const med = defenderBuildings['Medical Center'] || 0;
-    if (isAttacker) {
-      perUnitCap = 50;
-      buildingDamageReduction = Math.min(med * 50, totalDefenders * perUnitCap);
-    } else {
-      perUnitCap = 150;
-      buildingDamageReduction = Math.min(med * 75, totalDefenders * perUnitCap);
+    const maxReductionPerUnit = isAttacker ? 1 : 2;
+    const damagePerCenter = isAttacker ? 50 : 75;
+    const totalReduction = Math.min(med * damagePerCenter, totalDefenders * maxReductionPerUnit);
+    const reductionPerUnit = totalDefenders > 0 ? totalReduction / totalDefenders : 0;
+    
+    for (const unit of defenderUnitNames) {
+      const unitCount = defendingArmy[unit];
+      const unitReduction = reductionPerUnit * unitCount;
+      buildingEffectsPerUnit[unit].push(`Medical Center: -${unitReduction.toFixed(1)} damage (${med} centers)`);
     }
   }
 
   // For each attacking unit type
   for (const [attackerName, attackerCount] of Object.entries(attackingArmy)) {
     if (attackerCount <= 0) continue;
-          // Get effective stats for this attacker
-      const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, activeStrategy, true, ksDifferenceFactor);
+    
+    // Get effective stats for this attacker
+    const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, activeStrategy, true, ksDifferenceFactor);
+    
     // Determine attack value for this phase
     let attackValue = 0;
     if (phaseType === 'range') attackValue = attackerStats.range;
@@ -66,51 +97,60 @@ export function calculatePhaseDamage(
     else if (phaseType === 'melee') attackValue = attackerStats.melee;
     if (attackValue <= 0) continue;
 
-    // Each attacking unit attempts to "kill" a defending unit
-    for (let i = 0; i < attackerCount; i++) {
-      // Randomly select a defending unit (weighted by count)
-      const totalDefenders = defenderUnitNames.reduce((sum, u) => sum + defendingArmy[u], 0);
-      if (totalDefenders === 0) break;
-      let rand = Math.floor(Math.random() * totalDefenders);
-      let defenderName = defenderUnitNames[0];
-      for (const name of defenderUnitNames) {
-        if (rand < defendingArmy[name]) {
-          defenderName = name;
-          break;
-        }
-        rand -= defendingArmy[name];
-      }
-              // Get effective defense for this defender
-        const defenderStats = getEffectiveUnitStats(defenderName, defenderRace, {}, null, false, ksDifferenceFactor); // Defenders' tech/strategy not applied here for simplicity
-      const defenseValue = defenderStats.defense;
-      // Probabilistic kill chance
-      let killChance = 0.2;
-      if (attackValue > defenseValue) killChance = 0.8;
-      else if (attackValue === defenseValue) killChance = 0.5;
-      // Roll for kill
-      if (Math.random() < killChance) {
-        // Register a loss
-        losses[defenderName] = (losses[defenderName] || 0) + 1;
-        defendingArmy[defenderName]--;
-        if (defendingArmy[defenderName] <= 0) {
-          // Remove from selection pool
-          const idx = defenderUnitNames.indexOf(defenderName);
-          if (idx !== -1) defenderUnitNames.splice(idx, 1);
-        }
-      }
+    // Calculate total damage from this attacker type
+    const totalDamageFromAttacker = attackerCount * attackValue;
+    
+    // Distribute damage across defending units (weighted by count)
+    const totalDefenders = defenderUnitNames.reduce((sum, u) => sum + defendingArmy[u], 0);
+    if (totalDefenders === 0) continue;
+    
+    for (const defenderName of defenderUnitNames) {
+      const defenderCount = defendingArmy[defenderName];
+      const damageShare = (defenderCount / totalDefenders) * totalDamageFromAttacker;
+      damagePerUnit[defenderName] += damageShare;
     }
   }
-  // Apply building-based damage reduction to total losses (as a flat reduction, distributed across units)
-  if (buildingDamageReduction > 0) {
-    // Distribute reduction across units proportionally
-    let reductionLeft = buildingDamageReduction;
-    const unitNames = Object.keys(losses);
-    for (const unit of unitNames) {
-      if (reductionLeft <= 0) break;
-      const reduc = Math.min(losses[unit] || 0, Math.floor(reductionLeft / unitNames.length));
-      losses[unit] = Math.max(0, (losses[unit] || 0) - reduc);
-      reductionLeft -= reduc;
+
+  // Calculate final losses for each unit
+  for (const unit of defenderUnitNames) {
+    const totalDamage = damagePerUnit[unit];
+    const unitCount = defendingArmy[unit];
+    const defenderStats = getEffectiveUnitStats(unit, defenderRace, {}, null, false, ksDifferenceFactor);
+    const defenseValue = defenderStats.defense;
+    
+    // Calculate damage mitigation from buildings
+    let damageMitigated = 0;
+    if (buildingEffectsPerUnit[unit].length > 0) {
+      // Extract mitigation from building effects
+      const mitigationMatch = buildingEffectsPerUnit[unit][0].match(/-(\d+\.?\d*) damage/);
+      if (mitigationMatch) {
+        damageMitigated = parseFloat(mitigationMatch[1]);
+      }
     }
+    
+    const finalDamage = Math.max(0, totalDamage - damageMitigated);
+    
+    // Calculate units lost based on damage vs defense
+    let unitsLost = 0;
+    if (finalDamage > 0) {
+      // Each unit needs to take damage equal to its defense to be killed
+      const damagePerKill = defenseValue;
+      unitsLost = Math.floor(finalDamage / damagePerKill);
+      unitsLost = Math.min(unitsLost, unitCount); // Can't lose more than we have
+    }
+    
+    losses[unit] = unitsLost;
+    
+    // Create damage log entry
+    damageLog.push({
+      unitName: unit,
+      damageReceived: Math.round(totalDamage * 100) / 100,
+      damageMitigated: Math.round(damageMitigated * 100) / 100,
+      finalDamage: Math.round(finalDamage * 100) / 100,
+      unitsLost: unitsLost,
+      buildingEffects: buildingEffectsPerUnit[unit]
+    });
   }
-  return losses;
+
+  return { losses, damageLog };
 } 

@@ -56,9 +56,7 @@ export function getEffectiveUnitStats(
   }
 
   // --- Ranged Base Effectiveness ---
-  // All range and short attacks are dealt at 50% effectiveness before tech/strategy
-  stats.range *= 0.5;
-  stats.short *= 0.5;
+  // Base stats are used as-is (no automatic 50% reduction)
 
   // --- Technology Modifiers ---
   // Sharper Blades (melee)
