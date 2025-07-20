@@ -28,7 +28,8 @@ export function calculatePhaseDamage(
   defendingArmy: Army,
   phaseType: PhaseType,
   techLevels: TechLevels,
-  activeStrategy: StrategyName | null,
+  attackerStrategy: StrategyName | null,
+  defenderStrategy: StrategyName | null,
   ksDifferenceFactor: number = 1,
   attackerBuildings: any = {},
   defenderBuildings: any = {},
@@ -45,7 +46,7 @@ export function calculatePhaseDamage(
   let totalOffense = 0;
   for (const [attackerName, attackerCount] of Object.entries(attackingArmy)) {
     if (attackerCount <= 0) continue;
-    const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, activeStrategy, true, ksDifferenceFactor);
+    const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, attackerStrategy, true, ksDifferenceFactor);
     
     let attackValue = 0;
     if (phaseType === 'range') attackValue = attackerStats.range;
@@ -53,7 +54,7 @@ export function calculatePhaseDamage(
     else if (phaseType === 'melee') attackValue = attackerStats.melee;
     
     // Apply unit-to-unit combat bonuses (Anti-Cavalry strategy)
-    if (activeStrategy === 'Anti-Cavalry' && phaseType === 'melee') {
+    if (attackerStrategy === 'Anti-Cavalry' && phaseType === 'melee') {
       // Check if this is a pikeman unit attacking mounted units
       if (attackerName.toLowerCase().includes('pikeman')) {
         // Check if defender has mounted units (units with horses)
@@ -67,6 +68,19 @@ export function calculatePhaseDamage(
           attackValue *= 3.5; // Pikemen get 3.5x damage vs mounted units
         }
       }
+    }
+    
+    // Apply Gnome Far Fighting strategy (doubles long range attacks for both sides)
+    if ((attackerStrategy === 'Gnome Far Fighting' || defenderStrategy === 'Gnome Far Fighting') && 
+        (phaseType === 'range' || phaseType === 'short')) {
+      attackValue *= 2;
+    }
+    
+    // Apply Orc Surrounding strategy (Shadow Warriors deal damage in short phase)
+    if (attackerStrategy === 'Orc Surrounding' && phaseType === 'short' && 
+        attackerName.toLowerCase().includes('shadow warrior')) {
+      // Shadow Warriors get their full melee damage in short phase
+      attackValue = attackerStats.melee;
     }
     
     totalOffense += attackerCount * attackValue;
@@ -87,14 +101,20 @@ export function calculatePhaseDamage(
     // Apply unit-specific immunities and resistances
     let immunityPercent = 0;
     
-    // Mage: Invulnerable to melee phase
+    // Mage: Invulnerable to melee phase (unless Elf Energy Gathering strategy is active)
     if (defenderName.toLowerCase().includes('mage') && phaseType === 'melee') {
-      immunityPercent = 100;
+      if (defenderStrategy === 'Elf Energy Gathering') {
+        // Mages lose melee immunity but get +2 defense in melee
+        immunityPercent = 0;
+        defenseValue += 2;
+      } else {
+        immunityPercent = 100;
+      }
     }
     
     // Orc Shadow Warrior: 80% immunity in melee, 75% with Orc strategy
     if (defenderName.toLowerCase().includes('shadow warrior') && phaseType === 'melee') {
-      immunityPercent = activeStrategy === 'Orc' ? 75 : 80;
+      immunityPercent = defenderStrategy === 'Orc' ? 75 : 80;
     }
     
     // Undead Legion Skeleton: Immunity to long range (range phase)
@@ -103,7 +123,7 @@ export function calculatePhaseDamage(
     }
     
     // Dwarf Shield Line: Immunity to long range based on shieldbearer ratio
-    if (activeStrategy === 'Shield Line' && phaseType === 'range') {
+    if (defenderStrategy === 'Dwarf Shield Line' && phaseType === 'range') {
       const totalArmySize = Object.values(defendingArmy).reduce((sum, count) => sum + count, 0);
       const shieldbearerCount = defendingArmy['Shieldbearer'] || 0;
       if (totalArmySize > 0) {

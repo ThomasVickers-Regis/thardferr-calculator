@@ -85,66 +85,71 @@ export function getEffectiveUnitStats(
   if (strategy) {
     const strat = STRATEGY_DATA[strategy];
     if (strat) {
-      // Example: Archer Protection
+      const effects = strat.effects;
+      
+      // Apply strategy effects from STRATEGY_DATA
       if (strategy === 'Archer Protection') {
-        if (unitName.toLowerCase().includes('infantry')) stats.melee *= 0.5;
-        if (unitName.toLowerCase().includes('archer')) stats.range -= stats.melee; // Simplified
+        if (unitName.toLowerCase().includes('infantry')) {
+          stats.melee *= effects.infantry_attack_multiplier;
+        }
       }
-      // Infantry Attack
       if (strategy === 'Infantry Attack') {
-        if (unitName.toLowerCase().includes('infantry')) stats.melee *= 2.5;
-        // Other units' damages reduced (not specified)
+        if (unitName.toLowerCase().includes('infantry')) {
+          stats.melee *= effects.infantry_damage_multiplier;
+        }
       }
-      // Quick Retreat
       if (strategy === 'Quick Retreat') {
-        stats.melee *= 0.5;
-        stats.short *= 0.5;
-        stats.range *= 0.5;
+        stats.melee *= effects.all_unit_attack_multiplier;
+        stats.short *= effects.all_unit_attack_multiplier;
+        stats.range *= effects.all_unit_attack_multiplier;
       }
-      // Anti-Cavalry
       if (strategy === 'Anti-Cavalry') {
-        if (unitName.toLowerCase().includes('pikeman')) stats.melee *= 3.5;
-        stats.melee *= 0.9;
-        stats.short *= 0.9;
-        stats.range *= 0.9;
+        if (unitName.toLowerCase().includes('pikeman')) {
+          // Pikemen vs mounted multiplier is handled in battle logic
+        }
+        stats.melee *= effects.all_units_attack_multiplier;
+        stats.short *= effects.all_units_attack_multiplier;
+        stats.range *= effects.all_units_attack_multiplier;
       }
-      // Dwarf Shield Line
       if (strategy === 'Dwarf Shield Line') {
-        stats.melee *= 0.9;
-        if (unitName.toLowerCase().includes('shieldbearer')) stats.melee *= 2;
+        // Close combat attack reduction
+        stats.melee *= (1 - effects.all_units_close_combat_attack_reduction_percent);
+        stats.short *= (1 - effects.all_units_close_combat_attack_reduction_percent);
+        
+        // Shieldbearer damage increase
+        if (unitName.toLowerCase().includes('shieldbearer')) {
+          stats.melee *= (1 + effects.shieldbearers_close_combat_damage_increase_percent);
+        }
       }
-      // Elf Energy Gathering
       if (strategy === 'Elf Energy Gathering') {
         if (unitName.toLowerCase().includes('mage')) {
-          stats.defense += 2;
-          stats.melee *= 2;
-          stats.range += 4;
+          stats.defense += effects.wizards_defense_increase;
+          stats.melee *= effects.wizards_close_combat_damage_multiplier;
+          stats.range += effects.wizards_ranged_attack_increase;
         }
       }
-      // Gnome Far Fighting
       if (strategy === 'Gnome Far Fighting') {
-        stats.range *= 2;
-        stats.short *= 2;
+        // Long range attack doubling is handled in battle logic
       }
-      // Human Charging!
       if (strategy === 'Human Charging!') {
         if (unitName.toLowerCase().includes('knight')) {
-          stats.melee *= 1.5;
+          stats.melee *= effects.knights_attack_multiplier;
         }
       }
-      // Orc Surrounding
       if (strategy === 'Orc Surrounding') {
         if (unitName.toLowerCase().includes('shadow warrior')) {
-          stats.defense += 2;
-          // All Shadow Warrior damages dealt in Short-ranged phase (handled in battle logic)
+          stats.defense += effects.shadow_warriors_defense_increase;
+          // Short ranged phase damage is handled in battle logic
         }
       }
-      // Orc Berserker
       if (strategy === 'Orc Berserker') {
-        stats.melee += 3;
-        stats.short += 3;
-        stats.range += 3;
-        stats.defense *= 0.5;
+        stats.melee += effects.all_units_damage_increase;
+        stats.short += effects.all_units_damage_increase;
+        stats.range += effects.all_units_damage_increase;
+        stats.defense /= effects.all_units_defense_divide_by;
+      }
+      if (strategy === 'Orc') {
+        // Shadow warrior immunity reduction is handled in battle logic
       }
     }
   }

@@ -72,11 +72,13 @@ export function simulateRound(
       phase,
       techLevelsEnemy,
       strategyEnemy,
+      strategyYour,
       ksDifferenceFactor,
       enemyBuildings,
       yourBuildings,
       false, // enemy is attacker
-      enemyRace
+      enemyRace,
+      yourRace
     );
     const enemyDamageResult = calculatePhaseDamage(
       yourArmyState,
@@ -84,11 +86,13 @@ export function simulateRound(
       phase,
       techLevelsYour,
       strategyYour,
+      strategyEnemy,
       ksDifferenceFactor,
       yourBuildings,
       enemyBuildings,
       true, // your side is attacker
-      yourRace
+      yourRace,
+      enemyRace
     );
     
     // Apply losses to yourArmyState

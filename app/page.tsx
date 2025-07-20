@@ -96,7 +96,7 @@ const getDefaultArmy = (race: string) => {
 };
 
 // ArmyInput component: allows user to set quantities for all unit types
-const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels }: { armyName: string; army: Army; setArmy: (a: Army) => void; units: string[]; buildings?: any; race?: string; techLevels?: any }) => {
+const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels, strategy }: { armyName: string; army: Army; setArmy: (a: Army) => void; units: string[]; buildings?: any; race?: string; techLevels?: any; strategy?: any }) => {
   // Ensure race is lowercase and defined
   const raceKey = race?.toLowerCase() || 'dwarf';
   
@@ -277,10 +277,6 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
       {buildings && race && (
         <p className="text-sm text-purple-300 mb-2">
           {getUnitProductionSummary() || 'No Training Centers or Advanced Training Centers built'}
-          <br />
-          <span className="text-xs text-gray-400">
-            Debug: TC={buildings['Training Center'] || buildings['training center'] || buildings['TrainingCenter'] || 0}, ATC={buildings['Advanced Training Center'] || buildings['advanced training center'] || buildings['AdvancedTrainingCenter'] || 0}
-          </span>
         </p>
       )}
       <div className="overflow-x-auto">
@@ -300,8 +296,8 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
               const baseStats = UNIT_DATA[raceKey]?.[unit];
               if (!baseStats) return null; // Skip if unit not found for this race
               
-              // Get effective stats including technology bonuses
-              const effectiveStats = getEffectiveUnitStats(unit, raceKey, techLevels || {}, null, true, 1);
+              // Get effective stats including technology and strategy bonuses
+              const effectiveStats = getEffectiveUnitStats(unit, raceKey, techLevels || {}, strategy, true, 1);
               
               return (
                 <tr key={unit} className="even:bg-gray-700">
@@ -589,9 +585,20 @@ const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLe
           title="Select a strategy"
         >
           <option value="">None</option>
-          {Object.entries(STRATEGY_DATA).map(([strat, data]) => (
-            <option key={strat} value={strat}>{strat}</option>
-          ))}
+          {Object.entries(STRATEGY_DATA)
+            .filter(([strat, data]) => {
+              // Show all General strategies
+              if (data.type === 'General') return true;
+              // Show race-specific strategy for the current race
+              const capitalizedRace = race.charAt(0).toUpperCase() + race.slice(1);
+              if (data.type === `${capitalizedRace} Unique`) return true;
+              // Show Orc strategies for Orc race (handle both "Orc Unique" and "Orc")
+              if (race === 'orc' && (data.type === 'Orc Unique' || strat === 'Orc')) return true;
+              return false;
+            })
+            .map(([strat, data]) => (
+              <option key={strat} value={strat}>{strat}</option>
+            ))}
         </select>
       </div>
     </div>
@@ -679,38 +686,50 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
     
     // Add any percentage-based technology modifiers here if they exist in the data
 
-    // Add strategy effects
-    if (strategy) {
+    // Add strategy effects from STRATEGY_DATA
+    if (strategy && STRATEGY_DATA[strategy]) {
+      const strategyData = STRATEGY_DATA[strategy];
+      const effects = strategyData.effects;
+      
+      // Handle specific strategy effects based on phase
       if (strategy === 'Archer Protection' && phase === 'melee') {
-        modifiers.push('Archer Protection: Infantry -50% melee');
+        modifiers.push(`Archer Protection: Infantry -${((1 - effects.infantry_attack_multiplier) * 100).toFixed(0)}% melee`);
       }
       if (strategy === 'Infantry Attack' && phase === 'melee') {
-        modifiers.push('Infantry Attack: Infantry +150% melee');
+        modifiers.push(`Infantry Attack: Infantry +${((effects.infantry_damage_multiplier - 1) * 100).toFixed(0)}% melee`);
       }
       if (strategy === 'Quick Retreat') {
-        modifiers.push('Quick Retreat: All attacks -50%');
-        modifiers.push('Quick Retreat: Retreat at 40% losses (vs 20% normal)');
+        modifiers.push(`Quick Retreat: All attacks -${((1 - effects.all_unit_attack_multiplier) * 100).toFixed(0)}%`);
       }
       if (strategy === 'Anti-Cavalry' && phase === 'melee') {
-        modifiers.push('Anti-Cavalry: Pikemen +250% vs mounted');
+        modifiers.push(`Anti-Cavalry: Pikemen +${((effects.pikemen_attack_vs_mounted_multiplier - 1) * 100).toFixed(0)}% vs mounted`);
       }
       if (strategy === 'Dwarf Shield Line' && phase === 'melee') {
-        modifiers.push('Dwarf Shield Line: Shieldbearers +100% melee');
+        modifiers.push(`Dwarf Shield Line: Shieldbearers +${(effects.shieldbearers_close_combat_damage_increase_percent * 100).toFixed(0)}% melee`);
+      }
+      if (strategy === 'Dwarf Shield Line' && phase === 'range') {
+        const totalArmySize = Object.values(army).reduce((sum: number, count: any) => sum + (count || 0), 0);
+        const shieldbearerCount = army['Shieldbearer'] || 0;
+        if (totalArmySize > 0) {
+          const shieldbearerRatio = shieldbearerCount / totalArmySize;
+          const immunityPercent = Math.min(100, shieldbearerRatio * 200);
+          modifiers.push(`Dwarf Shield Line: ${immunityPercent.toFixed(1)}% long range immunity (${(shieldbearerRatio * 100).toFixed(1)}% Shieldbearers × 2)`);
+        }
       }
       if (strategy === 'Elf Energy Gathering' && (phase === 'melee' || phase === 'range')) {
-        modifiers.push('Elf Energy Gathering: Mages +100% melee, +4 range');
+        modifiers.push(`Elf Energy Gathering: Mages +${(effects.wizards_close_combat_damage_multiplier - 1) * 100}% melee, +${effects.wizards_ranged_attack_increase} range${phase === 'melee' ? ', lose melee immunity, +2 melee defense' : ''}`);
       }
       if (strategy === 'Gnome Far Fighting' && (phase === 'range' || phase === 'short')) {
         modifiers.push('Gnome Far Fighting: Range/Short attacks doubled');
       }
       if (strategy === 'Human Charging!' && phase === 'melee') {
-        modifiers.push('Human Charging!: Knights +50% melee');
+        modifiers.push(`Human Charging!: Knights +${((effects.knights_attack_multiplier - 1) * 100).toFixed(0)}% melee`);
       }
       if (strategy === 'Orc Surrounding' && phase === 'short') {
         modifiers.push('Orc Surrounding: Shadow Warriors in short phase');
       }
       if (strategy === 'Orc Berserker') {
-        modifiers.push('Orc Berserker: +3 all attacks, -50% defense');
+        modifiers.push(`Orc Berserker: +${effects.all_units_damage_increase} all attacks, -${((1 - 1/effects.all_units_defense_divide_by) * 100).toFixed(0)}% defense`);
       }
     }
 
@@ -3336,6 +3355,7 @@ export default function MainApp() {
               buildings={yourBuildings}
               race={yourRace}
               techLevels={yourTechLevels}
+              strategy={yourStrategy}
             />
             <PopulationAssignment
               population={yourPopulation}
@@ -3407,6 +3427,7 @@ export default function MainApp() {
               buildings={enemyBuildings}
               race={enemyRace}
               techLevels={enemyTechLevels}
+              strategy={enemyStrategy}
             />
             <PopulationAssignment
               population={enemyPopulation}

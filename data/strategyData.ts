@@ -58,7 +58,8 @@ export const STRATEGY_DATA: Record<string, StrategyData> = {
       wizards_defense_increase: 2,
       wizards_close_combat_damage_multiplier: 2,
       wizards_ranged_attack_increase: 4,
-      mage_loses_melee_invisibility: true
+      mage_loses_melee_invisibility: true,
+      mage_melee_defense_bonus: 2
     }
   },
   "Gnome Far Fighting": {
