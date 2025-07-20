@@ -68,6 +68,13 @@ export function simulateRound(
     
     // Both sides attack simultaneously in this phase
     // Calculate losses for each side
+    // For yourDamageResult, processedArmyStrategy should be strategyYour (your army's defense strategy)
+    // For enemyDamageResult, processedArmyStrategy should be strategyEnemy (enemy army's defense strategy)
+    const yourProcessedStrategy = strategyYour === 'Infantry Attack' ? 'Infantry Attack' : null;
+    const enemyProcessedStrategy = strategyEnemy === 'Infantry Attack' ? 'Infantry Attack' : null;
+    // Determine if your army is defending in this phase
+    const youAreDefending = phase === 'melee' ? false : true; // Only defend in melee if you are the defender
+    const enemyIsDefending = !youAreDefending;
     const yourDamageResult = calculatePhaseDamage(
       enemyArmyState,
       { ...yourArmyState },
@@ -75,14 +82,15 @@ export function simulateRound(
       techLevelsEnemy,
       strategyEnemy,
       strategyYour,
-      strategyYour, // processedArmyStrategy
+      yourProcessedStrategy,
       ksDifferenceFactor,
       enemyBuildings,
       yourBuildings,
-      false, // enemy is attacker
+      !youAreDefending, // isAttacker: true if you are attacking
       enemyRace,
       yourRace,
-      phase === 'melee' ? { ...roundStartYourArmy } : undefined
+      phase === 'melee' ? { ...roundStartYourArmy } : undefined,
+      youAreDefending // isDefender: true if you are defending
     );
     const enemyDamageResult = calculatePhaseDamage(
       yourArmyState,
@@ -91,14 +99,15 @@ export function simulateRound(
       techLevelsYour,
       strategyYour,
       strategyEnemy,
-      strategyEnemy, // processedArmyStrategy
+      enemyProcessedStrategy,
       ksDifferenceFactor,
       yourBuildings,
       enemyBuildings,
-      true, // your side is attacker
+      !enemyIsDefending, // isAttacker: true if enemy is attacking
       yourRace,
       enemyRace,
-      phase === 'melee' ? { ...roundStartEnemyArmy } : undefined
+      phase === 'melee' ? { ...roundStartEnemyArmy } : undefined,
+      enemyIsDefending // isDefender: true if enemy is defending
     );
     
     // Apply losses to yourArmyState

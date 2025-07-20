@@ -1357,10 +1357,22 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                     <div className="bg-gray-700 p-2 rounded mb-2">
                                       <div className="text-gray-300 font-medium mb-1">Damage Analysis:</div>
                                       <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div>Received: <span className="text-red-300 font-bold">{damageEntry.damageReceived}</span></div>
-                                        <div>Mitigated: <span className="text-green-400 font-bold">{damageEntry.damageMitigated}</span></div>
-                                        <div>Final: <span className="text-yellow-400 font-bold">{damageEntry.finalDamage}</span></div>
-                                        <div>Total Effective Defense: <span className="text-blue-300 font-bold">{((damageEntry.damageMitigated || 0) + (stats.defense * count)).toFixed(1)}</span></div>
+                                        <div>
+                                          <span className="text-gray-400">Received</span>:
+                                          <span className="text-red-300 font-bold" title="Raw damage before any mitigation">{damageEntry.damageReceived}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-400">Mitigated</span>:
+                                          <span className="text-green-400 font-bold" title="Total mitigation from buildings, redistribution, immunity, etc.">{damageEntry.damageMitigated}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-400">Final</span>:
+                                          <span className="text-yellow-400 font-bold" title="Actual damage taken after all mitigation">{damageEntry.finalDamage}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-400">Total Effective Defense</span>:
+                                          <span className="text-blue-300 font-bold">{((damageEntry.damageMitigated || 0) + (stats.defense * count)).toFixed(1)}</span>
+                                        </div>
                                       </div>
                                       {damageEntry.buildingEffects.length > 0 && (
                                         <div className="mt-2 pt-2 border-t border-gray-600">
@@ -1476,10 +1488,22 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                     <div className="bg-gray-700 p-2 rounded mb-2">
                                       <div className="text-gray-300 font-medium mb-1">Damage Analysis:</div>
                                       <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div>Received: <span className="text-red-300 font-bold">{damageEntry.damageReceived}</span></div>
-                                        <div>Mitigated: <span className="text-green-400 font-bold">{damageEntry.damageMitigated}</span></div>
-                                        <div>Final: <span className="text-yellow-400 font-bold">{damageEntry.finalDamage}</span></div>
-                                        <div>Lost: <span className="text-green-400 font-bold">{damageEntry.unitsLost}</span></div>
+                                        <div>
+                                          <span className="text-gray-400">Received</span>:
+                                          <span className="text-red-300 font-bold" title="Raw damage before any mitigation">{damageEntry.damageReceived}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-400">Mitigated</span>:
+                                          <span className="text-green-400 font-bold" title="Total mitigation from buildings, redistribution, immunity, etc.">{damageEntry.damageMitigated}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-400">Final</span>:
+                                          <span className="text-yellow-400 font-bold" title="Actual damage taken after all mitigation">{damageEntry.finalDamage}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-400">Lost</span>:
+                                          <span className="text-green-400 font-bold">{damageEntry.unitsLost}</span>
+                                        </div>
                                       </div>
                                       {damageEntry.buildingEffects.length > 0 && (
                                         <div className="mt-2 pt-2 border-t border-gray-600">
@@ -1526,9 +1550,12 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
                                     <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
                                     <div className="grid grid-cols-2 gap-2 text-xs">
                                       <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
-                                      <div>Effective: <span className="text-purple-400 font-bold">{stats.defense.toFixed(1)}</span></div>
-                                      <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? (stats.defense / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
-                                      <div>Total Defense: <span className="text-purple-400 font-bold">{(stats.defense * count).toFixed(1)}</span></div>
+                                      <div>Effective: <span className="text-purple-400 font-bold">{(damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense).toFixed(1)}</span></div>
+                                      {damageEntry?.appliedRedistributionBonus !== undefined && (
+                                        <div className="col-span-2 text-green-300">+{damageEntry.appliedRedistributionBonus.toFixed(2)} defense redistributed from infantry</div>
+                                      )}
+                                      <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? ((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense) / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
+                                      <div>Total Defense: <span className="text-purple-400 font-bold">{((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense) * count).toFixed(1)}</span></div>
                                     </div>
                                   </div>
                                 </div>

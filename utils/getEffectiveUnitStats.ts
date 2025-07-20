@@ -101,11 +101,12 @@ export function getEffectiveUnitStats(
         }
       }
       if (strategy === 'Infantry Attack') {
-        if (isInfantryUnit(unitName, race)) {
-          stats.defense *= (1 - effects.infantry_defense_reduction_percent);
-        } else {
-          // Other units get defense increase from infantry defense loss (handled in battle logic)
-        }
+        // Do not apply defense reduction here. It will be handled in the battle phase pipeline.
+        // if (isInfantryUnit(unitName, race)) {
+        //   stats.defense *= (1 - effects.infantry_defense_reduction_percent);
+        // } else {
+        //   // Other units get defense increase from infantry defense loss (handled in battle logic)
+        // }
       }
       if (strategy === 'Quick Retreat') {
         stats.melee *= effects.all_unit_attack_multiplier;
