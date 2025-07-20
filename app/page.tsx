@@ -128,11 +128,7 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
     const atc = buildings['Advanced Training Center'] || buildings['advanced training center'] || buildings['AdvancedTrainingCenter'] || 0;
     const castle = buildings['Castle'] || buildings['castle'] || 0;
     
-    // Debug: Log the building counts
-    console.log('Debug - Buildings:', buildings);
-    console.log('Debug - Building keys:', Object.keys(buildings));
-    console.log('Debug - TC:', tc, 'ATC:', atc, 'Castle:', castle);
-    console.log('Debug - Race:', race, 'RaceKey:', raceKey);
+
     
     // Map building data unit names to unit data names
     const mapUnitName = (buildingUnitName: string) => {
@@ -183,13 +179,11 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
     const buildingRaceKey = raceKey.charAt(0).toUpperCase() + raceKey.slice(1);
     
     const tcProd = BUILDING_DATA['Training Center']?.unit_production?.[buildingRaceKey] || {};
-    console.log('Debug - TC Production data:', tcProd);
     for (const [unit, v] of Object.entries(tcProd)) {
       const mappedUnit = mapUnitName(unit);
       unitCounts[mappedUnit] = Math.floor(tc / v.per_building) * v.per_day;
     }
     const atcProd = BUILDING_DATA['Advanced Training Center']?.unit_production?.[buildingRaceKey] || {};
-    console.log('Debug - ATC Production data:', atcProd);
     for (const [unit, v] of Object.entries(atcProd)) {
       const mappedUnit = mapUnitName(unit);
       unitCounts[mappedUnit] = (unitCounts[mappedUnit] || 0) + Math.floor(atc / v.per_building) * v.per_day;
@@ -202,11 +196,6 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
       .filter(([_, n]) => n > 0)
       .map(([unit, n]) => `${n} ${unit}`)
       .join(', ');
-    
-    // Debug: Log the unit counts and summary
-    console.log('Debug - Unit counts:', unitCounts);
-    console.log('Debug - Summary:', summary);
-    console.log('Debug - Final return:', summary ? `You can currently train ${summary} per day.` : '');
     
     return summary ? `You can currently train ${summary} per day.` : '';
   };
@@ -409,7 +398,13 @@ function calculateKS(army: Army, buildings: any, population: any, techLevels: an
 const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLevels, strategy, setStrategy, calculatedPopulation, race }: any) => {
   // Handler for stat changes
   const handleStatChange = (field: string, value: string) => {
-    setStats({ ...stats, [field]: parseInt(value) || 0 });
+    const newValue = parseInt(value) || 0;
+    setStats({ ...stats, [field]: newValue });
+    
+    // If castles changed, update the buildings state to sync castle count
+    if (field === 'Castles') {
+      // This will be handled by the parent component through useEffect
+    }
   };
   // Handler for tech level changes
   const handleTechChange = (tech: string, value: string) => {
@@ -1507,125 +1502,821 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
   );
 };
 
-// EconomicSummary component: shows total cost, upkeep, and TEGC for an army
-const EconomicSummary = ({ army, kingdomStats, race }: { army: Army; kingdomStats: KingdomStats; race: string }) => {
-  const raceKey = race?.toLowerCase() || 'dwarf';
-  // Calculate total initial gold cost and TEGC
-  const totalInitialGold = getArmyTotalInitialGoldCost(army, raceKey);
-  const totalTEGC = getArmyTEGC(army, raceKey);
-  // Calculate total upkeep for 48 hours
-  let totalGoldUpkeep = 0;
-  let totalFoodUpkeep = 0;
-  for (const [unit, count] of Object.entries(army)) {
-    if (count > 0) {
-      const unitData = UNIT_DATA[raceKey][unit];
-      if (unitData) {
-        totalGoldUpkeep += (unitData.upkeep.gold * 2) * count;
-        totalFoodUpkeep += (unitData.upkeep.food * 2) * count;
-      }
-    }
-  }
-
-  return (
-    <div className="p-4 bg-gray-800 rounded-lg mb-4">
-      <h3 className="text-lg font-semibold mb-2">Economic Summary</h3>
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <span className="font-medium" title="Sum of all unit base and equipment costs">Total Initial Gold Cost:</span>
-          <span className="ml-2">{totalInitialGold.toLocaleString()} gold</span>
-        </div>
-        <div>
-          <span className="font-medium" title="Total Effective Gold Cost for 48 hours (includes upkeep)">TEGC (48h):</span>
-          <span className="ml-2">{totalTEGC.toLocaleString()} gold</span>
-        </div>
-        <div>
-          <span className="font-medium" title="Total gold upkeep for 48 hours">Upkeep (Gold, 48h):</span>
-          <span className="ml-2">{totalGoldUpkeep.toLocaleString()} gold</span>
-        </div>
-        <div>
-          <span className="font-medium" title="Total food upkeep for 48 hours">Upkeep (Food, 48h):</span>
-          <span className="ml-2">{totalFoodUpkeep.toLocaleString()} food</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// UnitEfficiencyTable component: shows efficiency ratios for all units
-const UnitEfficiencyTable = ({ techLevels, strategy, race }: { techLevels: any; strategy: any; race: string }) => {
-  const raceKey = race?.toLowerCase() || 'dwarf';
-  // Calculate efficiency for all units
-  const unitRows = Object.entries(UNIT_DATA[raceKey] || {}).map(([unit, stats]) => {
-    const effectiveStats = getEffectiveUnitStats(unit, raceKey, techLevels, strategy, true, 1);
-    const ratios = getUnitEfficiencyRatios(unit, effectiveStats, raceKey);
+// EnemyCounterOptimizer: Analyzes enemy army and recommends optimal counter composition
+const EnemyCounterOptimizer = ({ 
+  yourArmy, yourKingdomStats, yourRace, yourTechLevels, yourStrategy, yourBuildings,
+  enemyArmy, enemyKingdomStats, enemyRace, enemyTechLevels, enemyStrategy, enemyBuildings
+}: { 
+  yourArmy: Army; yourKingdomStats: KingdomStats; yourRace: string; yourTechLevels: any; yourStrategy: any; yourBuildings: any;
+  enemyArmy: Army; enemyKingdomStats: KingdomStats; enemyRace: string; enemyTechLevels: any; enemyStrategy: any; enemyBuildings: any;
+}) => {
+  const yourRaceKey = yourRace?.toLowerCase() || 'dwarf';
+  const enemyRaceKey = enemyRace?.toLowerCase() || 'dwarf';
+  
+  // Get your Guard House capacity from buildings
+  const guardHouses = yourBuildings?.['Guard House'] || 0;
+  const maxUnits = guardHouses * 40; // 40 units per Guard House
+  const currentUnits = Object.values(yourArmy).reduce((sum: number, count: any) => sum + (count || 0), 0);
+  const availableSlots = Math.max(0, maxUnits - currentUnits);
+  
+  // Analyze enemy army composition
+  const enemyAnalysis = Object.entries(enemyArmy).map(([unit, count]) => {
+    if (count === 0) return null;
+    const baseStats = UNIT_DATA[enemyRaceKey]?.[unit];
+    if (!baseStats) return null;
+    
+    const effectiveStats = getEffectiveUnitStats(unit, enemyRaceKey, enemyTechLevels || {}, enemyStrategy || null, false, count);
+    
     return {
       unit,
-      ...ratios,
-      effectiveStats
+      count,
+      baseStats,
+      effectiveStats,
+      totalRangeDamage: effectiveStats.range * count,
+      totalShortDamage: effectiveStats.short * count,
+      totalMeleeDamage: effectiveStats.melee * count,
+      totalDefense: effectiveStats.defense * count,
+      // Check for special abilities
+      isRangedImmune: unit.includes('Skeleton') || unit.includes('Phantom'),
+      isMeleeImmune: unit.includes('Mage'),
+      hasGuardTower: enemyKingdomStats.GuardTower > 0
+    };
+  }).filter(Boolean);
+  
+  // Calculate enemy phase distribution
+  const enemyPhaseDamage = {
+    range: enemyAnalysis.reduce((sum, unit) => sum + (unit?.totalRangeDamage || 0), 0),
+    short: enemyAnalysis.reduce((sum, unit) => sum + (unit?.totalShortDamage || 0), 0),
+    melee: enemyAnalysis.reduce((sum, unit) => sum + (unit?.totalMeleeDamage || 0), 0)
+  };
+  
+  const totalEnemyDamage = enemyPhaseDamage.range + enemyPhaseDamage.short + enemyPhaseDamage.melee;
+  const enemyRangePercentage = totalEnemyDamage > 0 ? (enemyPhaseDamage.range / totalEnemyDamage) * 100 : 0;
+  const enemyMeleePercentage = totalEnemyDamage > 0 ? (enemyPhaseDamage.melee / totalEnemyDamage) * 100 : 0;
+  
+  // Get your available units
+  const yourUnits = Object.entries(UNIT_DATA[yourRaceKey] || {}).map(([unit, baseStats]) => {
+    const effectiveStats = getEffectiveUnitStats(unit, yourRaceKey, yourTechLevels || {}, yourStrategy || null, true, 1);
+    
+    // Calculate costs
+    const baseCost = baseStats.base_gold_cost || 0;
+    const equipmentCost = baseStats.equipment_gold_cost || 0;
+    const totalCost = baseCost + equipmentCost;
+    
+    // Calculate 48h upkeep
+    const goldUpkeep48h = (baseStats.upkeep.gold || 0) * 2;
+    const foodUpkeep48h = (baseStats.upkeep.food || 0) * 2;
+    const totalUpkeep48h = goldUpkeep48h + foodUpkeep48h;
+    
+    // Efficiency metrics
+    const damagePerGold = totalCost > 0 ? (effectiveStats.range + effectiveStats.short + effectiveStats.melee) / totalCost : 0;
+    const damagePerUpkeep = totalUpkeep48h > 0 ? (effectiveStats.range + effectiveStats.short + effectiveStats.melee) / totalUpkeep48h : 0;
+    
+    return {
+      unit,
+      effectiveStats,
+      totalCost,
+      totalUpkeep48h,
+      damagePerGold,
+      damagePerUpkeep,
+      rangeDamage: effectiveStats.range,
+      shortDamage: effectiveStats.short,
+      meleeDamage: effectiveStats.melee,
+      defense: effectiveStats.defense
     };
   });
-
-  // Find top 3 performers for each ratio (lowest is best)
-  const getTopIndices = (key: 'goldPerAttack' | 'goldPerDefense' | 'goldPerRanged') => {
-    return unitRows
-      .filter(row => row[key] !== null && row[key] !== Infinity)
-      .sort((a, b) => (a[key] ?? Infinity) - (b[key] ?? Infinity))
-      .slice(0, 3)
-      .map(row => row.unit);
+  
+  // Determine counter strategy based on enemy composition and kingdom data
+  let counterStrategy = 'balanced';
+  let strategyReason = '';
+  let rangedStrategy = '';
+  let meleeStrategy = '';
+  
+  // Check enemy kingdom defenses (using actual building data)
+  const enemyGuardTowers = enemyBuildings?.['Guard Tower'] || 0;
+  const enemyMedicalCenters = enemyBuildings?.['Medical Center'] || 0;
+  const enemyCastles = enemyKingdomStats.Castles || 0;
+  
+  // Check your kingdom capabilities
+  const yourGuardTowers = yourBuildings?.['Guard Tower'] || 0;
+  const yourMedicalCenters = yourBuildings?.['Medical Center'] || 0;
+  const yourCastles = yourKingdomStats.Castles || 0;
+  
+  // Calculate building recommendations to counter enemy efficiently
+  const buildingRecommendations = [];
+  
+  // Calculate optimal Guard Towers needed
+  if (enemyRangePercentage > 40) {
+    const enemyRangedDamage = enemyPhaseDamage.range;
+    const guardTowersNeeded = Math.ceil(enemyRangedDamage / 100); // 1 Guard Tower per 100 ranged damage
+    const optimalGuardTowers = Math.min(guardTowersNeeded, 3); // Cap at 3 to avoid waste
+    const additionalGuardTowers = Math.max(0, optimalGuardTowers - yourGuardTowers);
+    
+    if (additionalGuardTowers > 0) {
+      buildingRecommendations.push(`Build ${additionalGuardTowers} Guard Tower(s) to reduce enemy ranged damage by ~${additionalGuardTowers * 50}%`);
+    }
+  }
+  
+  // Calculate optimal Medical Centers needed
+  if (enemyMeleePercentage > 60) {
+    const enemyMeleeDamage = enemyPhaseDamage.melee;
+    const medicalCentersNeeded = Math.ceil(enemyMeleeDamage / 200); // 1 Medical Center per 200 melee damage
+    const optimalMedicalCenters = Math.min(medicalCentersNeeded, 2); // Cap at 2 to avoid waste
+    const additionalMedicalCenters = Math.max(0, optimalMedicalCenters - yourMedicalCenters);
+    
+    if (additionalMedicalCenters > 0) {
+      buildingRecommendations.push(`Build ${additionalMedicalCenters} Medical Center(s) to reduce melee damage by ${additionalMedicalCenters * 50}`);
+    }
+  }
+  
+  // Calculate requirements for each strategy
+  const calculateRangedRequirements = () => {
+    let requirements = [];
+    let difficulty = 'Easy';
+    
+    if (enemyGuardTowers > 0) {
+      requirements.push(`Enemy has ${enemyGuardTowers} Guard Tower(s) - ranged damage reduced by ~50%`);
+      difficulty = 'Hard';
+    }
+    if (enemyAnalysis.some(unit => unit?.isRangedImmune)) {
+      requirements.push('Enemy has ranged-immune units');
+      difficulty = 'Very Hard';
+    }
+    if (enemyRangePercentage > 60) {
+      requirements.push(`Enemy has ${enemyRangePercentage.toFixed(1)}% ranged damage - you need superior ranged to win`);
+      difficulty = difficulty === 'Easy' ? 'Medium' : difficulty;
+    }
+    
+    if (requirements.length === 0) {
+      requirements.push('No ranged defenses detected - ranged units attack first');
+      difficulty = 'Easy';
+    }
+    
+    return { requirements, difficulty };
   };
-  const topAttack = getTopIndices('goldPerAttack');
-  const topDefense = getTopIndices('goldPerDefense');
-  const topRanged = getTopIndices('goldPerRanged');
-
+  
+  const calculateMeleeRequirements = () => {
+    let requirements = [];
+    let difficulty = 'Easy';
+    
+    if (enemyAnalysis.some(unit => unit?.isMeleeImmune)) {
+      requirements.push('Enemy has melee-immune units - cannot damage with melee');
+      difficulty = 'Impossible';
+    }
+    if (enemyMedicalCenters > 0) {
+      requirements.push(`Enemy has ${enemyMedicalCenters} Medical Center(s) - reduces melee damage by 50 per center`);
+      difficulty = difficulty === 'Easy' ? 'Medium' : difficulty;
+    }
+    if (enemyMeleePercentage > 60) {
+      requirements.push(`Enemy has ${enemyMeleePercentage.toFixed(1)}% melee damage - you need superior melee to win`);
+      difficulty = difficulty === 'Easy' ? 'Medium' : difficulty;
+    }
+    
+    if (requirements.length === 0) {
+      requirements.push('No melee defenses detected - melee units can engage directly');
+      difficulty = 'Easy';
+    }
+    
+    return { requirements, difficulty };
+  };
+  
+  const rangedAnalysis = calculateRangedRequirements();
+  const meleeAnalysis = calculateMeleeRequirements();
+  
+  // Determine best strategy based on feasibility
+  if (meleeAnalysis.difficulty === 'Impossible') {
+    counterStrategy = 'ranged';
+    strategyReason = 'Melee strategy impossible due to melee-immune units';
+  } else if (rangedAnalysis.difficulty === 'Very Hard' && meleeAnalysis.difficulty !== 'Impossible') {
+    counterStrategy = 'melee';
+    strategyReason = 'Ranged strategy very difficult, melee more feasible';
+  } else if (rangedAnalysis.difficulty === 'Hard' && meleeAnalysis.difficulty === 'Easy') {
+    counterStrategy = 'melee';
+    strategyReason = 'Melee strategy easier than ranged';
+  } else if (rangedAnalysis.difficulty === 'Easy') {
+    counterStrategy = 'ranged';
+    strategyReason = 'Ranged strategy most feasible - units attack first';
+  } else {
+    counterStrategy = 'melee';
+    strategyReason = 'Melee strategy more feasible than ranged';
+  }
+  
+  rangedStrategy = `Ranged Strategy (${rangedAnalysis.difficulty}): ${rangedAnalysis.requirements.join(', ')}`;
+  meleeStrategy = `Melee Strategy (${meleeAnalysis.difficulty}): ${meleeAnalysis.requirements.join(', ')}`;
+  
+  // Generate optimal counter army
+  const generateCounterArmy = () => {
+    const counterArmy: any = {};
+    let remainingSlots = availableSlots;
+    let totalCost = 0;
+    let totalUpkeep = 0;
+    
+    // Calculate budget based on your kingdom's economic capabilities
+    const yourFarms = yourBuildings?.['Farm'] || 0;
+    const yourMines = yourBuildings?.['Mine'] || 0;
+    
+    // Estimate available budget (more realistic calculation)
+    const farmIncome = yourFarms * 50; // 50 gold per farm per hour
+    const mineIncome = yourMines * 100; // 100 gold per mine per hour
+    const totalHourlyIncome = farmIncome + mineIncome;
+    const estimatedBudget = totalHourlyIncome * 24; // 24 hours of income (more realistic timeframe)
+    
+    // Sort units based on counter strategy
+    let sortedUnits = [...yourUnits];
+    if (counterStrategy === 'ranged') {
+      sortedUnits = sortedUnits
+        .filter(unit => unit.rangeDamage > 0)
+        .sort((a, b) => b.damagePerGold - a.damagePerGold);
+    } else if (counterStrategy === 'melee') {
+      sortedUnits = sortedUnits
+        .filter(unit => unit.meleeDamage > 0)
+        .sort((a, b) => b.damagePerGold - a.damagePerGold);
+    } else {
+      sortedUnits = sortedUnits.sort((a, b) => b.damagePerGold - a.damagePerGold);
+    }
+    
+    // Fill available slots with best units, considering budget
+    sortedUnits.forEach(unit => {
+      if (remainingSlots > 0 && totalCost < estimatedBudget) {
+        // Calculate how many units we can afford
+        const remainingBudget = estimatedBudget - totalCost;
+        const maxAffordable = Math.floor(remainingBudget / unit.totalCost);
+        const unitsToAdd = Math.min(remainingSlots, maxAffordable, 25); // Cap at 25 per unit type
+        
+        if (unitsToAdd > 0) {
+          counterArmy[unit.unit] = unitsToAdd;
+          remainingSlots -= unitsToAdd;
+          totalCost += unitsToAdd * unit.totalCost;
+          totalUpkeep += unitsToAdd * unit.totalUpkeep48h;
+        }
+      }
+    });
+    
+    return { counterArmy, totalCost, totalUpkeep, remainingSlots, estimatedBudget };
+  };
+  
+  const optimalCounter = generateCounterArmy();
+  
+  // Calculate current army upkeep
+  const currentArmyUpkeep = {
+    gold: 0,
+    food: 0,
+    total: 0
+  };
+  
+  Object.entries(yourArmy).forEach(([unit, count]) => {
+    const unitCount = count || 0;
+    const baseStats = UNIT_DATA[yourRaceKey]?.[unit];
+    if (baseStats) {
+      currentArmyUpkeep.gold += (baseStats.upkeep.gold || 0) * unitCount * 2; // 48h
+      currentArmyUpkeep.food += (baseStats.upkeep.food || 0) * unitCount * 2; // 48h
+    }
+  });
+  currentArmyUpkeep.total = currentArmyUpkeep.gold + currentArmyUpkeep.food;
+  
+  // Calculate expected battle outcome
+  const calculateBattleOutcome = () => {
+    // Your current army + recommended additions
+    const yourTotalArmy = { ...yourArmy };
+    Object.entries(optimalCounter.counterArmy).forEach(([unit, count]) => {
+      yourTotalArmy[unit] = (yourTotalArmy[unit] || 0) + (count as number);
+    });
+    
+    // Calculate your total damage by phase
+    const yourPhaseDamage = { range: 0, short: 0, melee: 0 };
+    yourUnits.forEach(unit => {
+      const count = yourTotalArmy[unit.unit] || 0;
+      yourPhaseDamage.range += unit.rangeDamage * count;
+      yourPhaseDamage.short += unit.shortDamage * count;
+      yourPhaseDamage.melee += unit.meleeDamage * count;
+    });
+    
+    const yourTotalDamage = yourPhaseDamage.range + yourPhaseDamage.short + yourPhaseDamage.melee;
+    
+    return {
+      yourDamage: yourTotalDamage,
+      enemyDamage: totalEnemyDamage,
+      advantage: yourTotalDamage - totalEnemyDamage,
+      rangeAdvantage: yourPhaseDamage.range - enemyPhaseDamage.range,
+      meleeAdvantage: yourPhaseDamage.melee - enemyPhaseDamage.melee
+    };
+  };
+  
+  const battleOutcome = calculateBattleOutcome();
+  
   return (
     <div className="p-4 bg-gray-800 rounded-lg mb-4">
-      <h3 className="text-lg font-semibold mb-2">Unit Efficiency Table</h3>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="bg-gray-700">
-              <th className="p-2 text-left">Unit</th>
-              <th className="p-2 text-left" title="TEGC / Effective Melee">Gold/Attack</th>
-              <th className="p-2 text-left" title="TEGC / Effective Defense">Gold/Defense</th>
-              <th className="p-2 text-left" title="TEGC / Effective Ranged">Gold/Ranged</th>
-              <th className="p-2 text-left">Effective Melee</th>
-              <th className="p-2 text-left">Effective Short</th>
-              <th className="p-2 text-left">Effective Ranged</th>
-              <th className="p-2 text-left">Effective Defense</th>
-            </tr>
-          </thead>
-          <tbody>
-            {unitRows.map(row => (
-              <tr key={row.unit} className="even:bg-gray-700">
-                <td className="p-2 font-medium" title={row.unit}>{row.unit}</td>
-                <td className={`p-2 ${topAttack.includes(row.unit) ? 'bg-green-900 text-green-300 font-bold' : ''}`}>{row.goldPerAttack !== null ? row.goldPerAttack.toFixed(1) : 'N/A'}</td>
-                <td className={`p-2 ${topDefense.includes(row.unit) ? 'bg-blue-900 text-blue-300 font-bold' : ''}`}>{row.goldPerDefense !== null ? row.goldPerDefense.toFixed(1) : 'N/A'}</td>
-                <td className={`p-2 ${topRanged.includes(row.unit) ? 'bg-purple-900 text-purple-300 font-bold' : ''}`}>{row.goldPerRanged !== null ? row.goldPerRanged.toFixed(1) : 'N/A'}</td>
-                <td className="p-2">{row.effectiveStats.melee.toFixed(2)}</td>
-                <td className="p-2">{row.effectiveStats.short.toFixed(2)}</td>
-                <td className="p-2">{row.effectiveStats.range.toFixed(2)}</td>
-                <td className="p-2">{row.effectiveStats.defense.toFixed(2)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-2 space-y-1">
-        <p className="text-xs text-gray-400">Lower values are better. Top 3 units in each column are highlighted.</p>
-        <div className="text-xs text-gray-300">
-          <span className="font-medium">Efficiency Notes:</span>
-          <div className="ml-2">• Gold/Attack: Total cost per effective melee damage</div>
-          <div className="ml-2">• Gold/Defense: Total cost per effective defense</div>
-          <div className="ml-2">• Gold/Ranged: Total cost per effective ranged damage</div>
-          <div className="ml-2">• TEGC includes 48 hours of upkeep costs</div>
+      <h3 className="text-lg font-semibold mb-2">Enemy Counter Optimizer</h3>
+      
+            {/* Enemy Analysis */}
+      <div className="mb-4 p-3 bg-red-900 rounded">
+        <h4 className="font-medium text-red-300 mb-2">Enemy Army & Kingdom Analysis</h4>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="flex justify-between">
+              <span>Total Units:</span>
+              <span>{Object.values(enemyArmy).reduce((sum: number, count: any) => sum + (count || 0), 0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total Damage:</span>
+              <span>{totalEnemyDamage.toFixed(0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Ranged Damage:</span>
+              <span>{enemyPhaseDamage.range.toFixed(0)} ({enemyRangePercentage.toFixed(1)}%)</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Melee Damage:</span>
+              <span>{enemyPhaseDamage.melee.toFixed(0)} ({enemyMeleePercentage.toFixed(1)}%)</span>
+            </div>
+          </div>
+          <div>
+            <div className="flex justify-between">
+              <span>Guard Towers:</span>
+              <span>{enemyGuardTowers}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Medical Centers:</span>
+              <span>{enemyMedicalCenters}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Castles:</span>
+              <span>{enemyCastles}</span>
+            </div>
+            {buildingRecommendations.length > 0 && (
+              <div className="mt-2 p-2 bg-yellow-900/30 rounded">
+                <div className="text-yellow-300 font-semibold mb-1">Building Recommendations:</div>
+                {buildingRecommendations.map((rec, index) => (
+                  <div key={index} className="text-yellow-200 text-sm">• {rec}</div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+      </div>
+      
+      {/* Counter Strategy Analysis */}
+      <div className="mb-4 p-3 bg-blue-900 rounded">
+        <h4 className="font-medium text-blue-300 mb-2">Counter Strategy Analysis</h4>
+        <div className="text-sm space-y-2">
+          <div className="font-medium text-yellow-300 mb-2">Recommended Strategy: {counterStrategy.toUpperCase()}</div>
+          <div className="text-gray-300 mb-2">{strategyReason}</div>
+          
+          <div className="grid grid-cols-1 gap-2">
+            <div className={`p-2 rounded ${counterStrategy === 'ranged' ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-300'}`}>
+              <div className="font-medium">{rangedStrategy}</div>
+            </div>
+            <div className={`p-2 rounded ${counterStrategy === 'melee' ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-300'}`}>
+              <div className="font-medium">{meleeStrategy}</div>
+            </div>
+          </div>
+          
+          <div className="text-xs text-gray-400 mt-2">
+            <div className="font-medium">Strategy Notes:</div>
+            <div className="ml-2">• Ranged units attack first in battle</div>
+            <div className="ml-2">• Guard Towers reduce ranged damage by ~50%</div>
+            <div className="ml-2">• Medical Centers reduce melee damage by 50 per center</div>
+            <div className="ml-2">• Some units are immune to specific damage types</div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Your Capacity & Economy */}
+      <div className="mb-4 p-3 bg-green-900 rounded">
+        <h4 className="font-medium text-green-300 mb-2">Your Kingdom Capacity & Economy</h4>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="flex justify-between">
+              <span>Guard Houses:</span>
+              <span>{guardHouses}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Max Units:</span>
+              <span>{maxUnits}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Current Units:</span>
+              <span>{currentUnits}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Available Slots:</span>
+              <span className="font-bold text-green-300">{availableSlots}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Current 48h Upkeep:</span>
+              <span>{currentArmyUpkeep.total.toFixed(0)} gold</span>
+            </div>
+          </div>
+          <div>
+            <div className="flex justify-between">
+              <span>Farms:</span>
+              <span>{yourBuildings?.['Farm'] || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Mines:</span>
+              <span>{yourBuildings?.['Mine'] || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Medical Centers:</span>
+              <span>{yourMedicalCenters}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Castles:</span>
+              <span>{yourCastles}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Recommended Counter Army */}
+      <div className="mb-4 p-3 bg-purple-900 rounded">
+        <h4 className="font-medium text-purple-300 mb-2">Recommended Counter Army</h4>
+        <div className="text-sm mb-2">
+          <div className="flex justify-between">
+            <span>Units to Add:</span>
+            <span>{Object.values(optimalCounter.counterArmy).reduce((sum: number, count: any) => sum + count, 0)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Total Cost:</span>
+            <span>{optimalCounter.totalCost.toFixed(0)} gold</span>
+          </div>
+          <div className="flex justify-between">
+            <span>New Units 48h Upkeep:</span>
+            <span>{optimalCounter.totalUpkeep.toFixed(0)} gold</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Total 48h Upkeep:</span>
+            <span>{(currentArmyUpkeep.total + optimalCounter.totalUpkeep).toFixed(0)} gold</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Estimated Budget:</span>
+            <span>{optimalCounter.estimatedBudget.toFixed(0)} gold</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Budget Used:</span>
+            <span>{optimalCounter.estimatedBudget > 0 ? ((optimalCounter.totalCost / optimalCounter.estimatedBudget) * 100).toFixed(1) : '0'}%</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Remaining Slots:</span>
+            <span>{optimalCounter.remainingSlots}</span>
+          </div>
+        </div>
+        <div className="text-xs text-gray-400">
+          {Object.entries(optimalCounter.counterArmy).map(([unit, count]) => 
+            `${unit}: ${count}`
+          ).join(', ')}
+        </div>
+      </div>
+      
+      {/* Battle Prediction */}
+      <div className="mb-4 p-3 bg-yellow-900 rounded">
+        <h4 className="font-medium text-yellow-300 mb-2">Battle Prediction</h4>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="flex justify-between">
+              <span>Your Total Damage:</span>
+              <span className={battleOutcome.advantage > 0 ? 'text-green-300 font-bold' : 'text-red-300'}>{battleOutcome.yourDamage.toFixed(0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Enemy Total Damage:</span>
+              <span>{battleOutcome.enemyDamage.toFixed(0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Damage Advantage:</span>
+              <span className={battleOutcome.advantage > 0 ? 'text-green-300 font-bold' : 'text-red-300'}>{battleOutcome.advantage > 0 ? '+' : ''}{battleOutcome.advantage.toFixed(0)}</span>
+            </div>
+          </div>
+          <div>
+            <div className="flex justify-between">
+              <span>Ranged Advantage:</span>
+              <span className={battleOutcome.rangeAdvantage > 0 ? 'text-green-300' : 'text-red-300'}>{battleOutcome.rangeAdvantage > 0 ? '+' : ''}{battleOutcome.rangeAdvantage.toFixed(0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Melee Advantage:</span>
+              <span className={battleOutcome.meleeAdvantage > 0 ? 'text-green-300' : 'text-red-300'}>{battleOutcome.meleeAdvantage > 0 ? '+' : ''}{battleOutcome.meleeAdvantage.toFixed(0)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="text-xs text-gray-400">
+        <div className="font-medium">Counter Strategy Notes:</div>
+        <div className="ml-2">• Ranged units attack first and are prioritized when enemy has weak ranged defense</div>
+        <div className="ml-2">• Melee units are recommended against Guard Towers or ranged-immune units</div>
+        <div className="ml-2">• Medical Centers reduce incoming melee damage by 50 per center</div>
+        <div className="ml-2">• Recommendations factor in your current tech levels and strategy</div>
+        <div className="ml-2">• Upkeep costs are calculated for 48 hours</div>
       </div>
     </div>
   );
 };
 
+// GuardHouseOptimizer component: optimizes army to max out Guard Houses while staying under upkeep
+const GuardHouseOptimizer = ({ army, kingdomStats, race, techLevels, strategy }: { army: Army; kingdomStats: KingdomStats; race: string; techLevels: any; strategy: any }) => {
+  const raceKey = race?.toLowerCase() || 'dwarf';
+  
+  // Get Guard House capacity
+  const guardHouses = kingdomStats.GuardHouse || 0;
+  const maxUnits = guardHouses * 40; // 40 units per Guard House
+  
+  // Calculate current army stats
+  const currentTotalUnits = Object.values(army).reduce((sum, count) => sum + (count || 0), 0);
+  
+  // Calculate unit efficiency for Guard House optimization
+  const unitEfficiency = Object.entries(UNIT_DATA[raceKey] || {}).map(([unit, baseStats]) => {
+    const effectiveStats = getEffectiveUnitStats(unit, raceKey, techLevels, strategy, true, 1);
+    
+    // Calculate costs
+    const baseCost = baseStats.base_gold_cost || 0;
+    const equipmentCost = baseStats.equipment_gold_cost || 0;
+    const totalCost = baseCost + equipmentCost;
+    
+    // Calculate 48h upkeep
+    const goldUpkeep48h = (baseStats.upkeep.gold || 0) * 2;
+    const foodUpkeep48h = (baseStats.upkeep.food || 0) * 2;
+    const totalUpkeep48h = goldUpkeep48h + foodUpkeep48h;
+    
+    // Phase-specific damage
+    const rangeDamage = effectiveStats.range;
+    const shortDamage = effectiveStats.short;
+    const meleeDamage = effectiveStats.melee;
+    
+    // Efficiency metrics
+    const damagePerGold = totalCost > 0 ? (rangeDamage + shortDamage + meleeDamage) / totalCost : 0;
+    const damagePerUpkeep = totalUpkeep48h > 0 ? (rangeDamage + shortDamage + meleeDamage) / totalUpkeep48h : 0;
+    
+    return {
+      unit,
+      effectiveStats,
+      totalCost,
+      totalUpkeep48h,
+      damagePerGold,
+      damagePerUpkeep,
+      rangeDamage,
+      shortDamage,
+      meleeDamage,
+      defense: effectiveStats.defense
+    };
+  });
+  
+  // Sort units by different criteria
+  const bestDamagePerGold = [...unitEfficiency].sort((a, b) => b.damagePerGold - a.damagePerGold);
+  const bestDamagePerUpkeep = [...unitEfficiency].sort((a, b) => b.damagePerUpkeep - a.damagePerUpkeep);
+  const bestRangeDamage = [...unitEfficiency].filter(u => u.rangeDamage > 0).sort((a, b) => b.rangeDamage - a.rangeDamage);
+  const bestMeleeDamage = [...unitEfficiency].filter(u => u.meleeDamage > 0).sort((a, b) => b.meleeDamage - a.meleeDamage);
+  
+  // Generate Guard House optimization recommendations
+  const recommendations = [];
+  
+  // Check if army is at capacity
+  if (currentTotalUnits >= maxUnits) {
+    recommendations.push({
+      type: 'warning',
+      title: 'Guard House at Capacity',
+      description: `You have ${currentTotalUnits}/${maxUnits} units. Consider upgrading units for better efficiency.`,
+      impact: 'Cannot add more units without more Guard Houses'
+    });
+  } else {
+    const remainingSlots = maxUnits - currentTotalUnits;
+    recommendations.push({
+      type: 'info',
+      title: 'Available Slots',
+      description: `You have ${remainingSlots} unit slots remaining in your Guard Houses.`,
+      impact: 'Can add more units for increased damage output'
+    });
+  }
+  
+  // Phase stacking recommendations
+  const currentPhaseDamage = {
+    range: 0,
+    short: 0,
+    melee: 0
+  };
+  
+  unitEfficiency.forEach(unit => {
+    const count = army[unit.unit] || 0;
+    currentPhaseDamage.range += unit.rangeDamage * count;
+    currentPhaseDamage.short += unit.shortDamage * count;
+    currentPhaseDamage.melee += unit.meleeDamage * count;
+  });
+  
+  const totalDamage = currentPhaseDamage.range + currentPhaseDamage.short + currentPhaseDamage.melee;
+  const rangePercentage = totalDamage > 0 ? (currentPhaseDamage.range / totalDamage) * 100 : 0;
+  const shortPercentage = totalDamage > 0 ? (currentPhaseDamage.short / totalDamage) * 100 : 0;
+  const meleePercentage = totalDamage > 0 ? (currentPhaseDamage.melee / totalDamage) * 100 : 0;
+  
+  // Recommend phase stacking
+  if (rangePercentage > 50) {
+    recommendations.push({
+      type: 'recommendation',
+      title: 'Ranged-Focused Army',
+      description: `${rangePercentage.toFixed(1)}% of damage is ranged. Good against enemies with weak ranged defense.`,
+      impact: 'Effective against enemies without Guard Towers or ranged immunity'
+    });
+  } else if (meleePercentage > 50) {
+    recommendations.push({
+      type: 'recommendation',
+      title: 'Melee-Focused Army',
+      description: `${meleePercentage.toFixed(1)}% of damage is melee. Good for overwhelming enemy defense.`,
+      impact: 'Strong in close combat, vulnerable to ranged attacks'
+    });
+  } else {
+    recommendations.push({
+      type: 'warning',
+      title: 'Mixed Damage Army',
+      description: 'Damage is spread across phases. Consider focusing on one phase for better effectiveness.',
+      impact: 'Less effective than concentrated damage in one phase'
+    });
+  }
+  
+  // Generate optimal army composition
+  const generateOptimalArmy = (focus: 'range' | 'melee' | 'balanced') => {
+    const optimalArmy: any = {};
+    let remainingSlots = maxUnits - currentTotalUnits;
+    let totalCost = 0;
+    
+    if (focus === 'range') {
+      // Focus on ranged units
+      bestRangeDamage.forEach(unit => {
+        if (remainingSlots > 0 && unit.totalCost <= 1000) { // Budget constraint
+          const maxUnitsForThis = Math.min(remainingSlots, Math.floor(1000 / unit.totalCost));
+          if (maxUnitsForThis > 0) {
+            optimalArmy[unit.unit] = maxUnitsForThis;
+            remainingSlots -= maxUnitsForThis;
+            totalCost += maxUnitsForThis * unit.totalCost;
+          }
+        }
+      });
+    } else if (focus === 'melee') {
+      // Focus on melee units
+      bestMeleeDamage.forEach(unit => {
+        if (remainingSlots > 0 && unit.totalCost <= 1000) {
+          const maxUnitsForThis = Math.min(remainingSlots, Math.floor(1000 / unit.totalCost));
+          if (maxUnitsForThis > 0) {
+            optimalArmy[unit.unit] = maxUnitsForThis;
+            remainingSlots -= maxUnitsForThis;
+            totalCost += maxUnitsForThis * unit.totalCost;
+          }
+        }
+      });
+    } else {
+      // Balanced approach
+      bestDamagePerGold.forEach(unit => {
+        if (remainingSlots > 0 && unit.totalCost <= 500) {
+          const maxUnitsForThis = Math.min(remainingSlots, Math.floor(500 / unit.totalCost));
+          if (maxUnitsForThis > 0) {
+            optimalArmy[unit.unit] = maxUnitsForThis;
+            remainingSlots -= maxUnitsForThis;
+            totalCost += maxUnitsForThis * unit.totalCost;
+          }
+        }
+      });
+    }
+    
+    return { optimalArmy, totalCost, remainingSlots };
+  };
+  
+  const rangedArmy = generateOptimalArmy('range');
+  const meleeArmy = generateOptimalArmy('melee');
+  const balancedArmy = generateOptimalArmy('balanced');
+  
+  return (
+    <div className="p-4 bg-gray-800 rounded-lg mb-4">
+      <h3 className="text-lg font-semibold mb-2">Guard House Optimizer</h3>
+      
+      {/* Guard House Status */}
+      <div className="mb-4 p-3 bg-gray-750 rounded">
+        <h4 className="font-medium text-blue-300 mb-2">Guard House Status</h4>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="flex justify-between">
+              <span>Guard Houses:</span>
+              <span>{guardHouses}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Max Units:</span>
+              <span>{maxUnits}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Current Units:</span>
+              <span>{currentTotalUnits}</span>
+            </div>
+          </div>
+          <div>
+            <div className="flex justify-between">
+              <span>Available Slots:</span>
+              <span>{Math.max(0, maxUnits - currentTotalUnits)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Capacity Used:</span>
+              <span>{maxUnits > 0 ? ((currentTotalUnits / maxUnits) * 100).toFixed(1) : '0'}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Phase Damage Distribution */}
+      <div className="mb-4 p-3 bg-gray-750 rounded">
+        <h4 className="font-medium text-green-300 mb-2">Current Phase Distribution</h4>
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="text-center">
+            <div className="font-medium text-purple-300">Ranged: {rangePercentage.toFixed(1)}%</div>
+            <div className="text-xs text-gray-400">{currentPhaseDamage.range.toFixed(0)} damage</div>
+          </div>
+          <div className="text-center">
+            <div className="font-medium text-orange-300">Short: {shortPercentage.toFixed(1)}%</div>
+            <div className="text-xs text-gray-400">{currentPhaseDamage.short.toFixed(0)} damage</div>
+          </div>
+          <div className="text-center">
+            <div className="font-medium text-red-300">Melee: {meleePercentage.toFixed(1)}%</div>
+            <div className="text-xs text-gray-400">{currentPhaseDamage.melee.toFixed(0)} damage</div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Top Units by Efficiency */}
+      <div className="mb-4 p-3 bg-gray-750 rounded">
+        <h4 className="font-medium text-yellow-300 mb-2">Top Units by Efficiency</h4>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="font-medium text-purple-300">Best Damage/Gold:</div>
+            <div className="text-xs text-gray-400">
+              {bestDamagePerGold.slice(0, 3).map((unit, i) => (
+                <div key={unit.unit}>{i + 1}. {unit.unit} ({unit.damagePerGold.toFixed(3)})</div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="font-medium text-blue-300">Best Damage/Upkeep:</div>
+            <div className="text-xs text-gray-400">
+              {bestDamagePerUpkeep.slice(0, 3).map((unit, i) => (
+                <div key={unit.unit}>{i + 1}. {unit.unit} ({unit.damagePerUpkeep.toFixed(2)})</div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Optimal Army Compositions */}
+      <div className="mb-4 p-3 bg-gray-750 rounded">
+        <h4 className="font-medium text-cyan-300 mb-2">Optimal Army Compositions</h4>
+        <div className="space-y-3">
+          <div className="p-2 bg-purple-900 rounded">
+            <div className="font-medium text-purple-300">Ranged-Focused Army</div>
+            <div className="text-xs text-gray-400">
+              {Object.entries(rangedArmy.optimalArmy).map(([unit, count]) => `${unit}: ${count}`).join(', ')}
+            </div>
+            <div className="text-xs text-gray-400">Cost: {rangedArmy.totalCost.toFixed(0)} gold, Slots: {rangedArmy.remainingSlots}</div>
+          </div>
+          <div className="p-2 bg-red-900 rounded">
+            <div className="font-medium text-red-300">Melee-Focused Army</div>
+            <div className="text-xs text-gray-400">
+              {Object.entries(meleeArmy.optimalArmy).map(([unit, count]) => `${unit}: ${count}`).join(', ')}
+            </div>
+            <div className="text-xs text-gray-400">Cost: {meleeArmy.totalCost.toFixed(0)} gold, Slots: {meleeArmy.remainingSlots}</div>
+          </div>
+          <div className="p-2 bg-green-900 rounded">
+            <div className="font-medium text-green-300">Balanced Army</div>
+            <div className="text-xs text-gray-400">
+              {Object.entries(balancedArmy.optimalArmy).map(([unit, count]) => `${unit}: ${count}`).join(', ')}
+            </div>
+            <div className="text-xs text-gray-400">Cost: {balancedArmy.totalCost.toFixed(0)} gold, Slots: {balancedArmy.remainingSlots}</div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Recommendations */}
+      <div className="mb-4 p-3 bg-gray-750 rounded">
+        <h4 className="font-medium text-orange-300 mb-2">Optimization Recommendations</h4>
+        <div className="space-y-2">
+          {recommendations.map((rec, i) => (
+            <div key={i} className={`p-2 rounded text-sm ${
+              rec.type === 'warning' ? 'bg-red-900 text-red-200' : 
+              rec.type === 'recommendation' ? 'bg-green-900 text-green-200' : 
+              'bg-blue-900 text-blue-200'
+            }`}>
+              <div className="font-medium">{rec.title}</div>
+              <div className="text-xs text-gray-300">{rec.description}</div>
+              <div className="text-xs text-gray-400">Impact: {rec.impact}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      <div className="text-xs text-gray-400">
+        <div className="font-medium">Optimization Strategy:</div>
+        <div className="ml-2">• Focus on one damage phase for maximum effectiveness</div>
+        <div className="ml-2">• Ranged units excel against enemies with weak ranged defense</div>
+        <div className="ml-2">• Melee units are strong for overwhelming enemy defense</div>
+        <div className="ml-2">• Avoid spreading damage across multiple phases</div>
+      </div>
+    </div>
+  );
+};
+
+
 // BuildingTable component: shows and edits building counts for a kingdom
-const BuildingTable = ({ buildings, setBuildings, land, castles, race, population }: any) => {
+const BuildingTable = ({ buildings, setBuildings, land, castles, race, population, setKingdomStats }: any) => {
   // List of building keys in in-game order
   const buildingOrder = [
     'Advanced Training Center',
@@ -1646,6 +2337,7 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
   // State for ratios and manual overrides
   const [ratios, setRatios] = React.useState<any>({});
   const [manualOverride, setManualOverride] = React.useState<any>({});
+  const prevLandRef = React.useRef(land);
 
   // Max buildings allowed (excluding Castle)
   const maxBuildings = (land || 0) * 10;
@@ -1670,21 +2362,40 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
 
   // On land/race change, update counts from ratios unless manually overridden
   React.useEffect(() => {
+    // Only update if land actually changed
+    if (land === prevLandRef.current && Object.keys(buildings).length > 0) {
+      return;
+    }
+    
     const newBuildings: any = {};
+    
+    // Calculate current ratios from existing buildings (if we have buildings and land)
+    const currentRatios: any = {};
+    if (land && Object.keys(buildings).length > 0) {
+      buildingOrder.forEach(b => {
+        const currentCount = buildings[b] || 0;
+        currentRatios[b] = Math.round((currentCount / (prevLandRef.current || land)) * 100) / 100;
+      });
+    }
+    
     // Set all buildings (manual or auto)
     buildingOrder.forEach(b => {
       if (manualOverride[b]) {
         newBuildings[b] = buildings[b] || 0;
       } else {
-        newBuildings[b] = autoCounts[b];
+        // Use existing ratio if available, otherwise use default
+        const ratioToUse = currentRatios[b] !== undefined ? currentRatios[b] : (ratios[b] !== undefined ? ratios[b] : getDefaultRatio(b));
+        newBuildings[b] = Math.floor(ratioToUse * (land || 0));
       }
     });
+    
     // Only sum non-castle buildings for the cap
     const nonCastleOrder = buildingOrder.filter(b => b !== 'Castle');
     let nonCastleUsed = 0;
     nonCastleOrder.forEach(b => {
       nonCastleUsed += newBuildings[b];
     });
+    
     // If over max, reduce Med Center and Guard House first, then others (but only non-castle buildings)
     if (nonCastleUsed > maxBuildings) {
       let over = nonCastleUsed - maxBuildings;
@@ -1696,9 +2407,23 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
         if (over <= 0) break;
       }
     }
+    
     setBuildings(newBuildings);
+    
+    // Update ratios to reflect the new counts
+    const updatedRatios: any = {};
+    buildingOrder.forEach(b => {
+      if (land) {
+        updatedRatios[b] = Math.round((newBuildings[b] / land) * 100) / 100;
+      }
+    });
+    setRatios(updatedRatios);
+    
+    // Update the ref
+    prevLandRef.current = land;
+    
     // eslint-disable-next-line
-  }, [land, castles, race, ratios]);
+  }, [land, castles, race]);
 
   // Handler for changing ratio
   const handleRatioChange = (b: string, value: string) => {
@@ -1742,6 +2467,10 @@ const BuildingTable = ({ buildings, setBuildings, land, castles, race, populatio
     if (b === 'Castle') {
       // Cap castles to castleCap
       if (count > castleCap) count = castleCap;
+      // Update kingdom stats when castle count changes
+      if (setKingdomStats) {
+        setKingdomStats((prev: any) => ({ ...prev, Castles: count }));
+      }
     } else {
       // Prevent going over max for non-castle buildings
       const otherCounts = Object.entries(buildings)
@@ -2002,15 +2731,135 @@ const calculateOptimalPopulation = (buildings: any, totalPop: number) => {
 };
 
 const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }: any) => {
+  const prevTotalPopRef = React.useRef(totalPop);
+  const prevBuildingsRef = React.useRef(buildings);
+  const [efficiencyValues, setEfficiencyValues] = React.useState<any>({});
+  
   // Set optimal population assignments when component mounts or buildings change
   useEffect(() => {
-    // Only set if population is empty (initial load) or if buildings have changed significantly
     const currentTotal = Object.values(population).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
+    
+    // Check if buildings actually changed by comparing key building counts
+    const buildingsChanged = () => {
+      const keyBuildings = ['House', 'Farm', 'Forge', 'Building'];
+      for (const building of keyBuildings) {
+        const current = buildings[building] || 0;
+        const previous = prevBuildingsRef.current[building] || 0;
+        if (current !== previous) {
+          return true;
+        }
+      }
+      return false;
+    };
+    
     if (currentTotal === 0 && totalPop > 0) {
+      // Initial load - set optimal population
       const optimalPopulation = calculateOptimalPopulation(buildings, totalPop);
       setPopulation(optimalPopulation);
+    } else if (currentTotal > 0 && totalPop > 0 && buildingsChanged()) {
+      // Buildings changed - preserve efficiency ratios
+      const newPopulation: any = {};
+      
+      // Use stored efficiency values or calculate current ones
+      const efficiencyRatios: any = {};
+      JOBS.forEach(job => {
+        if (efficiencyValues[job.key] !== undefined) {
+          // Use stored efficiency value
+          efficiencyRatios[job.key] = efficiencyValues[job.key];
+        } else {
+          // Calculate current efficiency for initial load
+          if (job.key === 'Training' || job.key === 'Exploration') {
+            efficiencyRatios[job.key] = population[job.key] || 0;
+          } else if (job.key === 'Building') {
+            const currentAssigned = population[job.key] || 0;
+            efficiencyRatios[job.key] = Math.floor(currentAssigned / 150);
+          } else {
+            const buildingsForJob = getBuildings(job.key);
+            if (buildingsForJob > 0) {
+              const currentAssigned = population[job.key] || 0;
+              efficiencyRatios[job.key] = Math.floor(currentAssigned / buildingsForJob);
+            } else {
+              efficiencyRatios[job.key] = 0;
+            }
+          }
+        }
+      });
+      
+      // Apply efficiency ratios to new building counts
+      JOBS.forEach(job => {
+        if (job.key === 'Training' || job.key === 'Exploration') {
+          // Preserve absolute numbers for Training/Exploration
+          newPopulation[job.key] = efficiencyRatios[job.key] || 0;
+        } else if (job.key === 'Building') {
+          // Apply building efficiency (workers per 150)
+          const buildingEfficiency = efficiencyRatios[job.key] || 0;
+          newPopulation[job.key] = buildingEfficiency * 150;
+        } else {
+          // Apply efficiency per building for other jobs
+          const buildingsForJob = getBuildings(job.key);
+          if (buildingsForJob > 0 && efficiencyRatios[job.key] !== undefined) {
+            newPopulation[job.key] = buildingsForJob * efficiencyRatios[job.key];
+          } else {
+            // If no buildings, keep efficiency at 0
+            newPopulation[job.key] = 0;
+          }
+        }
+      });
+      
+      // Update stored efficiency values to match what we're applying
+      const newEfficiencyValues: any = {};
+      JOBS.forEach(job => {
+        newEfficiencyValues[job.key] = efficiencyRatios[job.key] || 0;
+      });
+      setEfficiencyValues(newEfficiencyValues);
+      
+      // Ensure we don't exceed total population
+      const newTotal = Object.values(newPopulation).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
+      if (newTotal > totalPop) {
+        // Scale down proportionally
+        const scale = totalPop / newTotal;
+        for (const job of JOBS) {
+          newPopulation[job.key] = Math.floor(newPopulation[job.key] * scale);
+        }
+      }
+      
+      setPopulation(newPopulation);
     }
+    
+    // Update the ref
+    prevBuildingsRef.current = buildings;
   }, [buildings, totalPop, setPopulation]);
+
+  // Capture efficiency values when they're first set (for initial load)
+  useEffect(() => {
+    const currentTotal = Object.values(population).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
+    
+    // If we have population assigned but no stored efficiency values, capture them
+    if (currentTotal > 0 && Object.keys(efficiencyValues).length === 0) {
+      const initialEfficiencyValues: any = {};
+      
+      JOBS.forEach(job => {
+        if (job.key === 'Training' || job.key === 'Exploration') {
+          initialEfficiencyValues[job.key] = population[job.key] || 0;
+        } else if (job.key === 'Building') {
+          const currentAssigned = population[job.key] || 0;
+          initialEfficiencyValues[job.key] = Math.floor(currentAssigned / 150);
+        } else {
+          const buildingsForJob = getBuildings(job.key);
+          if (buildingsForJob > 0) {
+            const currentAssigned = population[job.key] || 0;
+            initialEfficiencyValues[job.key] = Math.floor(currentAssigned / buildingsForJob);
+          } else {
+            initialEfficiencyValues[job.key] = 0;
+          }
+        }
+      });
+      
+      setEfficiencyValues(initialEfficiencyValues);
+    }
+  }, [population, efficiencyValues]);
+
+
 
   // Calculate optimal/max per job
   const getJobMax = (job: string) => {
@@ -2042,6 +2891,12 @@ const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }
   };
   // Efficiency per job (whole number)
   const getEfficiency = (job: string) => {
+    // Use stored efficiency value if available
+    if (efficiencyValues[job] !== undefined) {
+      return efficiencyValues[job];
+    }
+    
+    // Otherwise calculate from current population
     const b = getBuildings(job);
     if (job === 'Training' || job === 'Exploration') return population[job] || 0;
     if (!b) return 0;
@@ -2058,6 +2913,20 @@ const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }
     // Prevent over max for job
     if (getJobMax(job) && val > getJobMax(job)) val = getJobMax(job);
     setPopulation({ ...population, [job]: val });
+    
+    // Update efficiency value based on new assignment
+    if (job === 'Training' || job === 'Exploration') {
+      setEfficiencyValues((prev: any) => ({ ...prev, [job]: val }));
+    } else if (job === 'Building') {
+      const eff = Math.floor(val / 150);
+      setEfficiencyValues((prev: any) => ({ ...prev, [job]: eff }));
+    } else {
+      const buildingsForJob = getBuildings(job);
+      if (buildingsForJob > 0) {
+        const eff = Math.floor(val / buildingsForJob);
+        setEfficiencyValues((prev: any) => ({ ...prev, [job]: eff }));
+      }
+    }
   };
   // Handler for efficiency change (for Building, update assigned population immediately and always clamp)
   const handleEfficiencyInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2076,6 +2945,7 @@ const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }
       assigned = eff * 150;
     }
     setPopulation({ ...population, Building: assigned });
+    setEfficiencyValues((prev: any) => ({ ...prev, Building: eff }));
   };
   // Handler for efficiency change for other jobs
   const handleEfficiencyChange = (job: string, value: string) => {
@@ -2096,6 +2966,7 @@ const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }
     // Prevent over max for job
     if (getJobMax(job) && val > getJobMax(job)) val = getJobMax(job);
     setPopulation({ ...population, [job]: val });
+    setEfficiencyValues((prev: any) => ({ ...prev, [job]: eff }));
   };
   // Total assigned
   const totalAssigned = Object.values(population).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
@@ -2333,7 +3204,7 @@ export default function MainApp() {
   const [enemyRace, setEnemyRace] = useState<string>(RACES[0]);
   // Add building state for each kingdom
   const [yourBuildings, setYourBuildings] = useState<any>({});
-  const [enemyBuildings, setEnemyBuildings] = useState<any>({ Castle: 2 }); // Default 2 castles for testing castle scaling
+  const [enemyBuildings, setEnemyBuildings] = useState<any>({}); // Start empty like your army side
   // Add population state for each kingdom
   const [yourPopulation, setYourPopulation] = useState<any>({});
   const [enemyPopulation, setEnemyPopulation] = useState<any>({});
@@ -2377,6 +3248,21 @@ export default function MainApp() {
     // eslint-disable-next-line
   }, [enemyArmy, enemyBuildings, enemyPopulation, enemyTechLevels, enemyStrategy, enemyRace]);
 
+  // Sync castle counts between kingdom stats and buildings (one-way sync to avoid loops)
+  useEffect(() => {
+    const currentCastlesInBuildings = yourBuildings['Castle'] || 0;
+    if (yourKingdomStats.Castles !== currentCastlesInBuildings) {
+      setYourBuildings((prev: any) => ({ ...prev, Castle: yourKingdomStats.Castles }));
+    }
+  }, [yourKingdomStats.Castles]);
+
+  useEffect(() => {
+    const currentCastlesInBuildings = enemyBuildings['Castle'] || 0;
+    if (enemyKingdomStats.Castles !== currentCastlesInBuildings) {
+      setEnemyBuildings((prev: any) => ({ ...prev, Castle: enemyKingdomStats.Castles }));
+    }
+  }, [enemyKingdomStats.Castles]);
+
   // Calculate total population for each kingdom
   const calcTotalPop = (buildings: any) => {
     let total = 0;
@@ -2390,6 +3276,18 @@ export default function MainApp() {
   };
   const yourTotalPop = calcTotalPop(yourBuildings);
   const enemyTotalPop = calcTotalPop(enemyBuildings);
+
+  // Initialize enemy buildings and population to start empty like your army side
+  useEffect(() => {
+    // Reset enemy buildings to empty state to match your army side behavior
+    if (Object.keys(enemyBuildings).length > 1) {
+      setEnemyBuildings({ Castle: 1 });
+    }
+    // Reset enemy population to empty state to match your army side behavior
+    if (Object.keys(enemyPopulation).length > 0) {
+      setEnemyPopulation({});
+    }
+  }, []);
 
   // When race changes, reset army to 0 for all units of that race
   useEffect(() => {
@@ -2458,9 +3356,22 @@ export default function MainApp() {
               castles={yourKingdomStats.Castles}
               race={yourRace}
               population={yourPopulation}
+              setKingdomStats={setYourKingdomStats}
             />
-            <EconomicSummary army={yourArmy} kingdomStats={yourKingdomStats} race={yourRace} />
-            <UnitEfficiencyTable techLevels={yourTechLevels} strategy={yourStrategy} race={yourRace} />
+                    <EnemyCounterOptimizer 
+          yourArmy={yourArmy} 
+          yourKingdomStats={yourKingdomStats} 
+          yourRace={yourRace} 
+          yourTechLevels={yourTechLevels} 
+          yourStrategy={yourStrategy}
+          yourBuildings={yourBuildings}
+          enemyArmy={enemyArmy} 
+          enemyKingdomStats={enemyKingdomStats} 
+          enemyRace={enemyRace} 
+          enemyTechLevels={enemyTechLevels} 
+          enemyStrategy={enemyStrategy}
+          enemyBuildings={enemyBuildings}
+        />
           </div>
           <div>
             <h2 className="text-xl font-semibold mb-2">Enemy Army</h2>
@@ -2516,9 +3427,22 @@ export default function MainApp() {
               castles={enemyKingdomStats.Castles}
               race={enemyRace}
               population={enemyPopulation}
+              setKingdomStats={setEnemyKingdomStats}
             />
-            <EconomicSummary army={enemyArmy} kingdomStats={enemyKingdomStats} race={enemyRace} />
-            <UnitEfficiencyTable techLevels={enemyTechLevels} strategy={enemyStrategy} race={enemyRace} />
+                    <EnemyCounterOptimizer 
+          yourArmy={enemyArmy} 
+          yourKingdomStats={enemyKingdomStats} 
+          yourRace={enemyRace} 
+          yourTechLevels={enemyTechLevels} 
+          yourStrategy={enemyStrategy}
+          yourBuildings={enemyBuildings}
+          enemyArmy={yourArmy} 
+          enemyKingdomStats={yourKingdomStats} 
+          enemyRace={yourRace} 
+          enemyTechLevels={yourTechLevels} 
+          enemyStrategy={yourStrategy}
+          enemyBuildings={yourBuildings}
+        />
           </div>
         </div>
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
