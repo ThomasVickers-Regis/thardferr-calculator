@@ -8,7 +8,7 @@ import { UNIT_DATA } from '../data/unitData';
 import { TECHNOLOGY_DATA, TECHNOLOGY_TREES, RACE_UNIQUE_TECHS } from '../data/technologyData';
 import { STRATEGY_DATA } from '../data/strategyData';
 import { getArmyTotalInitialGoldCost, getArmyTEGC } from '../utils/economicHelpers';
-import { getEffectiveUnitStats } from '../utils/getEffectiveUnitStats';
+import { getEffectiveUnitStats, getStatModifiers } from '../utils/getEffectiveUnitStats';
 import { getUnitEfficiencyRatios } from '../utils/economicHelpers';
 import { BUILDING_DATA } from '../data/buildingData';
 
@@ -263,6 +263,75 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
     return info;
   };
 
+  const getStrategyAbilities = () => {
+    if (!strategy || !STRATEGY_DATA[strategy]) return [];
+    
+    const strategyData = STRATEGY_DATA[strategy];
+    const effects = strategyData.effects;
+    const abilities: { text: string; isPositive: boolean }[] = [];
+    
+    switch (strategy) {
+      case 'Archer Protection':
+        abilities.push({ text: 'Infantry: -50% melee attack', isPositive: false });
+        abilities.push({ text: 'Archers: +defense from infantry damage loss', isPositive: true });
+        break;
+        
+      case 'Infantry Attack':
+        abilities.push({ text: 'Infantry: -75% defense', isPositive: false });
+        abilities.push({ text: 'Other units: +defense from infantry defense loss', isPositive: true });
+        break;
+        
+      case 'Quick Retreat':
+        abilities.push({ text: 'All units: -50% attack', isPositive: false });
+        abilities.push({ text: 'Victory chance: -50%', isPositive: false });
+        break;
+        
+      case 'Anti-Cavalry':
+        abilities.push({ text: 'Pikemen: +250% vs mounted units', isPositive: true });
+        abilities.push({ text: 'All units: -10% attack', isPositive: false });
+        break;
+        
+      case 'Dwarf Shield Line':
+        abilities.push({ text: 'All units: -10% close combat attack', isPositive: false });
+        abilities.push({ text: 'Shieldbearers: +100% melee damage', isPositive: true });
+        abilities.push({ text: 'Long range immunity: 2× Shieldbearer ratio', isPositive: true });
+        break;
+        
+      case 'Elf Energy Gathering':
+        abilities.push({ text: 'Mages: +100% melee damage', isPositive: true });
+        abilities.push({ text: 'Mages: +4 range attack', isPositive: true });
+        abilities.push({ text: 'Mages: +2 defense', isPositive: true });
+        abilities.push({ text: 'Mages: Lose melee immunity', isPositive: false });
+        break;
+        
+      case 'Gnome Far Fighting':
+        abilities.push({ text: 'Range/Short attacks: Doubled for both sides', isPositive: true });
+        break;
+        
+      case 'Human Charging!':
+        abilities.push({ text: 'Knights: +50% melee/short attack', isPositive: true });
+        abilities.push({ text: 'Knights: -25% defense', isPositive: false });
+        break;
+        
+      case 'Orc Surrounding':
+        abilities.push({ text: 'Shadow Warriors: +2 defense', isPositive: true });
+        abilities.push({ text: 'Shadow Warriors: Deal damage in short phase', isPositive: true });
+        abilities.push({ text: 'Detection chance: +25%', isPositive: false });
+        break;
+        
+      case 'Orc Berserker':
+        abilities.push({ text: 'All units: +3 all attacks', isPositive: true });
+        abilities.push({ text: 'All units: -50% defense', isPositive: false });
+        break;
+        
+      case 'Orc':
+        abilities.push({ text: 'Shadow Warriors: 75% melee immunity (vs 80% normal)', isPositive: false });
+        break;
+    }
+    
+    return abilities;
+  };
+
   const raceSpecificInfo = getRaceSpecificInfo();
 
   return (
@@ -298,33 +367,87 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
               
               // Get effective stats including technology and strategy bonuses
               const effectiveStats = getEffectiveUnitStats(unit, raceKey, techLevels || {}, strategy, true, 1);
+              // Get individual modifiers for display
+              const statModifiers = getStatModifiers(unit, raceKey, techLevels || {}, strategy);
               
               return (
                 <tr key={unit} className="even:bg-gray-700">
                   <td className="p-2 font-medium" title={unit}>{unit}</td>
                   <td className="p-2">
                     {baseStats.melee}
-                    {effectiveStats.melee > baseStats.melee && (
-                      <span className="text-green-400 ml-1">(+{Math.round(effectiveStats.melee - baseStats.melee)})</span>
-                    )}
+                    {(() => {
+                      const modifiers = [];
+                      if (statModifiers.melee.positiveFlat > 0) {
+                        modifiers.push(<span key="positiveFlat" className="text-green-400 ml-1">(+{statModifiers.melee.positiveFlat})</span>);
+                      }
+                      if (statModifiers.melee.positive > 0) {
+                        modifiers.push(<span key="positive" className="text-green-400 ml-1">(+{Math.round(statModifiers.melee.positive)}%)</span>);
+                      }
+                      if (statModifiers.melee.negativeFlat > 0) {
+                        modifiers.push(<span key="negativeFlat" className="text-red-400 ml-1">(-{statModifiers.melee.negativeFlat})</span>);
+                      }
+                      if (statModifiers.melee.negative > 0) {
+                        modifiers.push(<span key="negative" className="text-red-400 ml-1">(-{Math.round(statModifiers.melee.negative)}%)</span>);
+                      }
+                      return modifiers;
+                    })()}
                   </td>
                   <td className="p-2">
                     {baseStats.short}
-                    {effectiveStats.short > baseStats.short && (
-                      <span className="text-green-400 ml-1">(+{Math.round(effectiveStats.short - baseStats.short)})</span>
-                    )}
+                    {(() => {
+                      const modifiers = [];
+                      if (statModifiers.short.positiveFlat > 0) {
+                        modifiers.push(<span key="positiveFlat" className="text-green-400 ml-1">(+{statModifiers.short.positiveFlat})</span>);
+                      }
+                      if (statModifiers.short.positive > 0) {
+                        modifiers.push(<span key="positive" className="text-green-400 ml-1">(+{Math.round(statModifiers.short.positive)}%)</span>);
+                      }
+                      if (statModifiers.short.negativeFlat > 0) {
+                        modifiers.push(<span key="negativeFlat" className="text-red-400 ml-1">(-{statModifiers.short.negativeFlat})</span>);
+                      }
+                      if (statModifiers.short.negative > 0) {
+                        modifiers.push(<span key="negative" className="text-red-400 ml-1">(-{Math.round(statModifiers.short.negative)}%)</span>);
+                      }
+                      return modifiers;
+                    })()}
                   </td>
                   <td className="p-2">
                     {baseStats.range}
-                    {effectiveStats.range > baseStats.range && (
-                      <span className="text-green-400 ml-1">(+{Math.round(effectiveStats.range - baseStats.range)})</span>
-                    )}
+                    {(() => {
+                      const modifiers = [];
+                      if (statModifiers.range.positiveFlat > 0) {
+                        modifiers.push(<span key="positiveFlat" className="text-green-400 ml-1">(+{statModifiers.range.positiveFlat})</span>);
+                      }
+                      if (statModifiers.range.positive > 0) {
+                        modifiers.push(<span key="positive" className="text-green-400 ml-1">(+{Math.round(statModifiers.range.positive)}%)</span>);
+                      }
+                      if (statModifiers.range.negativeFlat > 0) {
+                        modifiers.push(<span key="negativeFlat" className="text-red-400 ml-1">(-{statModifiers.range.negativeFlat})</span>);
+                      }
+                      if (statModifiers.range.negative > 0) {
+                        modifiers.push(<span key="negative" className="text-red-400 ml-1">(-{Math.round(statModifiers.range.negative)}%)</span>);
+                      }
+                      return modifiers;
+                    })()}
                   </td>
                   <td className="p-2">
                     {baseStats.defense}
-                    {effectiveStats.defense > baseStats.defense && (
-                      <span className="text-green-400 ml-1">(+{Math.round(effectiveStats.defense - baseStats.defense)})</span>
-                    )}
+                    {(() => {
+                      const modifiers = [];
+                      if (statModifiers.defense.positiveFlat > 0) {
+                        modifiers.push(<span key="positiveFlat" className="text-green-400 ml-1">(+{statModifiers.defense.positiveFlat})</span>);
+                      }
+                      if (statModifiers.defense.positive > 0) {
+                        modifiers.push(<span key="positive" className="text-green-400 ml-1">(+{Math.round(statModifiers.defense.positive)}%)</span>);
+                      }
+                      if (statModifiers.defense.negativeFlat > 0) {
+                        modifiers.push(<span key="negativeFlat" className="text-red-400 ml-1">(-{statModifiers.defense.negativeFlat})</span>);
+                      }
+                      if (statModifiers.defense.negative > 0) {
+                        modifiers.push(<span key="negative" className="text-red-400 ml-1">(-{Math.round(statModifiers.defense.negative)}%)</span>);
+                      }
+                      return modifiers;
+                    })()}
                   </td>
                   <td className="p-2">
                     <input
@@ -346,12 +469,17 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
           </tbody>
         </table>
       </div>
-      {raceSpecificInfo.length > 0 && (
+      {(raceSpecificInfo.length > 0 || getStrategyAbilities().length > 0) && (
         <div className="mt-2">
           <div className="text-xs text-gray-300">
             <span className="font-medium">Special Abilities:</span>
             {raceSpecificInfo.map((info, index) => (
-              <div key={index} className="ml-2">• {info}</div>
+              <div key={`race-${index}`} className="ml-2">• {info}</div>
+            ))}
+            {getStrategyAbilities().map((ability, index) => (
+              <div key={`strategy-${index}`} className={`ml-2 ${ability.isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                • {ability.text}
+              </div>
             ))}
           </div>
         </div>
@@ -695,14 +823,21 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
       if (strategy === 'Archer Protection' && phase === 'melee') {
         modifiers.push(`Archer Protection: Infantry -${((1 - effects.infantry_attack_multiplier) * 100).toFixed(0)}% melee`);
       }
+      if (strategy === 'Archer Protection' && phase === 'range') {
+        modifiers.push('Archer Protection: Archers -20% damage when infantry present');
+      }
       if (strategy === 'Infantry Attack' && phase === 'melee') {
-        modifiers.push(`Infantry Attack: Infantry +${((effects.infantry_damage_multiplier - 1) * 100).toFixed(0)}% melee`);
+        if (typeof effects.infantry_damage_multiplier === 'number' && !isNaN(effects.infantry_damage_multiplier)) {
+          modifiers.push(`Infantry Attack: Infantry +${((effects.infantry_damage_multiplier - 1) * 100).toFixed(0)}% melee, other units -20%`);
+        } else {
+          modifiers.push('Infantry Attack: Infantry -75% defense, other units gain redistributed defense');
+        }
       }
       if (strategy === 'Quick Retreat') {
         modifiers.push(`Quick Retreat: All attacks -${((1 - effects.all_unit_attack_multiplier) * 100).toFixed(0)}%`);
       }
       if (strategy === 'Anti-Cavalry' && phase === 'melee') {
-        modifiers.push(`Anti-Cavalry: Pikemen +${((effects.pikemen_attack_vs_mounted_multiplier - 1) * 100).toFixed(0)}% vs mounted`);
+        modifiers.push(`Anti-Cavalry: Pikemen +${((effects.pikemen_attack_vs_mounted_multiplier - 1) * 100).toFixed(0)}% vs mounted, all units -10%`);
       }
       if (strategy === 'Dwarf Shield Line' && phase === 'melee') {
         modifiers.push(`Dwarf Shield Line: Shieldbearers +${(effects.shieldbearers_close_combat_damage_increase_percent * 100).toFixed(0)}% melee`);
@@ -723,13 +858,16 @@ const BattleSimulationDisplay = ({ battleOutcome, yourTechLevels, yourStrategy, 
         modifiers.push('Gnome Far Fighting: Range/Short attacks doubled');
       }
       if (strategy === 'Human Charging!' && phase === 'melee') {
-        modifiers.push(`Human Charging!: Knights +${((effects.knights_attack_multiplier - 1) * 100).toFixed(0)}% melee`);
+        modifiers.push(`Human Charging!: Knights +${((effects.knights_attack_multiplier * effects.knights_damage_multiplier - 1) * 100).toFixed(0)}% melee`);
       }
       if (strategy === 'Orc Surrounding' && phase === 'short') {
         modifiers.push('Orc Surrounding: Shadow Warriors in short phase');
       }
       if (strategy === 'Orc Berserker') {
         modifiers.push(`Orc Berserker: +${effects.all_units_damage_increase} all attacks, -${((1 - 1/effects.all_units_defense_divide_by) * 100).toFixed(0)}% defense`);
+      }
+      if (strategy === 'Orc' && phase === 'melee') {
+        modifiers.push(`Orc: Shadow Warriors ${effects.shadow_warrior_melee_immunity_reduction}% melee immunity (vs 80% normal)`);
       }
     }
 

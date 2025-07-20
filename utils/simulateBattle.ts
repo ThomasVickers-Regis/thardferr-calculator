@@ -75,13 +75,10 @@ export function simulateBattle(
       garrisonEfficiency = 0.90; // 90% for single castle (less aggressive scaling)
     }
     
-    console.log(`Castle scaling applied: ${enemyCastles} castles = ${garrisonEfficiency * 100}% efficiency`);
-    
     // Apply garrison efficiency to all units
     for (const [unit, count] of Object.entries(enemyArmy)) {
       const originalCount = count;
       enemyArmy[unit] = Math.floor(count * garrisonEfficiency);
-      console.log(`${unit}: ${originalCount} → ${enemyArmy[unit]} (${garrisonEfficiency * 100}% scaling)`);
     }
   }
   
@@ -123,6 +120,21 @@ export function simulateBattle(
     } else if (enemyRemainingPercent < enemyRetreatThreshold) {
       winner = 'yourArmy';
       break;
+    }
+    
+    // Quick Retreat victory conditions
+    if (strategyYour === 'Quick Retreat' || strategyEnemy === 'Quick Retreat') {
+      const yourCasualties = yourInitialTotal > 0 ? ((yourInitialTotal - yourTotalUnits) / yourInitialTotal) * 100 : 0;
+      const enemyCasualties = enemyInitialTotal > 0 ? ((enemyInitialTotal - enemyTotalUnits) / enemyInitialTotal) * 100 : 0;
+      
+      // Attacker wins if they cause ≥35% casualties AND suffer less % casualties than defender
+      if (yourCasualties >= 35 && yourCasualties < enemyCasualties) {
+        winner = 'yourArmy';
+        break;
+      } else if (enemyCasualties >= 35 && enemyCasualties < yourCasualties) {
+        winner = 'enemyArmy';
+        break;
+      }
     }
     
     // Fallback: Check if either army is completely eliminated

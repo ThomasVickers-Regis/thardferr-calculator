@@ -14,15 +14,15 @@ export const STRATEGY_DATA: Record<string, StrategyData> = {
     description: "Infantry stays back to protect archers.",
     effects: {
       infantry_attack_multiplier: 0.5,
-      archer_damage_reduction_by_infantry_attack: true
+      archer_defense_increase_from_infantry_damage: true
     }
   },
   "Infantry Attack": {
     type: "General",
     description: "Infantry sent first to kill powerful units.",
     effects: {
-      infantry_damage_multiplier: 2.5,
-      other_units_damage_reduced: true
+      infantry_defense_reduction_percent: 0.75,
+      other_units_defense_increase_from_infantry_defense: true
     }
   },
   "Quick Retreat": {
@@ -74,7 +74,8 @@ export const STRATEGY_DATA: Record<string, StrategyData> = {
     description: "Knights charge first, breaking enemy lines.",
     effects: {
       knights_attack_multiplier: 1.5,
-      knights_damage_multiplier: 1.5
+      knights_short_multiplier: 1.5,
+      knights_defense_reduction_percent: 0.25
     }
   },
   "Orc Surrounding": {

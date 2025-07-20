@@ -57,7 +57,9 @@ export function simulateRound(
   const phaseLogs: RoundResult['phaseLogs'] = [];
   const phases: PhaseType[] = ['range', 'short', 'melee'];
   
-
+  // Save the original armies at the start of the round
+  const roundStartYourArmy = { ...yourArmyState };
+  const roundStartEnemyArmy = { ...enemyArmyState };
 
   for (const phase of phases) {
     // Record army state at START of this phase
@@ -73,12 +75,14 @@ export function simulateRound(
       techLevelsEnemy,
       strategyEnemy,
       strategyYour,
+      strategyYour, // processedArmyStrategy
       ksDifferenceFactor,
       enemyBuildings,
       yourBuildings,
       false, // enemy is attacker
       enemyRace,
-      yourRace
+      yourRace,
+      phase === 'melee' ? { ...roundStartYourArmy } : undefined
     );
     const enemyDamageResult = calculatePhaseDamage(
       yourArmyState,
@@ -87,12 +91,14 @@ export function simulateRound(
       techLevelsYour,
       strategyYour,
       strategyEnemy,
+      strategyEnemy, // processedArmyStrategy
       ksDifferenceFactor,
       yourBuildings,
       enemyBuildings,
       true, // your side is attacker
       yourRace,
-      enemyRace
+      enemyRace,
+      phase === 'melee' ? { ...roundStartEnemyArmy } : undefined
     );
     
     // Apply losses to yourArmyState

@@ -1,4 +1,4 @@
-import { getEffectiveUnitStats, TechLevels, StrategyName } from './getEffectiveUnitStats';
+import { getEffectiveUnitStats, TechLevels, StrategyName, isInfantryUnit, isPikemanUnit, isMountedUnit } from './getEffectiveUnitStats';
 import { UNIT_DATA } from '../data/unitData';
 
 export type Army = Record<string, number>; // { "Elf Archer": 10, ... }
@@ -21,6 +21,28 @@ export interface DamageLog {
   finalDamage: number;
   unitsLost: number;
   buildingEffects: string[];
+  trueEffectiveDefense?: number; // For UI display of real defense used
+  appliedRedistributionBonus?: number; // For UI display of redistribution bonus
+}
+
+function isArcherUnit(unitName: string, race?: string) {
+  // Optionally, you can add a flag in unitData for archers in the future
+  return unitName.toLowerCase().includes('archer');
+}
+function isSwordmanUnit(unitName: string, race?: string) {
+  return unitName.toLowerCase().includes('swordman');
+}
+function isShieldbearerUnit(unitName: string, race?: string) {
+  return unitName.toLowerCase().includes('shieldbearer');
+}
+function isShadowWarriorUnit(unitName: string, race?: string) {
+  return unitName.toLowerCase().includes('shadow warrior');
+}
+function isMageUnit(unitName: string, race?: string) {
+  return unitName.toLowerCase().includes('mage');
+}
+function isSkeletonUnit(unitName: string, race?: string) {
+  return unitName.toLowerCase().includes('skeleton');
 }
 
 export function calculatePhaseDamage(
@@ -30,12 +52,14 @@ export function calculatePhaseDamage(
   techLevels: TechLevels,
   attackerStrategy: StrategyName | null,
   defenderStrategy: StrategyName | null,
+  processedArmyStrategy: StrategyName | null,
   ksDifferenceFactor: number = 1,
   attackerBuildings: any = {},
   defenderBuildings: any = {},
   isAttacker: boolean = false,
   attackerRace: string = 'dwarf',
-  defenderRace: string = 'dwarf'
+  defenderRace: string = 'dwarf',
+  originalDefendingArmy?: Army
 ): { losses: Record<string, number>; damageLog: DamageLog[] } {
   const losses: Record<string, number> = {};
   const damageLog: DamageLog[] = [];
@@ -56,16 +80,27 @@ export function calculatePhaseDamage(
     // Apply unit-to-unit combat bonuses (Anti-Cavalry strategy)
     if (attackerStrategy === 'Anti-Cavalry' && phaseType === 'melee') {
       // Check if this is a pikeman unit attacking mounted units
-      if (attackerName.toLowerCase().includes('pikeman')) {
+      if (isPikemanUnit(attackerName, attackerRace)) {
         // Check if defender has mounted units (units with horses)
         const hasMountedUnits = defenderUnitNames.some(unit => 
-          unit.toLowerCase().includes('knight') || 
-          unit.toLowerCase().includes('caragous') || 
-          unit.toLowerCase().includes('rider') ||
-          unit.toLowerCase().includes('mounted')
+          isMountedUnit(unit, defenderRace)
         );
         if (hasMountedUnits) {
           attackValue *= 3.5; // Pikemen get 3.5x damage vs mounted units
+        }
+      }
+    }
+    
+    // Apply Archer Protection strategy (archer damage reduction by infantry attack)
+    if (attackerStrategy === 'Archer Protection' && phaseType === 'range') {
+      if (isArcherUnit(attackerName, attackerRace)) {
+        // Check if defender has infantry units that could protect archers
+        const hasInfantry = defenderUnitNames.some(unit => 
+          isInfantryUnit(unit, defenderRace)
+        );
+        if (hasInfantry) {
+          // Reduce archer damage when infantry is present (simplified implementation)
+          attackValue *= 0.8; // 20% reduction
         }
       }
     }
@@ -78,7 +113,7 @@ export function calculatePhaseDamage(
     
     // Apply Orc Surrounding strategy (Shadow Warriors deal damage in short phase)
     if (attackerStrategy === 'Orc Surrounding' && phaseType === 'short' && 
-        attackerName.toLowerCase().includes('shadow warrior')) {
+        isShadowWarriorUnit(attackerName, attackerRace)) {
       // Shadow Warriors get their full melee damage in short phase
       attackValue = attackerStats.melee;
     }
@@ -102,7 +137,7 @@ export function calculatePhaseDamage(
     let immunityPercent = 0;
     
     // Mage: Invulnerable to melee phase (unless Elf Energy Gathering strategy is active)
-    if (defenderName.toLowerCase().includes('mage') && phaseType === 'melee') {
+    if (isMageUnit(defenderName, defenderRace) && phaseType === 'melee') {
       if (defenderStrategy === 'Elf Energy Gathering') {
         // Mages lose melee immunity but get +2 defense in melee
         immunityPercent = 0;
@@ -113,12 +148,12 @@ export function calculatePhaseDamage(
     }
     
     // Orc Shadow Warrior: 80% immunity in melee, 75% with Orc strategy
-    if (defenderName.toLowerCase().includes('shadow warrior') && phaseType === 'melee') {
+    if (isShadowWarriorUnit(defenderName, defenderRace) && phaseType === 'melee') {
       immunityPercent = defenderStrategy === 'Orc' ? 75 : 80;
     }
     
     // Undead Legion Skeleton: Immunity to long range (range phase)
-    if (defenderName.toLowerCase().includes('skeleton') && phaseType === 'range') {
+    if (isSkeletonUnit(defenderName, defenderRace) && phaseType === 'range') {
       immunityPercent = 100;
     }
     
@@ -140,9 +175,13 @@ export function calculatePhaseDamage(
     unitImmunities[defenderName] = immunityPercent;
   }
 
+
+
   // Calculate building bonuses (distributed per unit)
   let buildingDefenseBonus = 0;
   const totalDefenders = defenderUnitNames.reduce((sum, u) => sum + defendingArmy[u], 0);
+  
+
   
   if (phaseType === 'range' && defenderBuildings['Guard Towers']) {
     const towers = defenderBuildings['Guard Towers'] || 0;
@@ -177,6 +216,70 @@ export function calculatePhaseDamage(
   if (totalDamage < minimumDamage && totalOffense > 0) {
     totalDamage = minimumDamage;
   }
+
+  // Apply strategy redistribution effects
+  let redistributionBonus = 0;
+  
+  // Archer Protection: Infantry attack loss redistributed as defense to archers
+  if (defenderStrategy === 'Archer Protection' && phaseType === 'range') {
+    const infantryUnits = defenderUnitNames.filter(unit => 
+      isInfantryUnit(unit, defenderRace) ||
+      isSwordmanUnit(unit, defenderRace) ||
+      isPikemanUnit(unit, defenderRace) ||
+      isShieldbearerUnit(unit, defenderRace)
+    );
+    
+    let totalInfantryAttackLoss = 0;
+    for (const infantryUnit of infantryUnits) {
+      const infantryCount = defendingArmy[infantryUnit];
+      const infantryStats = getEffectiveUnitStats(infantryUnit, defenderRace, {}, null, false, ksDifferenceFactor);
+      // Calculate the attack loss (50% of normal attack)
+      totalInfantryAttackLoss += infantryCount * (infantryStats.melee * 0.5);
+    }
+    
+    // Redistribute as defense to archers
+    const archerUnits = defenderUnitNames.filter(unit => 
+      isArcherUnit(unit, defenderRace)
+    );
+    
+    if (archerUnits.length > 0) {
+      const totalArchers = archerUnits.reduce((sum, unit) => sum + defendingArmy[unit], 0);
+      if (totalArchers > 0) {
+        redistributionBonus = totalInfantryAttackLoss / totalArchers;
+      }
+    }
+  }
+  
+  // Infantry Attack: Infantry defense loss redistributed as defense to other units
+  let redistributionBonuses: Record<string, number> = {};
+  if (processedArmyStrategy === 'Infantry Attack' && phaseType === 'melee') {
+    const raceKey = defenderRace.toLowerCase();
+    const armyForRedistribution = originalDefendingArmy || defendingArmy;
+    let totalInfantryDefenseLoss = 0;
+    // Only count non-infantry units with count > 0
+    let totalNonInfantryCount = 0;
+    for (const unit of Object.keys(armyForRedistribution)) {
+      const count = armyForRedistribution[unit];
+      const baseStats = UNIT_DATA[raceKey]?.[unit];
+      if (!baseStats) continue;
+      if (isInfantryUnit(unit, defenderRace)) {
+        const effectiveStats = getEffectiveUnitStats(unit, raceKey, techLevels, processedArmyStrategy, false, ksDifferenceFactor);
+        const loss = (baseStats.defense - effectiveStats.defense) * count;
+        totalInfantryDefenseLoss += loss;
+      } else {
+        if (count > 0) totalNonInfantryCount += count;
+      }
+    }
+    for (const unit of Object.keys(armyForRedistribution)) {
+      if (!isInfantryUnit(unit, defenderRace)) {
+        const count = armyForRedistribution[unit];
+        // Each unit gets a share proportional to its count
+        redistributionBonuses[unit] = (count > 0 && totalNonInfantryCount > 0)
+          ? (totalInfantryDefenseLoss * (count / totalNonInfantryCount)) / count
+          : 0;
+      }
+    }
+  }
   
 
   
@@ -185,8 +288,28 @@ export function calculatePhaseDamage(
   for (const defenderName of defenderUnitNames) {
     const defenderCount = defendingArmy[defenderName];
     const defenderStats = getEffectiveUnitStats(defenderName, defenderRace, {}, null, false, ksDifferenceFactor);
+    let effectiveDefense = defenderStats.defense;
     const immunityPercent = unitImmunities[defenderName] || 0;
-    
+
+    // Only show building effects if damage was actually received
+    const buildingEffects = [];
+
+    // Apply Infantry Attack redistribution bonus to non-infantry units
+    let redistributionMitigation = 0;
+    let appliedRedistributionBonus = 0;
+    if (processedArmyStrategy === 'Infantry Attack' && phaseType === 'melee' && !isInfantryUnit(defenderName, defenderRace)) {
+      const beforeRedistribution = effectiveDefense;
+      const bonus = redistributionBonuses[defenderName] || 0;
+      effectiveDefense += bonus;
+      appliedRedistributionBonus = bonus;
+      redistributionMitigation = bonus * defenderCount; // Total mitigation from redistribution
+      // Add a log entry for the redistributed defense bonus
+      buildingEffects.push(`Infantry Attack: +${bonus.toFixed(2)} defense redistributed from infantry`);
+    }
+
+    // Apply immunity to defense calculation
+    effectiveDefense = effectiveDefense * (1 - immunityPercent / 100);
+
     // Calculate damage share for this unit
     const damageShare = totalDefenders > 0 ? (defenderCount / totalDefenders) * totalDamage : 0;
     
@@ -197,7 +320,7 @@ export function calculatePhaseDamage(
   let unitsLost = 0;
   if (effectiveDamage > 0) {
     // Method 1: Traditional damage/defense per unit
-    const damagePerKill = defenderStats.defense;
+    const damagePerKill = effectiveDefense;
     const traditionalLosses = Math.floor(effectiveDamage / damagePerKill);
     
     // Method 2: Proportional casualties based on damage ratio
@@ -224,7 +347,6 @@ export function calculatePhaseDamage(
     const totalArmySize = Object.values(defendingArmy).reduce((sum, count) => sum + count, 0);
     
     // Only show building effects if damage was actually received
-    const buildingEffects = [];
     if (totalDamage > 0 && buildingDefenseBonus > 0) {
       buildingEffects.push(`Building bonus: -${buildingDefenseBonus.toFixed(1)} damage per unit`);
     }
@@ -235,10 +357,12 @@ export function calculatePhaseDamage(
     damageLog.push({
       unitName: defenderName,
       damageReceived: damageShare,
-      damageMitigated: totalDamage > 0 ? (buildingDefenseBonus * defenderCount) + (damageShare - effectiveDamage) : 0,
+      damageMitigated: (totalDamage > 0 ? (buildingDefenseBonus * defenderCount) + (damageShare - effectiveDamage) : 0) + redistributionMitigation,
       finalDamage: effectiveDamage,
       unitsLost: losses[defenderName],
-      buildingEffects: buildingEffects
+      buildingEffects: buildingEffects,
+      trueEffectiveDefense: effectiveDefense,
+      appliedRedistributionBonus: appliedRedistributionBonus
     });
   }
 
