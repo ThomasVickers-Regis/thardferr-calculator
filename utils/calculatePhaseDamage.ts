@@ -65,6 +65,16 @@ export interface DamageLog {
   buildingEffects: string[];
   trueEffectiveDefense?: number;
   appliedRedistributionBonus?: number;
+  // Add detailed breakdown for UI clarity
+  breakdown?: {
+    initialShare: number;
+    afterDefenseScaling: number;
+    afterMitigation: number;
+    afterImmunity: number;
+    final: number;
+    mitigationDetails: string[];
+    unitWeight: number;
+  };
 }
 
 function isArcherUnit(unitName: string, race?: string) {
@@ -275,12 +285,9 @@ export function calculatePhaseDamage(
     const relativeStrength = totalOffense / (totalDefense + buildingDefenseBonus);
     postMitigationTotalDamage = totalOffense * relativeStrength * 1.2;
   }
-  const minimumDamage = totalOffense * 0.25;
-  const minimumDamageEnforced = postMitigationTotalDamage < minimumDamage && totalOffense > 0;
+  // Minimum damage rule removed
+  const minimumDamageEnforced = false;
   let postMitigationTotalDamageBeforeMin = postMitigationTotalDamage;
-  if (minimumDamageEnforced) {
-    postMitigationTotalDamage = minimumDamage;
-  }
 
   // --- UWDA Weighted Damage Allocation ---
   // 1. Build weighted unit list for the defending army
@@ -345,17 +352,20 @@ export function calculatePhaseDamage(
 
     // Add all stat changes and effects to the effects array for display (with green/red text)
     const statChanges: string[] = [];
-    if (techStrategyModifiersMap[defenderName].defense !== 0) {
-      statChanges.push(`${techStrategyModifiersMap[defenderName].defense > 0 ? '+' : ''}${techStrategyModifiersMap[defenderName].defense} defense`);
+    const roundEffect = (val: number) => Math.abs(val) < 0.01 ? 0 : Math.round(val * 100) / 100;
+    // Track if any stat change is due to KS difference factor only
+    const isKSFactor = ksDifferenceFactor !== 1;
+    if (roundEffect(techStrategyModifiersMap[defenderName].defense) !== 0) {
+      statChanges.push(`${roundEffect(techStrategyModifiersMap[defenderName].defense)} defense${isKSFactor ? ' (KS difference factor)' : ''}`);
     }
-    if (techStrategyModifiersMap[defenderName].melee !== 0) {
-      statChanges.push(`${techStrategyModifiersMap[defenderName].melee > 0 ? '+' : ''}${techStrategyModifiersMap[defenderName].melee} melee`);
+    if (roundEffect(techStrategyModifiersMap[defenderName].melee) !== 0) {
+      statChanges.push(`${roundEffect(techStrategyModifiersMap[defenderName].melee)} melee${isKSFactor ? ' (KS difference factor)' : ''}`);
     }
-    if (techStrategyModifiersMap[defenderName].short !== 0) {
-      statChanges.push(`${techStrategyModifiersMap[defenderName].short > 0 ? '+' : ''}${techStrategyModifiersMap[defenderName].short} short`);
+    if (roundEffect(techStrategyModifiersMap[defenderName].short) !== 0) {
+      statChanges.push(`${roundEffect(techStrategyModifiersMap[defenderName].short)} short${isKSFactor ? ' (KS difference factor)' : ''}`);
     }
-    if (techStrategyModifiersMap[defenderName].range !== 0) {
-      statChanges.push(`${techStrategyModifiersMap[defenderName].range > 0 ? '+' : ''}${techStrategyModifiersMap[defenderName].range} range`);
+    if (roundEffect(techStrategyModifiersMap[defenderName].range) !== 0) {
+      statChanges.push(`${roundEffect(techStrategyModifiersMap[defenderName].range)} range${isKSFactor ? ' (KS difference factor)' : ''}`);
     }
     // Only show redistribution effect if Infantry Attack is active and bonus is strictly greater than zero and finite
     if (processedArmyStrategy === 'Infantry Attack' && Number.isFinite(redistributionBonuses[defenderName]) && redistributionBonuses[defenderName] > 0) {
@@ -399,36 +409,37 @@ export function calculatePhaseDamage(
       buildingEffects.push(medEffectString);
     }
 
-    // Calculate raw damage share (UWDA)
+    // --- Refactored breakdown calculation for consistency ---
     let rawDamageShare = unitDamageAlloc[defenderName] || 0;
-    // Subtract per-unit Guard Tower mitigation (range phase)
+    const initialShare = rawDamageShare;
+    let mitigationDetails: string[] = [];
+    // Step 1: Apply all mitigations (tower, med, building bonus)
+    let afterMitigation = rawDamageShare;
     if (towerMitigation > 0) {
-      rawDamageShare = Math.max(0, rawDamageShare - towerMitigation);
+      mitigationDetails.push(`Guard Towers: -${towerMitigation.toFixed(2)}`);
+      afterMitigation = Math.max(0, afterMitigation - towerMitigation);
     }
-    // Subtract per-unit Medical Center mitigation (melee phase)
     if (medMitigation > 0) {
-      rawDamageShare = Math.max(0, rawDamageShare - medMitigation);
+      mitigationDetails.push(`Medical Centers: -${medMitigation.toFixed(2)}`);
+      afterMitigation = Math.max(0, afterMitigation - medMitigation);
     }
-    // Subtract global buildingDefenseBonus (Guard Towers, range phase)
     if (buildingDefenseBonus > 0) {
-      rawDamageShare = Math.max(0, rawDamageShare - buildingDefenseBonus);
+      mitigationDetails.push(`Building bonus: -${buildingDefenseBonus.toFixed(2)}`);
+      afterMitigation = Math.max(0, afterMitigation - buildingDefenseBonus);
     }
-    const rawEffectiveDamage = rawDamageShare * (1 - immunityPercent / 100);
-    // Calculate post-mitigation damage share (before min)
-    const postMitigationDamageShareBeforeMin = totalDefenders > 0 ? (defenderCount / totalDefenders) * postMitigationTotalDamageBeforeMin : 0;
-    const postMitigationEffectiveDamageBeforeMin = postMitigationDamageShareBeforeMin * (1 - immunityPercent / 100);
+    // Step 2: Apply immunity
+    const afterImmunity = afterMitigation * (1 - immunityPercent / 100);
+    // Step 3: Final damage (should match main stat)
     // Calculate post-mitigation damage share (after min)
+    const totalDefenders = defenderUnitNames.reduce((sum, u) => sum + (defendingArmy[u] > 0 ? defendingArmy[u] : 0), 0);
     const postMitigationDamageShare = totalDefenders > 0 ? (defenderCount / totalDefenders) * postMitigationTotalDamage : 0;
     const postMitigationEffectiveDamage = postMitigationDamageShare * (1 - immunityPercent / 100);
-    // Clamp final damage to at least 0
     const finalDamage = Math.max(0, postMitigationEffectiveDamage);
+    // --- End refactor ---
+
     // Calculate total mitigation (before min), always include medMitigation and towerMitigation
-    let totalMitigated = Math.max(0, rawEffectiveDamage - postMitigationEffectiveDamageBeforeMin) + medMitigation + towerMitigation;
-    // If minimum damage is enforced, add an effect but do NOT set mitigation to zero
-    if (minimumDamageEnforced) {
-      buildingEffects.push(`Minimum damage rule applied: ${minimumDamage.toFixed(2)} total phase damage`);
-      // Do not set totalMitigated = 0; show the true mitigation value
-    }
+    let totalMitigated = 0 + medMitigation + towerMitigation;
+    // Minimum damage rule removed: do not add effect
     // Calculate units lost
     let unitsLost = 0;
     if (finalDamage > 0) {
@@ -436,12 +447,14 @@ export function calculatePhaseDamage(
       const traditionalLosses = Math.floor(finalDamage / damagePerKill);
       const totalArmyDefense = totalDefense + buildingDefenseBonus;
       const damageRatio = postMitigationTotalDamage / totalArmyDefense;
-      const proportionalLosses = Math.floor(defenderCount * damageRatio * 0.5);
+      const proportionalLosses = Math.ceil(defenderCount * damageRatio); // More aggressive, no 0.5 multiplier
       unitsLost = Math.max(traditionalLosses, proportionalLosses);
       if (finalDamage >= damagePerKill * 0.3 && unitsLost === 0 && immunityPercent < 100) {
         unitsLost = 1;
       }
       unitsLost = Math.min(unitsLost, defenderCount);
+      // Debug logging for tuning
+      console.log(`[BattleCalc] ${defenderName}: finalDamage=${finalDamage}, damagePerKill=${damagePerKill}, traditionalLosses=${traditionalLosses}, proportionalLosses=${proportionalLosses}, unitsLost=${unitsLost}`);
     }
     losses[defenderName] = unitsLost;
     if (postMitigationTotalDamage > 0 && buildingDefenseBonus > 0 && ((phaseType === 'range' && defenderBuildings['Guard Towers'] && defenderBuildings['Guard Towers'] > 0) || (phaseType === 'melee' && defenderBuildings['Medical Center'] && defenderBuildings['Medical Center'] > 0))) {
@@ -452,13 +465,22 @@ export function calculatePhaseDamage(
     }
     damageLog.push({
       unitName: defenderName,
-      damageReceived: rawEffectiveDamage,
+      damageReceived: initialShare, // show initial share before mitigation
       damageMitigated: totalMitigated,
       finalDamage: finalDamage,
       unitsLost: losses[defenderName],
       buildingEffects: buildingEffects,
       trueEffectiveDefense: effectiveDefense,
-      appliedRedistributionBonus: (processedArmyStrategy === 'Infantry Attack' && Number.isFinite(redistributionBonuses[defenderName]) && redistributionBonuses[defenderName] > 0) ? redistributionBonuses[defenderName] : undefined
+      appliedRedistributionBonus: (processedArmyStrategy === 'Infantry Attack' && Number.isFinite(redistributionBonuses[defenderName]) && redistributionBonuses[defenderName] > 0) ? redistributionBonuses[defenderName] : undefined,
+      breakdown: {
+        initialShare,
+        afterDefenseScaling: unitDamageAlloc[defenderName] || 0,
+        afterMitigation,
+        afterImmunity,
+        final: finalDamage,
+        mitigationDetails,
+        unitWeight: unitWeights[defenderName] || 1
+      }
     });
   }
   return { losses, damageLog };
