@@ -153,7 +153,6 @@ export function calculatePhaseDamage(
   let totalNonInfantryCount = 0;
   if (processedArmyStrategy === 'Infantry Attack') {
     // All redistribution logic and debug output only runs if Infantry Attack is active
-    console.log('[Infantry Attack] processedArmyStrategy:', processedArmyStrategy, 'defenderRace:', defenderRace);
     for (const defenderName of defenderUnitNames) {
       const count = defendingArmy[defenderName];
       const baseStats = baseStatsMap[defenderName];
@@ -161,7 +160,6 @@ export function calculatePhaseDamage(
       // Add tech/strategy modifiers (except Infantry Attack reduction)
       effectiveDefense += techStrategyModifiersMap[defenderName].defense;
       const isInf = isInfantryUnit(defenderName, defenderRace);
-      console.log('[Infantry Attack] Unit:', defenderName, 'isInfantry:', isInf, 'count:', count);
       if (isInf) {
         const reducedDefense = effectiveDefense * 0.25;
         const loss = (effectiveDefense - reducedDefense) * count;
@@ -172,7 +170,6 @@ export function calculatePhaseDamage(
         baseStatsMap[defenderName].finalDefense = effectiveDefense;
       }
     }
-    console.log('[Infantry Attack] totalInfantryDefenseLoss:', totalInfantryDefenseLoss, 'totalNonInfantryCount:', totalNonInfantryCount);
     for (const defenderName of defenderUnitNames) {
       if (!isInfantryUnit(defenderName, defenderRace)) {
         const count = defendingArmy[defenderName];
@@ -180,7 +177,6 @@ export function calculatePhaseDamage(
           ? (totalInfantryDefenseLoss * (count / totalNonInfantryCount)) / count
           : 0;
         baseStatsMap[defenderName].finalDefense += redistributionBonuses[defenderName];
-        console.log('[Infantry Attack] Redistribution bonus for', defenderName, ':', redistributionBonuses[defenderName]);
       }
     }
   } else {
@@ -265,14 +261,12 @@ export function calculatePhaseDamage(
   //       if (count > 0) totalNonInfantryCount += count;
   //     }
   //   }
-  //   console.log('[Infantry Attack] Total infantry defense lost:', totalInfantryDefenseLoss, 'Total non-infantry count:', totalNonInfantryCount);
   //   for (const unit of Object.keys(armyForRedistribution)) {
   //     if (!isInfantryUnit(unit, defenderRace)) {
   //       const count = armyForRedistribution[unit];
   //       redistributionBonuses[unit] = (count > 0 && totalNonInfantryCount > 0)
   //         ? (totalInfantryDefenseLoss * (count / totalNonInfantryCount)) / count
   //         : 0;
-  //       console.log('[Infantry Attack] Redistribution bonus for', unit, ':', redistributionBonuses[unit]);
   //     }
   //   }
   // }
@@ -303,8 +297,6 @@ export function calculatePhaseDamage(
   weightedUnits.sort((a, b) => b.weight - a.weight);
   // 3. Compute total weighted count
   const totalWeighted = weightedUnits.reduce((sum, u) => sum + u.count * u.weight, 0);
-  console.log('[UWDA] Weighted units:', weightedUnits);
-  console.log('[UWDA] Total weighted count:', totalWeighted);
   // 4. Allocate damage by weighted share
   let remainingDamage = rawTotalDamage;
   const unitDamageAlloc: Record<string, number> = {};
@@ -327,20 +319,16 @@ export function calculatePhaseDamage(
     if (damageForUnit > maxAbsorb) {
       unitDamageAlloc[u.name] = maxAbsorb;
       remainingDamage -= maxAbsorb;
-      console.log(`[UWDA] ${u.name}: overkill, allocated ${maxAbsorb}, excess ${damageForUnit - maxAbsorb}`);
     } else {
       unitDamageAlloc[u.name] = damageForUnit;
       remainingDamage -= damageForUnit;
-      console.log(`[UWDA] ${u.name}: allocated ${damageForUnit}`);
     }
   }
   // If any damage remains, trickle down to lowest weight unit
   if (remainingDamage > 0 && weightedUnits.length > 0) {
     const last = weightedUnits[weightedUnits.length - 1];
     unitDamageAlloc[last.name] += remainingDamage;
-    console.log(`[UWDA] Trickle-down: added remaining ${remainingDamage} to ${last.name}`);
   }
-  console.log('[UWDA] Final unit damage allocation:', unitDamageAlloc);
 
   // 7. Distribute damage to units and apply all effects
   for (const defenderName of defenderUnitNames) {
@@ -453,8 +441,6 @@ export function calculatePhaseDamage(
         unitsLost = 1;
       }
       unitsLost = Math.min(unitsLost, defenderCount);
-      // Debug logging for tuning
-      console.log(`[BattleCalc] ${defenderName}: finalDamage=${finalDamage}, damagePerKill=${damagePerKill}, traditionalLosses=${traditionalLosses}, proportionalLosses=${proportionalLosses}, unitsLost=${unitsLost}`);
     }
     losses[defenderName] = unitsLost;
     if (postMitigationTotalDamage > 0 && buildingDefenseBonus > 0 && ((phaseType === 'range' && defenderBuildings['Guard Towers'] && defenderBuildings['Guard Towers'] > 0) || (phaseType === 'melee' && defenderBuildings['Medical Center'] && defenderBuildings['Medical Center'] > 0))) {

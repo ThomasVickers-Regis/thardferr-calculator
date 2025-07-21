@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { UNIT_DATA } from '../data/unitData';
 import { getEffectiveUnitStats } from '../utils/getEffectiveUnitStats';
 
@@ -9,6 +9,7 @@ const EnemyCounterOptimizer = ({
   yourArmy: any; yourKingdomStats: any; yourRace: string; yourTechLevels: any; yourStrategy: any; yourBuildings: any;
   enemyArmy: any; enemyKingdomStats: any; enemyRace: string; enemyTechLevels: any; enemyStrategy: any; enemyBuildings: any;
 }) => {
+  const [minimized, setMinimized] = useState(true);
   const yourRaceKey = yourRace?.toLowerCase() || 'dwarf';
   const enemyRaceKey = enemyRace?.toLowerCase() || 'dwarf';
   // Get your Guard House capacity from buildings
@@ -21,16 +22,17 @@ const EnemyCounterOptimizer = ({
     if (count === 0) return null;
     const baseStats = UNIT_DATA[enemyRaceKey]?.[unit];
     if (!baseStats) return null;
-    const effectiveStats = getEffectiveUnitStats(unit, enemyRaceKey, enemyTechLevels || {}, enemyStrategy || null, false, count);
+    const countNum = typeof count === 'number' ? count : Number(count);
+    const effectiveStats = getEffectiveUnitStats(unit, enemyRaceKey, enemyTechLevels || {}, enemyStrategy || null, false, countNum);
     return {
       unit,
-      count,
+      count: countNum,
       baseStats,
       effectiveStats,
-      totalRangeDamage: effectiveStats.range * count,
-      totalShortDamage: effectiveStats.short * count,
-      totalMeleeDamage: effectiveStats.melee * count,
-      totalDefense: effectiveStats.defense * count,
+      totalRangeDamage: effectiveStats.range * countNum,
+      totalShortDamage: effectiveStats.short * countNum,
+      totalMeleeDamage: effectiveStats.melee * countNum,
+      totalDefense: effectiveStats.defense * countNum,
       isRangedImmune: unit.includes('Skeleton') || unit.includes('Phantom'),
       isMeleeImmune: unit.includes('Mage'),
       hasGuardTower: enemyKingdomStats.GuardTower > 0
@@ -223,206 +225,219 @@ const EnemyCounterOptimizer = ({
       yourPhaseDamage.short += unit.shortDamage * count;
       yourPhaseDamage.melee += unit.meleeDamage * count;
     });
-    const yourTotalDamage = yourPhaseDamage.range + yourPhaseDamage.short + yourPhaseDamage.melee;
+    const yourTotalDamage = Number(yourPhaseDamage.range) + Number(yourPhaseDamage.short) + Number(yourPhaseDamage.melee);
     return {
       yourDamage: yourTotalDamage,
-      enemyDamage: totalEnemyDamage,
-      advantage: yourTotalDamage - totalEnemyDamage,
-      rangeAdvantage: yourPhaseDamage.range - enemyPhaseDamage.range,
-      meleeAdvantage: yourPhaseDamage.melee - enemyPhaseDamage.melee
+      enemyDamage: Number(totalEnemyDamage),
+      advantage: yourTotalDamage - Number(totalEnemyDamage),
+      rangeAdvantage: Number(yourPhaseDamage.range) - Number(enemyPhaseDamage.range),
+      meleeAdvantage: Number(yourPhaseDamage.melee) - Number(enemyPhaseDamage.melee)
     };
   };
   const battleOutcome = calculateBattleOutcome();
   return (
     <div className="p-4 bg-gray-800 rounded-lg mb-4">
-      <h3 className="text-lg font-semibold mb-2">Enemy Counter Optimizer</h3>
-      <div className="mb-4 p-3 bg-red-900 rounded">
-        <h4 className="font-medium text-red-300 mb-2">Enemy Army & Kingdom Analysis</h4>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <div className="flex justify-between">
-              <span>Total Units:</span>
-              <span>{Object.values(enemyArmy).reduce((sum: number, count: any) => sum + (count || 0), 0)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Total Damage:</span>
-              <span>{totalEnemyDamage.toFixed(0)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Ranged Damage:</span>
-              <span>{enemyPhaseDamage.range.toFixed(0)} ({enemyRangePercentage.toFixed(1)}%)</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Melee Damage:</span>
-              <span>{enemyPhaseDamage.melee.toFixed(0)} ({enemyMeleePercentage.toFixed(1)}%)</span>
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between">
-              <span>Guard Towers:</span>
-              <span>{enemyGuardTowers}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Medical Centers:</span>
-              <span>{enemyMedicalCenters}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Castles:</span>
-              <span>{enemyCastles}</span>
-            </div>
-            {buildingRecommendations.length > 0 && (
-              <div className="mt-2 p-2 bg-yellow-900/30 rounded">
-                <div className="text-yellow-300 font-semibold mb-1">Building Recommendations:</div>
-                {buildingRecommendations.map((rec, index) => (
-                  <div key={index} className="text-yellow-200 text-sm">• {rec}</div>
-                ))}
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-lg font-semibold">Enemy Counter Optimizer</h3>
+        <button
+          className="px-2 py-1 text-xs bg-gray-700 rounded hover:bg-gray-600 border border-gray-600"
+          onClick={() => setMinimized(m => !m)}
+          aria-label={minimized ? 'Expand' : 'Minimize'}
+        >
+          {minimized ? 'Show' : 'Hide'}
+        </button>
+      </div>
+      {!minimized && (
+        <>
+          <div className="mb-4 p-3 bg-red-900 rounded">
+            <h4 className="font-medium text-red-300 mb-2">Enemy Army & Kingdom Analysis</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <div className="flex justify-between">
+                  <span>Total Units:</span>
+                  <span>{Object.values(enemyArmy).reduce((sum: number, count: any) => sum + (count || 0), 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Damage:</span>
+                  <span>{totalEnemyDamage.toFixed(0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Ranged Damage:</span>
+                  <span>{enemyPhaseDamage.range.toFixed(0)} ({enemyRangePercentage.toFixed(1)}%)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Melee Damage:</span>
+                  <span>{enemyPhaseDamage.melee.toFixed(0)} ({enemyMeleePercentage.toFixed(1)}%)</span>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="mb-4 p-3 bg-blue-900 rounded">
-        <h4 className="font-medium text-blue-300 mb-2">Counter Strategy Analysis</h4>
-        <div className="text-sm space-y-2">
-          <div className="font-medium text-yellow-300 mb-2">Recommended Strategy: {counterStrategy.toUpperCase()}</div>
-          <div className="text-gray-300 mb-2">{strategyReason}</div>
-          <div className="grid grid-cols-1 gap-2">
-            <div className={`p-2 rounded ${counterStrategy === 'ranged' ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-300'}`}>
-              <div className="font-medium">{rangedStrategy}</div>
-            </div>
-            <div className={`p-2 rounded ${counterStrategy === 'melee' ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-300'}`}>
-              <div className="font-medium">{meleeStrategy}</div>
-            </div>
-          </div>
-          <div className="text-xs text-gray-400 mt-2">
-            <div className="font-medium">Strategy Notes:</div>
-            <div className="ml-2">• Ranged units attack first in battle</div>
-            <div className="ml-2">• Guard Towers reduce ranged damage by ~50%</div>
-            <div className="ml-2">• Medical Centers reduce melee damage by 50 per center</div>
-            <div className="ml-2">• Some units are immune to specific damage types</div>
-          </div>
-        </div>
-      </div>
-      <div className="mb-4 p-3 bg-green-900 rounded">
-        <h4 className="font-medium text-green-300 mb-2">Your Kingdom Capacity & Economy</h4>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <div className="flex justify-between">
-              <span>Guard Houses:</span>
-              <span>{guardHouses}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Max Units:</span>
-              <span>{maxUnits}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Current Units:</span>
-              <span>{currentUnits}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Available Slots:</span>
-              <span className="font-bold text-green-300">{availableSlots}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Current 48h Upkeep:</span>
-              <span>{currentArmyUpkeep.total.toFixed(0)} gold</span>
+              <div>
+                <div className="flex justify-between">
+                  <span>Guard Towers:</span>
+                  <span>{enemyGuardTowers}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Medical Centers:</span>
+                  <span>{enemyMedicalCenters}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Castles:</span>
+                  <span>{enemyCastles}</span>
+                </div>
+                {buildingRecommendations.length > 0 && (
+                  <div className="mt-2 p-2 bg-yellow-900/30 rounded">
+                    <div className="text-yellow-300 font-semibold mb-1">Building Recommendations:</div>
+                    {buildingRecommendations.map((rec, index) => (
+                      <div key={index} className="text-yellow-200 text-sm">• {rec}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <div>
-            <div className="flex justify-between">
-              <span>Farms:</span>
-              <span>{yourBuildings?.['Farm'] || 0}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Mines:</span>
-              <span>{yourBuildings?.['Mine'] || 0}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Medical Centers:</span>
-              <span>{yourMedicalCenters}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Castles:</span>
-              <span>{yourCastles}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="mb-4 p-3 bg-purple-900 rounded">
-        <h4 className="font-medium text-purple-300 mb-2">Recommended Counter Army</h4>
-        <div className="text-sm mb-2">
-          <div className="flex justify-between">
-            <span>Units to Add:</span>
-            <span>{Object.values(optimalCounter.counterArmy).reduce((sum: number, count: any) => sum + count, 0)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Total Cost:</span>
-            <span>{optimalCounter.totalCost.toFixed(0)} gold</span>
-          </div>
-          <div className="flex justify-between">
-            <span>New Units 48h Upkeep:</span>
-            <span>{optimalCounter.totalUpkeep.toFixed(0)} gold</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Total 48h Upkeep:</span>
-            <span>{(currentArmyUpkeep.total + optimalCounter.totalUpkeep).toFixed(0)} gold</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Estimated Budget:</span>
-            <span>{optimalCounter.estimatedBudget.toFixed(0)} gold</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Budget Used:</span>
-            <span>{optimalCounter.estimatedBudget > 0 ? ((optimalCounter.totalCost / optimalCounter.estimatedBudget) * 100).toFixed(1) : '0'}%</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Remaining Slots:</span>
-            <span>{optimalCounter.remainingSlots}</span>
-          </div>
-        </div>
-        <div className="text-xs text-gray-400">
-          {Object.entries(optimalCounter.counterArmy).map(([unit, count]) => 
-            `${unit}: ${count}`
-          ).join(', ')}
-        </div>
-      </div>
-      <div className="mb-4 p-3 bg-yellow-900 rounded">
-        <h4 className="font-medium text-yellow-300 mb-2">Battle Prediction</h4>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <div className="flex justify-between">
-              <span>Your Total Damage:</span>
-              <span className={battleOutcome.advantage > 0 ? 'text-green-300 font-bold' : 'text-red-300'}>{battleOutcome.yourDamage.toFixed(0)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Enemy Total Damage:</span>
-              <span>{battleOutcome.enemyDamage.toFixed(0)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Damage Advantage:</span>
-              <span className={battleOutcome.advantage > 0 ? 'text-green-300 font-bold' : 'text-red-300'}>{battleOutcome.advantage > 0 ? '+' : ''}{battleOutcome.advantage.toFixed(0)}</span>
+          <div className="mb-4 p-3 bg-blue-900 rounded">
+            <h4 className="font-medium text-blue-300 mb-2">Counter Strategy Analysis</h4>
+            <div className="text-sm space-y-2">
+              <div className="font-medium text-yellow-300 mb-2">Recommended Strategy: {counterStrategy.toUpperCase()}</div>
+              <div className="text-gray-300 mb-2">{strategyReason}</div>
+              <div className="grid grid-cols-1 gap-2">
+                <div className={`p-2 rounded ${counterStrategy === 'ranged' ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-300'}`}>
+                  <div className="font-medium">{rangedStrategy}</div>
+                </div>
+                <div className={`p-2 rounded ${counterStrategy === 'melee' ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-300'}`}>
+                  <div className="font-medium">{meleeStrategy}</div>
+                </div>
+              </div>
+              <div className="text-xs text-gray-400 mt-2">
+                <div className="font-medium">Strategy Notes:</div>
+                <div className="ml-2">• Ranged units attack first in battle</div>
+                <div className="ml-2">• Guard Towers reduce ranged damage by ~50%</div>
+                <div className="ml-2">• Medical Centers reduce melee damage by 50 per center</div>
+                <div className="ml-2">• Some units are immune to specific damage types</div>
+              </div>
             </div>
           </div>
-          <div>
-            <div className="flex justify-between">
-              <span>Ranged Advantage:</span>
-              <span className={battleOutcome.rangeAdvantage > 0 ? 'text-green-300' : 'text-red-300'}>{battleOutcome.rangeAdvantage > 0 ? '+' : ''}{battleOutcome.rangeAdvantage.toFixed(0)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Melee Advantage:</span>
-              <span className={battleOutcome.meleeAdvantage > 0 ? 'text-green-300' : 'text-red-300'}>{battleOutcome.meleeAdvantage > 0 ? '+' : ''}{battleOutcome.meleeAdvantage.toFixed(0)}</span>
+          <div className="mb-4 p-3 bg-green-900 rounded">
+            <h4 className="font-medium text-green-300 mb-2">Your Kingdom Capacity & Economy</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <div className="flex justify-between">
+                  <span>Guard Houses:</span>
+                  <span>{guardHouses}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Max Units:</span>
+                  <span>{maxUnits}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Current Units:</span>
+                  <span>{currentUnits}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Available Slots:</span>
+                  <span className="font-bold text-green-300">{availableSlots}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Current 48h Upkeep:</span>
+                  <span>{currentArmyUpkeep.total.toFixed(0)} gold</span>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between">
+                  <span>Farms:</span>
+                  <span>{yourBuildings?.['Farm'] || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Mines:</span>
+                  <span>{yourBuildings?.['Mine'] || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Medical Centers:</span>
+                  <span>{yourMedicalCenters}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Castles:</span>
+                  <span>{yourCastles}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-      <div className="text-xs text-gray-400">
-        <div className="font-medium">Counter Strategy Notes:</div>
-        <div className="ml-2">• Ranged units attack first and are prioritized when enemy has weak ranged defense</div>
-        <div className="ml-2">• Melee units are recommended against Guard Towers or ranged-immune units</div>
-        <div className="ml-2">• Medical Centers reduce incoming melee damage by 50 per center</div>
-        <div className="ml-2">• Recommendations factor in your current tech levels and strategy</div>
-        <div className="ml-2">• Upkeep costs are calculated for 48 hours</div>
-      </div>
+          <div className="mb-4 p-3 bg-purple-900 rounded">
+            <h4 className="font-medium text-purple-300 mb-2">Recommended Counter Army</h4>
+            <div className="text-sm mb-2">
+              <div className="flex justify-between">
+                <span>Units to Add:</span>
+                <span>{Object.values(optimalCounter.counterArmy).reduce((sum: number, count: any) => sum + count, 0)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total Cost:</span>
+                <span>{optimalCounter.totalCost.toFixed(0)} gold</span>
+              </div>
+              <div className="flex justify-between">
+                <span>New Units 48h Upkeep:</span>
+                <span>{optimalCounter.totalUpkeep.toFixed(0)} gold</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total 48h Upkeep:</span>
+                <span>{(currentArmyUpkeep.total + optimalCounter.totalUpkeep).toFixed(0)} gold</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Estimated Budget:</span>
+                <span>{optimalCounter.estimatedBudget.toFixed(0)} gold</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Budget Used:</span>
+                <span>{optimalCounter.estimatedBudget > 0 ? ((optimalCounter.totalCost / optimalCounter.estimatedBudget) * 100).toFixed(1) : '0'}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Remaining Slots:</span>
+                <span>{optimalCounter.remainingSlots}</span>
+              </div>
+            </div>
+            <div className="text-xs text-gray-400">
+              {Object.entries(optimalCounter.counterArmy).map(([unit, count]) => 
+                `${unit}: ${count}`
+              ).join(', ')}
+            </div>
+          </div>
+          <div className="mb-4 p-3 bg-yellow-900 rounded">
+            <h4 className="font-medium text-yellow-300 mb-2">Battle Prediction</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <div className="flex justify-between">
+                  <span>Your Total Damage:</span>
+                  <span className={battleOutcome.advantage > 0 ? 'text-green-300 font-bold' : 'text-red-300'}>{battleOutcome.yourDamage.toFixed(0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Enemy Total Damage:</span>
+                  <span>{battleOutcome.enemyDamage.toFixed(0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Damage Advantage:</span>
+                  <span className={battleOutcome.advantage > 0 ? 'text-green-300 font-bold' : 'text-red-300'}>{battleOutcome.advantage > 0 ? '+' : ''}{battleOutcome.advantage.toFixed(0)}</span>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between">
+                  <span>Ranged Advantage:</span>
+                  <span className={battleOutcome.rangeAdvantage > 0 ? 'text-green-300' : 'text-red-300'}>{battleOutcome.rangeAdvantage > 0 ? '+' : ''}{battleOutcome.rangeAdvantage.toFixed(0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Melee Advantage:</span>
+                  <span className={battleOutcome.meleeAdvantage > 0 ? 'text-green-300' : 'text-red-300'}>{battleOutcome.meleeAdvantage > 0 ? '+' : ''}{battleOutcome.meleeAdvantage.toFixed(0)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="text-xs text-gray-400">
+            <div className="font-medium">Counter Strategy Notes:</div>
+            <div className="ml-2">• Ranged units attack first and are prioritized when enemy has weak ranged defense</div>
+            <div className="ml-2">• Melee units are recommended against Guard Towers or ranged-immune units</div>
+            <div className="ml-2">• Medical Centers reduce incoming melee damage by 50 per center</div>
+            <div className="ml-2">• Recommendations factor in your current tech levels and strategy</div>
+            <div className="ml-2">• Upkeep costs are calculated for 48 hours</div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
