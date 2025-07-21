@@ -184,9 +184,18 @@ const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLe
           onChange={e => handleStrategyChange(e.target.value)}
         >
           <option value="">None</option>
-          {Object.keys(STRATEGY_DATA).map(strat => (
-            <option key={strat} value={strat}>{strat}</option>
-          ))}
+          {Object.entries(STRATEGY_DATA)
+            .filter(([strat, data]) => {
+              if (data.type === 'General') return true;
+              if (!race) return false;
+              const raceLower = race.toLowerCase();
+              // Show only unique strategy for the selected race
+              if (data.type.toLowerCase().includes(raceLower)) return true;
+              return false;
+            })
+            .map(([strat]) => (
+              <option key={strat} value={strat}>{strat}</option>
+            ))}
         </select>
       </div>
     </div>
