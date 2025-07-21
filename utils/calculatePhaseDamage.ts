@@ -470,4 +470,111 @@ export function calculatePhaseDamage(
     });
   }
   return { losses, damageLog };
+}
+
+// New: BattleState and PhaseResult types for UI-driven simulation
+export interface BattleState {
+  yourArmy: Army;
+  enemyArmy: Army;
+  yourTechLevels: any;
+  enemyTechLevels: any;
+  yourStrategy: string | null;
+  enemyStrategy: string | null;
+  yourBuildings: Record<string, number>;
+  enemyBuildings: Record<string, number>;
+  yourRace: string;
+  enemyRace: string;
+  yourCasualties: Record<string, number>;
+  enemyCasualties: Record<string, number>;
+  yourEffects: string[];
+  enemyEffects: string[];
+}
+
+export interface PhaseResult {
+  phase: 'range' | 'short' | 'melee';
+  updatedYourArmy: Army;
+  updatedEnemyArmy: Army;
+  yourLosses: Record<string, number>;
+  enemyLosses: Record<string, number>;
+  yourEffects: string[];
+  enemyEffects: string[];
+  yourDamageLog: any[];
+  enemyDamageLog: any[];
+  updatedYourCasualties: Record<string, number>;
+  updatedEnemyCasualties: Record<string, number>;
+}
+
+export function simulateBattlePhase(
+  state: BattleState,
+  phase: 'range' | 'short' | 'melee'
+): PhaseResult {
+  // Calculate damage for this phase (your army defends, then enemy army defends)
+  const yourDamageResult = calculatePhaseDamage(
+    state.enemyArmy,
+    state.yourArmy,
+    phase,
+    state.enemyTechLevels,
+    state.enemyStrategy,
+    state.yourStrategy,
+    state.yourStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
+    1,
+    state.enemyBuildings,
+    state.yourBuildings,
+    true,
+    state.enemyRace,
+    state.yourRace
+  );
+  const enemyDamageResult = calculatePhaseDamage(
+    state.yourArmy,
+    state.enemyArmy,
+    phase,
+    state.yourTechLevels,
+    state.yourStrategy,
+    state.enemyStrategy,
+    state.enemyStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
+    1,
+    state.yourBuildings,
+    state.enemyBuildings,
+    true,
+    state.yourRace,
+    state.enemyRace
+  );
+
+  // Update armies
+  const updatedYourArmy: Army = { ...state.yourArmy };
+  const updatedEnemyArmy: Army = { ...state.enemyArmy };
+  Object.entries(yourDamageResult.losses).forEach(([unit, lost]) => {
+    updatedYourArmy[unit] = Math.max(0, (updatedYourArmy[unit] || 0) - lost);
+  });
+  Object.entries(enemyDamageResult.losses).forEach(([unit, lost]) => {
+    updatedEnemyArmy[unit] = Math.max(0, (updatedEnemyArmy[unit] || 0) - lost);
+  });
+
+  // Update cumulative casualties
+  const updatedYourCasualties: Record<string, number> = { ...state.yourCasualties };
+  const updatedEnemyCasualties: Record<string, number> = { ...state.enemyCasualties };
+  Object.entries(yourDamageResult.losses).forEach(([unit, lost]) => {
+    updatedYourCasualties[unit] = (updatedYourCasualties[unit] || 0) + lost;
+  });
+  Object.entries(enemyDamageResult.losses).forEach(([unit, lost]) => {
+    updatedEnemyCasualties[unit] = (updatedEnemyCasualties[unit] || 0) + lost;
+  });
+
+  // Collect effects (for now, just concatenate per-unit effects)
+  const yourEffects = yourDamageResult.damageLog.flatMap(log => log.buildingEffects || []);
+  const enemyEffects = enemyDamageResult.damageLog.flatMap(log => log.buildingEffects || []);
+
+  return {
+    phase,
+    updatedYourArmy,
+    updatedEnemyArmy,
+    yourLosses: yourDamageResult.losses,
+    enemyLosses: enemyDamageResult.losses,
+    yourEffects,
+    enemyEffects,
+    yourDamageLog: yourDamageResult.damageLog,
+    enemyDamageLog: enemyDamageResult.damageLog,
+    updatedYourCasualties,
+    updatedEnemyCasualties
+  };
 } 

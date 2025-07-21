@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { simulateBattle, BattleOutcome, KingdomStats } from '../utils/simulateBattle';
+import { simulateBattlePhase, BattleState, PhaseResult } from '../utils/calculatePhaseDamage';
 import { Army } from '../utils/calculatePhaseDamage';
 import { TechLevels, StrategyName } from '../utils/getEffectiveUnitStats';
 import '../app/globals.css';
@@ -149,7 +149,7 @@ export default function MainApp() {
   const [yourStrategy, setYourStrategy] = useState<StrategyName | null>(null);
   const [enemyStrategy, setEnemyStrategy] = useState<StrategyName | null>(null);
   // State for battle outcome
-  const [battleOutcome, setBattleOutcome] = useState<BattleOutcome | null>(null);
+  const [battleOutcome, setBattleOutcome] = useState<any>(null);
   // Add race state for each kingdom
   const [yourRace, setYourRace] = useState<string>(RACES[0]);
   const [enemyRace, setEnemyRace] = useState<string>(RACES[0]);
@@ -165,24 +165,71 @@ export default function MainApp() {
   const [yourBuildingRatios, setYourBuildingRatios] = useState<any>({});
   const [enemyBuildingRatios, setEnemyBuildingRatios] = useState<any>({});
 
-  // Handler for simulating the battle
+  // Handler for simulating the battle (per-phase, UI-driven, legacy-compatible)
   const handleSimulateBattle = () => {
-    const outcome = simulateBattle(
-      yourArmy,
-      enemyArmy,
-      yourKingdomStats,
-      enemyKingdomStats,
-      yourTechLevels,
+    // Initialize battle state
+    let state: BattleState = {
+      yourArmy: { ...yourArmy },
+      enemyArmy: { ...enemyArmy },
+      yourTechLevels: { ...yourTechLevels },
+      enemyTechLevels: { ...enemyTechLevels },
       yourStrategy,
-      enemyTechLevels,
       enemyStrategy,
-      20, // maxRounds
-      yourBuildings,
-      enemyBuildings,
+      yourBuildings: { ...yourBuildings },
+      enemyBuildings: { ...enemyBuildings },
       yourRace,
-      enemyRace
-    );
-    setBattleOutcome(outcome);
+      enemyRace,
+      yourCasualties: {},
+      enemyCasualties: {},
+      yourEffects: [],
+      enemyEffects: []
+    };
+    const phases: ('range' | 'short' | 'melee')[] = ['range', 'short', 'melee'];
+    const phaseResults: PhaseResult[] = [];
+    const yourArmyAtStartArr: any[] = [];
+    const enemyArmyAtStartArr: any[] = [];
+    phases.forEach(phase => {
+      yourArmyAtStartArr.push({ ...state.yourArmy });
+      enemyArmyAtStartArr.push({ ...state.enemyArmy });
+      const result = simulateBattlePhase(state, phase);
+      phaseResults.push(result);
+      // Update state for next phase
+      state = {
+        ...state,
+        yourArmy: result.updatedYourArmy,
+        enemyArmy: result.updatedEnemyArmy,
+        yourCasualties: result.updatedYourCasualties,
+        enemyCasualties: result.updatedEnemyCasualties,
+        yourEffects: result.yourEffects,
+        enemyEffects: result.enemyEffects
+      };
+    });
+    // Build legacy-compatible battleOutcome object
+    const battleOutcome = {
+      winner: Object.values(state.enemyArmy).every(v => v === 0) ? 'yourArmy' : (Object.values(state.yourArmy).every(v => v === 0) ? 'enemyArmy' : 'draw'),
+      rounds: 1,
+      finalYourArmy: { ...state.yourArmy },
+      finalEnemyArmy: { ...state.enemyArmy },
+      finalYourArmyBeforeHealing: { ...state.yourArmy },
+      finalEnemyArmyBeforeHealing: { ...state.enemyArmy },
+      battleLog: [
+        {
+          round: 1,
+          roundResult: {
+            phaseLogs: phaseResults.map((phase, idx) => ({
+              phase: phase.phase,
+              yourLosses: phase.yourLosses,
+              enemyLosses: phase.enemyLosses,
+              yourDamageLog: phase.yourDamageLog,
+              enemyDamageLog: phase.enemyDamageLog,
+              yourArmyAtStart: yourArmyAtStartArr[idx] || {},
+              enemyArmyAtStart: enemyArmyAtStartArr[idx] || {},
+            }))
+          }
+        }
+      ]
+    };
+    setBattleOutcome(battleOutcome);
   };
 
   // Auto-calculate KS for your kingdom
