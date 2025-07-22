@@ -100,14 +100,6 @@ export function getEffectiveUnitStats(
           stats.melee *= effects.infantry_attack_multiplier;
         }
       }
-      if (strategy === 'Infantry Attack') {
-        // Do not apply defense reduction here. It will be handled in the battle phase pipeline.
-        // if (isInfantryUnit(unitName, race)) {
-        //   stats.defense *= (1 - effects.infantry_defense_reduction_percent);
-        // } else {
-        //   // Other units get defense increase from infantry defense loss (handled in battle logic)
-        // }
-      }
       if (strategy === 'Quick Retreat') {
         stats.melee *= effects.all_unit_attack_multiplier;
         stats.short *= effects.all_unit_attack_multiplier;
@@ -248,14 +240,6 @@ export function getStatModifiers(
           modifiers.melee.negative += (1 - effects.infantry_attack_multiplier) * 100; // -50%
         }
         // Archer defense increase is handled in battle logic
-      }
-      
-      if (strategy === 'Infantry Attack') {
-        if (isInfantryUnit(unitName, race)) {
-          modifiers.defense.negative += effects.infantry_defense_reduction_percent * 100; // -75%
-        } else {
-          // Other units get defense increase from infantry defense loss (handled in battle logic)
-        }
       }
       
       if (strategy === 'Quick Retreat') {

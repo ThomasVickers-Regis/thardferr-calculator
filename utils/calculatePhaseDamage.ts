@@ -122,57 +122,45 @@ export function calculatePhaseDamage(
 
   const defenderUnitNames = Object.keys(defendingArmy).filter(u => defendingArmy[u] > 0);
   if (defenderUnitNames.length === 0) return { losses: {}, damageLog: [] };
-
-  // Distribute damage and mitigation down to each unit stack.
-  const { weightedTotals, sumOfAllWeightedTotals } = calculateWeightedTotals(defendingArmy, defenderRace);
-  const totalDefenders = defenderUnitNames.reduce((sum, name) => sum + defendingArmy[name], 0);
-
+  
+  // Now, calculate losses and create the final log entries.
   for (const defenderName of defenderUnitNames) {
       const unitCount = defendingArmy[defenderName];
       if (unitCount <= 0) continue;
 
-      // 1. Distribute Raw Damage
-      const weightRatio = sumOfAllWeightedTotals > 0 ? weightedTotals[defenderName] / sumOfAllWeightedTotals : (1 / defenderUnitNames.length);
-      const rawDamageAllocatedToStack = rawTotalDamage * weightRatio;
-
-      // 2. Distribute Mitigation
-      const unitCountRatio = totalDefenders > 0 ? unitCount / totalDefenders : 0;
-      const mitigationAllocatedToStack = totalMitigation * unitCountRatio;
-
-      // 3. Calculate Final Damage to the Stack
-      let finalDamageToStack = Math.max(0, rawDamageAllocatedToStack - mitigationAllocatedToStack);
-
-      // 4. Apply Immunities & Special Reductions to the final damage
-      const { reduction, effects } = applySpecialReductions(defenderName, defenderRace, defenderStrategy, phaseType, defendingArmy);
-      finalDamageToStack *= (1 - reduction);
-
-      // 5. Calculate Losses
-      const effectiveStats = getEffectiveUnitStats(defenderName, defenderRace, techLevels, defenderStrategy, false, ksDifferenceFactor);
-      const unitEffectiveDefense = effectiveStats.defense;
-      const unitLosses = unitEffectiveDefense > 0 ? Math.floor(finalDamageToStack / unitEffectiveDefense) : unitCount;
+      let { rawDamageReceived, finalDamagePerUnit, unitLosses, buildingEffects, unitEffectiveDefense } = handleInfantryAttack(
+          defenderName,
+          defenderUnitNames,
+          defendingArmy,
+          defenderRace,
+          techLevels,
+          defenderStrategy,
+          ksDifferenceFactor,
+          rawTotalDamage,
+          totalMitigation,
+          buildingEffectsLog,
+          phaseType,
+          isAttacker
+      );
 
       losses[defenderName] = Math.min(unitCount, unitLosses);
+      const mitigatedDamage = rawDamageReceived - finalDamagePerUnit;
 
-      // 6. Log the results
-      const damageReceived = unitCount > 0 ? rawDamageAllocatedToStack / unitCount : 0;
-      const damageMitigated = unitCount > 0 ? mitigationAllocatedToStack / unitCount : 0;
-      const finalDamage = unitCount > 0 ? finalDamageToStack / unitCount : 0;
-      
       damageLog.push({
           unitName: defenderName,
-          damageReceived: damageReceived,
-          damageMitigated: damageMitigated,
-          finalDamage: finalDamage,
+          damageReceived: rawDamageReceived,
+          damageMitigated: mitigatedDamage, 
+          finalDamage: finalDamagePerUnit,
           unitsLost: losses[defenderName],
-          buildingEffects: [...buildingEffectsLog, ...effects],
+          buildingEffects: buildingEffects, 
           trueEffectiveDefense: unitEffectiveDefense,
           appliedRedistributionBonus: undefined,
           breakdown: {
-              initialShare: damageReceived,
-              afterDefenseScaling: damageReceived,
-              afterMitigation: finalDamage,
-              afterImmunity: finalDamage,
-              final: finalDamage,
+              initialShare: rawDamageReceived,
+              afterDefenseScaling: rawDamageReceived, // No change in this model
+              afterMitigation: finalDamagePerUnit,
+              afterImmunity: finalDamagePerUnit, // Combined for simplicity
+              final: finalDamagePerUnit,
               mitigationDetails: [],
               unitWeight: UNIT_WEIGHTS[defenderRace.toLowerCase()]?.[defenderName] || 1
           }
@@ -181,6 +169,75 @@ export function calculatePhaseDamage(
 
   return { losses, damageLog };
 }
+
+function handleInfantryAttack(
+    defenderName: string,
+    defenderUnitNames: string[],
+    defendingArmy: Army,
+    defenderRace: string,
+    techLevels: TechLevels,
+    defenderStrategy: StrategyName | null,
+    ksDifferenceFactor: number,
+    rawTotalDamage: number,
+    totalMitigation: number,
+    buildingEffectsLog: string[],
+    phaseType: PhaseType,
+    isAttacker: boolean
+) {
+    const { weightedTotals, sumOfAllWeightedTotals } = calculateWeightedTotals(defendingArmy, defenderRace);
+    const totalDefenders = defenderUnitNames.reduce((sum, name) => sum + defendingArmy[name], 0);
+
+    let unitEffectiveDefense = getEffectiveUnitStats(defenderName, defenderRace, techLevels, defenderStrategy, false, ksDifferenceFactor).defense;
+    const buildingEffects: string[] = [...buildingEffectsLog];
+
+    // Calculate raw damage share before anything else
+    const weightRatio = sumOfAllWeightedTotals > 0 ? weightedTotals[defenderName] / sumOfAllWeightedTotals : (1 / defenderUnitNames.length);
+    const rawDamageAllocatedToStack = rawTotalDamage * weightRatio;
+
+    if (defenderStrategy === 'Infantry Attack') {
+        let totalInfantryDefenseLoss = 0;
+        const infantryUnits = defenderUnitNames.filter(name => isInfantryUnit(name, defenderRace));
+        const nonInfantryUnitCount = defenderUnitNames
+            .filter(name => !isInfantryUnit(name, defenderRace))
+            .reduce((sum, name) => sum + defendingArmy[name], 0);
+
+        for (const unitName of infantryUnits) {
+            const unitCount = defendingArmy[unitName];
+            const baseStats = getEffectiveUnitStats(unitName, defenderRace, techLevels, null, false, ksDifferenceFactor);
+            totalInfantryDefenseLoss += (baseStats.defense * 0.75) * unitCount;
+        }
+
+        if (isInfantryUnit(defenderName, defenderRace)) {
+            unitEffectiveDefense *= 0.25;
+            buildingEffects.push(`Infantry Attack Penalty: -75% defense`);
+        } else if (nonInfantryUnitCount > 0) {
+            const bonusPerUnit = totalInfantryDefenseLoss / nonInfantryUnitCount;
+            unitEffectiveDefense += bonusPerUnit;
+            buildingEffects.push(`Infantry Attack Bonus: +${bonusPerUnit.toFixed(2)} defense`);
+        }
+    }
+
+    // Apply mitigation to the raw damage share
+    const unitCountRatio = totalDefenders > 0 ? defendingArmy[defenderName] / totalDefenders : 0;
+    const mitigationAllocatedToStack = totalMitigation * unitCountRatio;
+    let finalDamageToStack = Math.max(0, rawDamageAllocatedToStack - mitigationAllocatedToStack);
+    
+    // Apply special reductions to the now-mitigated damage
+    const { reduction, effects } = applySpecialReductions(defenderName, defenderRace, defenderStrategy, phaseType, defendingArmy);
+    finalDamageToStack *= (1 - reduction);
+    buildingEffects.push(...effects);
+
+    const unitLosses = unitEffectiveDefense > 0 ? Math.floor(finalDamageToStack / unitEffectiveDefense) : defendingArmy[defenderName];
+    
+    return {
+        rawDamageReceived: defendingArmy[defenderName] > 0 ? rawDamageAllocatedToStack / defendingArmy[defenderName] : 0,
+        finalDamagePerUnit: defendingArmy[defenderName] > 0 ? finalDamageToStack / defendingArmy[defenderName] : 0,
+        unitLosses,
+        buildingEffects,
+        unitEffectiveDefense,
+    };
+}
+
 
 // Helper functions to break down the main function's logic.
 

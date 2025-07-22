@@ -90,12 +90,16 @@ const UnitDetail: React.FC<UnitDetailProps> = ({ unitName, count, survived, lost
               <div className="text-xs text-gray-300">Final: <span className="text-yellow-300">{formatNumber(damageEntry.breakdown?.final)}</span></div>
             </div>
           )}
-          {damageEntry.buildingEffects.length > 0 && (
+          {damageEntry.buildingEffects && damageEntry.buildingEffects.length > 0 && (
             <div className="mt-2 pt-2 border-t border-gray-600">
-              <div className="text-gray-400 text-xs">Effects:</div>
-              {damageEntry.buildingEffects.map((effect: string, i: number) => (
-                <div key={i} className="text-green-300 text-xs">• {effect}</div>
-              ))}
+              <div className="text-gray-400 text-xs mb-1">Effects:</div>
+              {damageEntry.buildingEffects.map((effect: string, i: number) => {
+                const isDebuff = effect.includes('Penalty');
+                const textColor = isDebuff ? 'text-red-400' : 'text-green-300';
+                return (
+                  <div key={i} className={`text-xs ${textColor}`}>• {effect}</div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -137,11 +141,7 @@ const UnitDetail: React.FC<UnitDetailProps> = ({ unitName, count, survived, lost
         <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
-          <div>Effective: <span className="text-purple-400 font-bold">{formatNumber((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense), 1)}</span></div>
-          {damageEntry?.appliedRedistributionBonus !== undefined && (
-            <div className="col-span-2 text-green-300">+{formatNumber(damageEntry.appliedRedistributionBonus, 2)} defense redistributed from infantry</div>
-          )}
-          <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? formatNumber(((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense) / baseStats.defense), 2) : '1.00'}x</span></div>
+          <div>Effective: <span className="text-purple-400 font-bold">{formatNumber(damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense, 1)}</span></div>
           <div>Total Defense: <span className="text-purple-400 font-bold">{formatNumber((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense) * count, 1)}</span></div>
         </div>
       </div>
