@@ -132,23 +132,76 @@ export function calculatePhaseDamage(
 
   // 2. Apply global mitigation from buildings, etc.
   let mitigation = 0;
+  const buildingEffectsLog: string[] = [];
+  const totalDefenders = defenderUnitNames.reduce((sum, name) => sum + defendingArmy[name], 0);
+
+  // Guard Tower Mitigation: A total damage pool is calculated, then distributed across all units,
+  // with a per-unit cap ensuring no single unit can mitigate more than its limit.
   if (phaseType === 'range' && defenderBuildings['Guard Towers']) {
-    mitigation += defenderBuildings['Guard Towers'] * 10; // Example value, adjust as needed
+      const towerCount = defenderBuildings['Guard Towers'];
+      const potentialMitigationPool = towerCount * 40;
+      const perUnitCap = 2;
+      
+      const maxMitigationByUnitCap = totalDefenders * perUnitCap;
+      const totalGTMitigation = Math.min(potentialMitigationPool, maxMitigationByUnitCap);
+
+      if (totalGTMitigation > 0) {
+        mitigation += totalGTMitigation;
+        buildingEffectsLog.push(`Guard Towers reduced total damage by ${totalGTMitigation.toFixed(0)}`);
+      }
   }
+  
+  // Medical Center Mitigation: Works similarly to Guard Towers, but the values depend on
+  // whether the defending army is the one attacking in the overall battle.
   if (phaseType === 'melee' && defenderBuildings['Medical Center']) {
-    mitigation += defenderBuildings['Medical Center'] * 10; // Example value, adjust as needed
+      const centerCount = defenderBuildings['Medical Center'];
+      // isAttacker: true = 'on attack' rules (50 pool / 1 cap)
+      // isAttacker: false = 'on defense' rules (75 pool / 2 cap)
+      const perCenterPool = isAttacker ? 50 : 75;
+      const perUnitCap = isAttacker ? 1 : 2;
+      
+      const potentialMitigationPool = centerCount * perCenterPool;
+      const maxMitigationByUnitCap = totalDefenders * perUnitCap;
+      const totalMCMitigation = Math.min(potentialMitigationPool, maxMitigationByUnitCap);
+
+      if (totalMCMitigation > 0) {
+        mitigation += totalMCMitigation;
+        buildingEffectsLog.push(`Medical Centers reduced total damage by ${totalMCMitigation.toFixed(0)}`);
+      }
   }
+
+  const mitigationPerUnit = totalDefenders > 0 ? mitigation / totalDefenders : 0;
   const postMitigatedOffense = Math.max(0, rawTotalDamage - mitigation);
 
-  // If there's no offense, there are no losses.
+  // If there's no offense, there are no losses, but we should still log the state.
   if (postMitigatedOffense <= 0) {
       defenderUnitNames.forEach(unitName => {
           losses[unitName] = 0;
+          const effectiveStats = getEffectiveUnitStats(unitName, defenderRace, techLevels, defenderStrategy, false, ksDifferenceFactor);
+          damageLog.push({
+              unitName: unitName,
+              damageReceived: 0,
+              damageMitigated: mitigationPerUnit,
+              finalDamage: 0,
+              unitsLost: 0,
+              buildingEffects: buildingEffectsLog,
+              trueEffectiveDefense: effectiveStats.defense,
+              appliedRedistributionBonus: undefined,
+              breakdown: {
+                  initialShare: 0,
+                  afterDefenseScaling: 0,
+                  afterMitigation: 0,
+                  afterImmunity: 0,
+                  final: 0,
+                  mitigationDetails: [],
+                  unitWeight: UNIT_WEIGHTS[defenderRace.toLowerCase()]?.[unitName] || 1
+              }
+          });
       });
       return { losses, damageLog };
   }
 
-  // 3. Distribute damage based on unit weights
+  // 3. Distribute damage based on unit weights and apply immunities
   const raceKey = defenderRace.toLowerCase();
   const unitWeights = UNIT_WEIGHTS[raceKey] || {};
   
@@ -168,34 +221,55 @@ export function calculatePhaseDamage(
       const unitCount = defendingArmy[defenderName];
       if (unitCount <= 0) continue;
 
-      // Get this unit's effective defense
-      const effectiveStats = getEffectiveUnitStats(defenderName, defenderRace, techLevels, defenderStrategy, false, ksDifferenceFactor);
-      const unitEffectiveDefense = effectiveStats.defense;
+      let unitEffectiveDefense = getEffectiveUnitStats(defenderName, defenderRace, techLevels, defenderStrategy, false, ksDifferenceFactor).defense;
 
-      // If sum of weights is 0, can't divide. Just distribute damage evenly.
+      // Apply Immunities and Damage Reductions
+      let damageReduction = 0;
+      const buildingEffects: string[] = [...buildingEffectsLog];
+      
+      if (phaseType === 'melee' && isMageUnit(defenderName, defenderRace) && defenderStrategy !== 'Elf Energy Gathering') {
+          damageReduction = 1.0; // 100%
+      }
+      if (phaseType === 'range' && defenderName.includes('Skeleton')) {
+          damageReduction = 1.0; // 100%
+      }
+      if (phaseType === 'melee' && isShadowWarriorUnit(defenderName, defenderRace)) {
+          damageReduction = defenderStrategy === 'Orc' ? 0.75 : 0.80;
+      }
+      if (phaseType === 'range' && defenderStrategy === 'Dwarf Shield Line') {
+          const shieldbearerCount = defendingArmy['Shieldbearer'] || 0;
+          const totalArmySize = Object.values(defendingArmy).reduce((sum, count) => sum + count, 0);
+          if (totalArmySize > 0) {
+              const shieldbearerRatio = shieldbearerCount / totalArmySize;
+              damageReduction = Math.min(1.0, shieldbearerRatio * 2);
+          }
+      }
+      
+      if (damageReduction > 0) {
+        buildingEffects.push(`${(damageReduction * 100).toFixed(0)}% damage reduction`);
+      }
+      
       const weightRatio = sumOfAllWeightedTotals > 0 
           ? weightedTotals[defenderName] / sumOfAllWeightedTotals
           : (1 / defenderUnitNames.length);
       
-      const damageAllocatedToStack = postMitigatedOffense * weightRatio;
+      let damageAllocatedToStack = postMitigatedOffense * weightRatio;
+      damageAllocatedToStack *= (1 - damageReduction);
 
-      // A unit is lost if its health (effectiveDefense) is depleted.
       const unitLosses = unitEffectiveDefense > 0 
           ? Math.floor(damageAllocatedToStack / unitEffectiveDefense)
-          : unitCount; // If defense is 0, all units are lost to any damage
+          : unitCount;
 
-      // Ensure losses don't exceed the number of units
       losses[defenderName] = Math.min(unitCount, unitLosses);
 
-      // Log the details for the UI
       const damagePerUnit = unitCount > 0 ? damageAllocatedToStack / unitCount : 0;
       damageLog.push({
           unitName: defenderName,
           damageReceived: damagePerUnit,
-          damageMitigated: mitigation, // This was global mitigation
+          damageMitigated: mitigationPerUnit, 
           finalDamage: damagePerUnit,
           unitsLost: losses[defenderName],
-          buildingEffects: [], // Populate as needed
+          buildingEffects: buildingEffects, 
           trueEffectiveDefense: unitEffectiveDefense,
           appliedRedistributionBonus: undefined,
           breakdown: {

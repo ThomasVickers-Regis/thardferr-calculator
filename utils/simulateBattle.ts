@@ -22,6 +22,8 @@ export interface BattleOutcome {
   finalYourArmyBeforeHealing: Army;
   finalEnemyArmyBeforeHealing: Army;
   battleLog: BattleLogEntry[];
+  yourHealing: Record<string, number>;
+  enemyHealing: Record<string, number>;
 }
 
 /**
@@ -296,6 +298,42 @@ export function simulateBattle(
     }
   }
 
+  // Determine winner
+  const yourArmyTotal = Object.values(yourArmy).reduce((a, b) => a + b, 0);
+  const enemyArmyTotal = Object.values(enemyArmy).reduce((a, b) => a + b, 0);
+  const winner = yourArmyTotal > enemyArmyTotal ? 'yourArmy' : 'enemyArmy';
+
+  // End-of-battle healing
+  const calculateHealing = (army: Army, buildings: any, land: number, battleLog: any[], isYourArmy: boolean) => {
+      const healing: Record<string, number> = {};
+      if (buildings['Medical Center'] && land > 0) {
+          const mcRatio = buildings['Medical Center'] / land;
+          const healingPercent = mcRatio >= 1 ? 0.20 : (mcRatio >= 0.5 ? 0.10 : 0);
+          if (healingPercent > 0) {
+              const lossKey = isYourArmy ? 'yourLosses' : 'enemyLosses';
+              for (const unitName in army) {
+                  const losses = battleLog.reduce((acc, log: any) => acc + (log.roundResult[lossKey][unitName] || 0), 0);
+                  const healedCount = Math.floor(losses * healingPercent);
+                  if (healedCount > 0) {
+                      healing[unitName] = healedCount;
+                  }
+              }
+          }
+      }
+      return healing;
+  };
+
+  const yourHealed: Record<string, number> = calculateHealing(yourArmy, yourBuildings, yourBuildings.Land || 20, battleLog, true); 
+  const enemyHealed: Record<string, number> = calculateHealing(enemyArmy, enemyBuildings, enemyBuildings.Land || 20, battleLog, false);
+  
+  for(const unit in yourHealed) {
+      if(yourArmy[unit]) yourArmy[unit] += yourHealed[unit];
+  }
+  for(const unit in enemyHealed) {
+      if(enemyArmy[unit]) enemyArmy[unit] += enemyHealed[unit];
+  }
+
+
   return {
     winner,
     rounds: round - 1,
@@ -303,6 +341,8 @@ export function simulateBattle(
     finalEnemyArmy: enemyArmy,
     finalYourArmyBeforeHealing: yourArmyBeforeHealing,
     finalEnemyArmyBeforeHealing: enemyArmyBeforeHealing,
-    battleLog
+    battleLog,
+    yourHealing: yourHealed,
+    enemyHealing: enemyHealed,
   };
 } 

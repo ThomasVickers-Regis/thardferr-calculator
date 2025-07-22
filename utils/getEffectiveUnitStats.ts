@@ -316,20 +316,30 @@ export function getStatModifiers(
   return modifiers;
 } 
 
+// Helper functions to identify unit types
 export function isInfantryUnit(unitName: string, race: string): boolean {
-  const raceKey = race?.toLowerCase() || 'dwarf';
-  const unit = UNIT_DATA[raceKey]?.[unitName];
-  return !!unit?.isInfantry;
+  const infantryNames = ['Infantry', 'HeavyInfantry', 'Swordman', 'Militia', 'Rusher', 'Slother', 'SkeletonWarrior', 'Shieldbearer', 'AxeMan'];
+  return infantryNames.includes(unitName);
 }
 
 export function isPikemanUnit(unitName: string, race: string): boolean {
-  const raceKey = race?.toLowerCase() || 'dwarf';
-  const unit = UNIT_DATA[raceKey]?.[unitName];
-  return !!unit?.isPikeman;
+  const pikemanNames = ['Pikeman', 'Lanceman', 'WraithPikeman'];
+  return pikemanNames.includes(unitName);
 }
 
 export function isMountedUnit(unitName: string, race: string): boolean {
-  const raceKey = race?.toLowerCase() || 'dwarf';
-  const unit = UNIT_DATA[raceKey]?.[unitName];
-  return !!unit?.isMounted;
+  const mountedNames = ['Knight', 'Rider', 'Caragous', 'WolfMaster', 'WraithRider', 'Runner', 'MountedArchers'];
+  return mountedNames.includes(unitName);
+}
+
+export function isMageUnit(unitName: string, race: string): boolean {
+    return unitName === 'Mage';
+}
+
+export function isShadowWarriorUnit(unitName: string, race: string): boolean {
+    return unitName === 'ShadowWarrior';
+}
+
+export function isKnightUnit(unitName: string, race: string): boolean {
+    return unitName === 'Knight';
 } 

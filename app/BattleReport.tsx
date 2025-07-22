@@ -466,123 +466,23 @@ const BattlePhase = ({
                     .map(([unit, count]) => {
                       const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1);
                       const baseStats = UNIT_DATA[yourProps.race.toLowerCase()]?.[unit];
-                      let attackValue = 0;
-                      if (phaseLog.phase === 'range') attackValue = stats.range;
-                      else if (phaseLog.phase === 'short') attackValue = stats.short;
-                      else if (phaseLog.phase === 'melee') attackValue = stats.melee;
-                      
-                      const totalDamage = (count as number) * attackValue;
                       const lost = phaseLog.yourLosses[unit] || 0;
                       const survived = (count as number) - lost;
                       const damageEntry = (phaseLog.yourDamageLog || []).find((d: any) => d.unitName === unit);
                       
                       return (
-                        <div key={unit} className="border border-gray-700 p-3 rounded bg-gray-750">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-gray-200 font-bold text-base">{unit}</span>
-                            <span className={`font-bold text-lg ${lost > 0 ? 'text-red-400' : 'text-gray-500'}`}>
-                              {lost > 0 ? `-${lost}` : '0'}
-                            </span>
-                          </div>
-                          
-                          {/* Unit Status */}
-                          <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
-                            <div className="bg-gray-700 p-1 rounded text-center">
-                              <div className="text-gray-400">Count</div>
-                              <div className="text-blue-300 font-bold">{count as number}</div>
-                            </div>
-                            <div className="bg-gray-700 p-1 rounded text-center">
-                              <div className="text-gray-400">Survived</div>
-                              <div className="text-green-400 font-bold">{survived}</div>
-                            </div>
-                            <div className="bg-gray-700 p-1 rounded text-center">
-                              <div className="text-gray-400">Loss Rate</div>
-                              <div className="text-yellow-400 font-bold">{count as number > 0 ? Math.round((lost / (count as number)) * 100) : 0}%</div>
-                            </div>
-                          </div>
-                          
-                          {/* Damage Details */}
-                          {damageEntry && (
-                            <div className="bg-gray-700 p-2 rounded mb-2">
-                              <div className="text-gray-300 font-medium mb-1">Damage Analysis:</div>
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div>
-                                  <span className="text-gray-400">Received</span>:
-                                  <span className="text-red-300 font-bold" title="Raw damage before any mitigation">{formatNumber(damageEntry.damageReceived)}</span>
-                                  <span className="text-gray-400 ml-2">Total:</span>
-                                  <span className="text-red-200 font-bold">{formatNumber(damageEntry.damageReceived * (count as number))}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-400">Mitigated</span>:
-                                  <span className="text-green-400 font-bold" title="Total mitigation from buildings, redistribution, immunity, etc.">{formatNumber(damageEntry.damageMitigated)}</span>
-                                  <span className="text-gray-400 ml-2">Total:</span>
-                                  <span className="text-green-200 font-bold">{formatNumber(damageEntry.damageMitigated * (count as number))}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-400">Final</span>:
-                                  <span className="text-yellow-400 font-bold" title="Actual damage taken after all mitigation">{formatNumber(damageEntry.finalDamage)}</span>
-                                  <span className="text-gray-400 ml-2">Total:</span>
-                                  <span className="text-yellow-200 font-bold">{formatNumber(damageEntry.finalDamage * (count as number))}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-400">Total Effective Defense</span>:
-                                  <span className="text-blue-300 font-bold">{formatNumber((damageEntry.damageMitigated || 0) + (stats.defense * (count as number)), 1)}</span>
-                                </div>
-                              </div>
-                              {damageEntry.buildingEffects.length > 0 && (
-                                <div className="mt-2 pt-2 border-t border-gray-600">
-                                  <div className="text-gray-400 text-xs">Effects:</div>
-                                  {damageEntry.buildingEffects.map((effect: any, i: number) => (
-                                    <div key={i} className="text-green-300 text-xs">• {effect}</div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Attack Stats */}
-                          <div className="bg-gray-700 p-2 rounded mb-2">
-                            <div className="text-gray-300 font-medium mb-1">Attack Stats:</div>
-                            {phaseLog.phase === 'melee' && (
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div>Melee: <span className="text-red-300">{baseStats?.melee || 0}</span></div>
-                                <div>Effective: <span className="text-red-400 font-bold">{formatNumber(stats.melee, 1)}</span></div>
-                                <div>Multiplier: <span className="text-red-300">{baseStats?.melee ? formatNumber(stats.melee / baseStats.melee, 2) : '1.00'}x</span></div>
-                                <div>Total: <span className="text-red-400 font-bold">{formatNumber(stats.melee * (count as number), 1)}</span></div>
-                              </div>
-                            )}
-                            {phaseLog.phase === 'short' && (
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div>Short: <span className="text-orange-300">{baseStats?.short || 0}</span></div>
-                                <div>Effective: <span className="text-orange-400 font-bold">{formatNumber(stats.short, 1)}</span></div>
-                                <div>Multiplier: <span className="text-orange-300">{baseStats?.short ? formatNumber(stats.short / baseStats.short, 2) : '1.00'}x</span></div>
-                                <div>Total: <span className="text-orange-400 font-bold">{formatNumber(stats.short * (count as number), 1)}</span></div>
-                              </div>
-                            )}
-                            {phaseLog.phase === 'range' && (
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div>Range: <span className="text-blue-300">{baseStats?.range || 0}</span></div>
-                                <div>Effective: <span className="text-blue-400 font-bold">{formatNumber(stats.range, 1)}</span></div>
-                                <div>Multiplier: <span className="text-blue-300">{baseStats?.range ? formatNumber(stats.range / baseStats.range, 2) : '1.00'}x</span></div>
-                                <div>Total: <span className="text-blue-400 font-bold">{formatNumber(stats.range * (count as number), 1)}</span></div>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Defense Stats */}
-                          <div className="bg-gray-700 p-2 rounded">
-                            <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
-                              <div>Effective: <span className="text-purple-400 font-bold">{formatNumber((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense), 1)}</span></div>
-                              {damageEntry?.appliedRedistributionBonus !== undefined && (
-                                <div className="col-span-2 text-green-300">+{formatNumber(damageEntry.appliedRedistributionBonus, 2)} defense redistributed from infantry</div>
-                              )}
-                              <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? formatNumber(((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense) / baseStats.defense), 2) : '1.00'}x</span></div>
-                              <div>Total Defense: <span className="text-purple-400 font-bold">{formatNumber((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense), 1)}</span></div>
-                            </div>
-                          </div>
-                        </div>
+                        <UnitDetail
+                          key={unit}
+                          unitName={unit}
+                          count={count as number}
+                          survived={survived}
+                          lost={lost}
+                          stats={stats}
+                          baseStats={baseStats}
+                          damageEntry={damageEntry}
+                          side={"your"}
+                          phase={phaseLog.phase}
+                        />
                       );
                     }).filter((x): x is React.JSX.Element => x !== null)}
                 </div>
