@@ -1,6 +1,7 @@
 import { UNIT_DATA, UnitStats } from '../data/unitData';
 import { TECHNOLOGY_DATA } from '../data/technologyData';
 import { STRATEGY_DATA } from '../data/strategyData';
+import { UNIT_DATA as unitData } from "@/data/unitData";
 
 // Types for input
 export type TechLevels = Record<string, number>; // e.g., { 'Ranged Accuracy': 2, 'Hardening': 3 }
@@ -90,74 +91,38 @@ export function getEffectiveUnitStats(
 
   // --- Strategy Modifiers ---
   if (strategy) {
-    const strat = STRATEGY_DATA[strategy];
-    if (strat) {
-      const effects = strat.effects;
-      
-      // Apply strategy effects from STRATEGY_DATA
-      if (strategy === 'Archer Protection') {
-        if (isInfantryUnit(unitName, race)) {
-          stats.melee *= effects.infantry_attack_multiplier;
+    const strategyEffects = STRATEGY_DATA[strategy]?.effects;
+    if (strategyEffects) {
+        if (strategy === 'Human Charging!' && isKnightUnit(unitName, race)) {
+            stats.melee *= strategyEffects.knights_attack_multiplier || 1;
+            // Also apply damage multiplier if it exists
+            if (strategyEffects.knights_damage_multiplier) {
+                stats.melee *= strategyEffects.knights_damage_multiplier;
+            }
         }
-      }
-      if (strategy === 'Quick Retreat') {
-        stats.melee *= effects.all_unit_attack_multiplier;
-        stats.short *= effects.all_unit_attack_multiplier;
-        stats.range *= effects.all_unit_attack_multiplier;
-      }
-      if (strategy === 'Anti-Cavalry') {
-        if (isPikemanUnit(unitName, race)) {
-          // Pikemen get their vs mounted multiplier in unit stats too
-          stats.melee *= effects.pikemen_attack_vs_mounted_multiplier;
+        if (strategy === 'Quick Retreat' && strategyEffects.all_unit_attack_multiplier) {
+            stats.melee *= strategyEffects.all_unit_attack_multiplier;
+            stats.short *= strategyEffects.all_unit_attack_multiplier;
+            stats.range *= strategyEffects.all_unit_attack_multiplier;
         }
-        stats.melee *= effects.all_units_attack_multiplier;
-        stats.short *= effects.all_units_attack_multiplier;
-        stats.range *= effects.all_units_attack_multiplier;
-      }
-      if (strategy === 'Dwarf Shield Line') {
-        // Close combat attack reduction
-        stats.melee *= (1 - effects.all_units_close_combat_attack_reduction_percent);
-        stats.short *= (1 - effects.all_units_close_combat_attack_reduction_percent);
-        
-        // Shieldbearer damage increase
-        if (isInfantryUnit(unitName, race)) {
-          stats.melee *= (1 + effects.shieldbearers_close_combat_damage_increase_percent);
+        if (strategy === 'Anti-Cavalry' && strategyEffects.all_units_attack_multiplier) {
+            stats.melee *= strategyEffects.all_units_attack_multiplier;
+            stats.short *= strategyEffects.all_units_attack_multiplier;
+            stats.range *= strategyEffects.all_units_attack_multiplier;
         }
-      }
-      if (strategy === 'Elf Energy Gathering') {
-        if (isInfantryUnit(unitName, race)) {
-          stats.defense += effects.wizards_defense_increase;
-          stats.melee *= effects.wizards_close_combat_damage_multiplier;
-          stats.range += effects.wizards_ranged_attack_increase;
+        if (strategy === 'Archer Protection' && isInfantryUnit(unitName, race)) {
+            stats.melee *= strategyEffects.infantry_attack_multiplier || 1;
+            stats.short *= strategyEffects.infantry_attack_multiplier || 1;
+            stats.range *= strategyEffects.infantry_attack_multiplier || 1;
         }
-      }
-      if (strategy === 'Gnome Far Fighting') {
-        // Long range attack doubling is handled in battle logic
-      }
-      if (strategy === 'Human Charging!') {
-        if (isInfantryUnit(unitName, race)) {
-          stats.melee *= effects.knights_attack_multiplier;
-          // Also apply damage multiplier if it exists
-          if (effects.knights_damage_multiplier) {
-            stats.melee *= effects.knights_damage_multiplier;
-          }
+        if (strategy === 'Dwarf Shield Line') {
+            if (isShieldbearerUnit(unitName, race)) {
+                stats.melee *= 1 + (strategyEffects.shieldbearers_close_combat_damage_increase_percent || 0);
+                stats.short *= 1 + (strategyEffects.shieldbearers_close_combat_damage_increase_percent || 0);
+            }
+            stats.melee *= 1 - (strategyEffects.all_units_close_combat_attack_reduction_percent || 0);
+            stats.short *= 1 - (strategyEffects.all_units_close_combat_attack_reduction_percent || 0);
         }
-      }
-      if (strategy === 'Orc Surrounding') {
-        if (isMountedUnit(unitName, race)) {
-          stats.defense += effects.shadow_warriors_defense_increase;
-          // Short ranged phase damage is handled in battle logic
-        }
-      }
-      if (strategy === 'Orc Berserker') {
-        stats.melee += effects.all_units_damage_increase;
-        stats.short += effects.all_units_damage_increase;
-        stats.range += effects.all_units_damage_increase;
-        stats.defense *= (1 / effects.all_units_defense_divide_by); // Convert division to multiplication
-      }
-      if (strategy === 'Orc') {
-        // Shadow warrior immunity reduction is handled in battle logic
-      }
     }
   }
 
@@ -282,6 +247,14 @@ export function getStatModifiers(
         }
       }
       
+      if (strategy === 'Infantry Attack') {
+        if (isInfantryUnit(unitName, race)) {
+          modifiers.defense.negative += effects.infantry_defense_reduction_percent * 100;
+        }
+        // The defense bonus for non-infantry is dynamic and calculated in battle logic,
+        // so it's not represented here as a static modifier.
+      }
+      
       if (strategy === 'Orc Surrounding') {
         if (isMountedUnit(unitName, race)) {
           modifiers.defense.positiveFlat += effects.shadow_warriors_defense_increase; // Flat +2
@@ -302,18 +275,21 @@ export function getStatModifiers(
 
 // Helper functions to identify unit types
 export function isInfantryUnit(unitName: string, race: string): boolean {
-  const infantryNames = ['Infantry', 'HeavyInfantry', 'Swordman', 'Militia', 'Rusher', 'Slother', 'SkeletonWarrior', 'Shieldbearer', 'AxeMan'];
-  return infantryNames.includes(unitName);
+  const raceKey = race?.toLowerCase();
+  if (!raceKey || !UNIT_DATA[raceKey] || !UNIT_DATA[raceKey][unitName]) return false;
+  return !!UNIT_DATA[raceKey][unitName].isInfantry;
 }
 
 export function isPikemanUnit(unitName: string, race: string): boolean {
-  const pikemanNames = ['Pikeman', 'Lanceman', 'WraithPikeman'];
-  return pikemanNames.includes(unitName);
+  const raceKey = race?.toLowerCase();
+  if (!raceKey || !UNIT_DATA[raceKey] || !UNIT_DATA[raceKey][unitName]) return false;
+  return !!UNIT_DATA[raceKey][unitName].isPikeman;
 }
 
 export function isMountedUnit(unitName: string, race: string): boolean {
-  const mountedNames = ['Knight', 'Rider', 'Caragous', 'WolfMaster', 'WraithRider', 'Runner', 'MountedArchers'];
-  return mountedNames.includes(unitName);
+  const raceKey = race?.toLowerCase();
+  if (!raceKey || !UNIT_DATA[raceKey] || !UNIT_DATA[raceKey][unitName]) return false;
+  return !!UNIT_DATA[raceKey][unitName].isMounted;
 }
 
 export function isMageUnit(unitName: string, race: string): boolean {
@@ -326,4 +302,13 @@ export function isShadowWarriorUnit(unitName: string, race: string): boolean {
 
 export function isKnightUnit(unitName: string, race: string): boolean {
     return unitName === 'Knight';
+}
+
+export function isArcherUnit(unitName: string, race: string): boolean {
+    const archerNames = ['Archer', 'EliteArcher', 'LightCrossbowman', 'HeavyCrossbowman', 'MountedArchers', 'PhantomArcher', 'Slinger', 'AxeThrower'];
+    return archerNames.includes(unitName);
+}
+
+export function isShieldbearerUnit(unitName: string, race: string): boolean {
+    return unitName === 'Shieldbearer';
 } 

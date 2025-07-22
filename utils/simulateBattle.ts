@@ -45,9 +45,9 @@ export function simulateBattle(
   yourKingdomStats: KingdomStats,
   enemyKingdomStats: KingdomStats,
   techLevelsYour: TechLevels,
-  strategyYour: StrategyName | null,
+  yourStrategy: StrategyName | null,
   techLevelsEnemy: TechLevels,
-  strategyEnemy: StrategyName | null,
+  enemyStrategy: StrategyName | null,
   maxRounds: number = 20,
   yourBuildings: any = {},
   enemyBuildings: any = {},
@@ -109,8 +109,8 @@ export function simulateBattle(
     const enemyRemainingPercent = enemyInitialTotal > 0 ? (enemyTotalUnits / enemyInitialTotal) * 100 : 0;
     
     // Determine retreat thresholds based on strategies
-    const yourRetreatThreshold = strategyYour === 'Quick Retreat' ? 35 : 17.5;
-    const enemyRetreatThreshold = strategyEnemy === 'Quick Retreat' ? 35 : 17.5;
+    const yourRetreatThreshold = yourStrategy === 'Quick Retreat' ? 35 : 17.5;
+    const enemyRetreatThreshold = enemyStrategy === 'Quick Retreat' ? 35 : 17.5;
     
     // Check for retreat conditions
     if (yourRemainingPercent < yourRetreatThreshold && enemyRemainingPercent < enemyRetreatThreshold) {
@@ -125,7 +125,7 @@ export function simulateBattle(
     }
     
     // Quick Retreat victory conditions
-    if (strategyYour === 'Quick Retreat' || strategyEnemy === 'Quick Retreat') {
+    if (yourStrategy === 'Quick Retreat' || enemyStrategy === 'Quick Retreat') {
       const yourCasualties = yourInitialTotal > 0 ? ((yourInitialTotal - yourTotalUnits) / yourInitialTotal) * 100 : 0;
       const enemyCasualties = enemyInitialTotal > 0 ? ((enemyInitialTotal - enemyTotalUnits) / enemyInitialTotal) * 100 : 0;
       
@@ -162,9 +162,9 @@ export function simulateBattle(
       yourArmy,
       enemyArmy,
       techLevelsYour,
-      strategyYour,
+      yourStrategy,
       techLevelsEnemy,
-      strategyEnemy,
+      enemyStrategy,
       ksDifferenceFactor,
       yourBuildings,
       enemyBuildings,
@@ -203,8 +203,8 @@ export function simulateBattle(
 
     
     // Determine retreat thresholds based on strategies
-    const yourRetreatThreshold = strategyYour === 'Quick Retreat' ? 35 : 17.5;
-    const enemyRetreatThreshold = strategyEnemy === 'Quick Retreat' ? 35 : 17.5;
+    const yourRetreatThreshold = yourStrategy === 'Quick Retreat' ? 35 : 17.5;
+    const enemyRetreatThreshold = enemyStrategy === 'Quick Retreat' ? 35 : 17.5;
     
     // Check for retreat conditions
     if (yourRemainingPercent < yourRetreatThreshold && enemyRemainingPercent < enemyRetreatThreshold) {
@@ -297,11 +297,6 @@ export function simulateBattle(
       });
     }
   }
-
-  // Determine winner
-  const yourArmyTotal = Object.values(yourArmy).reduce((a, b) => a + b, 0);
-  const enemyArmyTotal = Object.values(enemyArmy).reduce((a, b) => a + b, 0);
-  const winner = yourArmyTotal > enemyArmyTotal ? 'yourArmy' : 'enemyArmy';
 
   // End-of-battle healing
   const calculateHealing = (army: Army, buildings: any, land: number, battleLog: any[], isYourArmy: boolean) => {

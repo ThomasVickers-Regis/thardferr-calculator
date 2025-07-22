@@ -1,5 +1,7 @@
-import { getEffectiveUnitStats, TechLevels, StrategyName, isInfantryUnit, isPikemanUnit, isMountedUnit } from './getEffectiveUnitStats';
-import { UNIT_DATA } from '../data/unitData';
+import { UNIT_DATA } from '@/data/unitData';
+import { Army, TechLevels, StrategyName, PhaseType, Buildings } from '@/types';
+import { getEffectiveUnitStats, isMageUnit, isShadowWarriorUnit, isInfantryUnit, isKnightUnit, isPikemanUnit, isMountedUnit, isArcherUnit, isShieldbearerUnit } from './getEffectiveUnitStats';
+import { STRATEGY_DATA } from '@/data/strategyData';
 
 // UWDA: Unit Weights by race and unit name
 export const UNIT_WEIGHTS: Record<string, Record<string, number>> = {
@@ -53,9 +55,6 @@ export const UNIT_WEIGHTS: Record<string, Record<string, number>> = {
   }
 };
 
-export type Army = Record<string, number>;
-export type PhaseType = 'range' | 'short' | 'melee';
-
 export interface DamageLog {
   unitName: string;
   damageReceived: number;
@@ -75,25 +74,6 @@ export interface DamageLog {
     mitigationDetails: string[];
     unitWeight: number;
   };
-}
-
-function isArcherUnit(unitName: string, race?: string) {
-  return unitName.toLowerCase().includes('archer');
-}
-function isSwordmanUnit(unitName: string, race?: string) {
-  return unitName.toLowerCase().includes('swordman');
-}
-function isShieldbearerUnit(unitName: string, race?: string) {
-  return unitName.toLowerCase().includes('shieldbearer');
-}
-function isShadowWarriorUnit(unitName: string, race?: string) {
-  return unitName.toLowerCase().includes('shadow warrior');
-}
-function isMageUnit(unitName: string, race?: string) {
-  return unitName.toLowerCase().includes('mage');
-}
-function isSkeletonUnit(unitName: string, race?: string) {
-  return unitName.toLowerCase().includes('skeleton');
 }
 
 export function calculatePhaseDamage(
@@ -117,7 +97,7 @@ export function calculatePhaseDamage(
   const damageLog: DamageLog[] = [];
 
   // Pre-calculate raw damage and mitigation pools.
-  const rawTotalDamage = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor);
+  const rawTotalDamage = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy);
   const { totalMitigation, buildingEffectsLog } = calculateTotalMitigation(defendingArmy, defenderBuildings, phaseType, isAttacker);
 
   const defenderUnitNames = Object.keys(defendingArmy).filter(u => defendingArmy[u] > 0);
@@ -140,7 +120,8 @@ export function calculatePhaseDamage(
           totalMitigation,
           buildingEffectsLog,
           phaseType,
-          isAttacker
+          isAttacker,
+          attackingArmy
       );
 
       losses[defenderName] = Math.min(unitCount, unitLosses);
@@ -182,13 +163,17 @@ function handleInfantryAttack(
     totalMitigation: number,
     buildingEffectsLog: string[],
     phaseType: PhaseType,
-    isAttacker: boolean
+    isAttacker: boolean,
+    attackingArmy: Army
 ) {
     const { weightedTotals, sumOfAllWeightedTotals } = calculateWeightedTotals(defendingArmy, defenderRace);
     const totalDefenders = defenderUnitNames.reduce((sum, name) => sum + defendingArmy[name], 0);
 
     let unitEffectiveDefense = getEffectiveUnitStats(defenderName, defenderRace, techLevels, defenderStrategy, false, ksDifferenceFactor).defense;
     const buildingEffects: string[] = [...buildingEffectsLog];
+
+    // Add defender strategy effects to the log
+    buildingEffects.push(...getStrategyEffects(defenderName, defenderRace, defenderStrategy, phaseType, false, attackingArmy));
 
     // Calculate raw damage share before anything else
     const weightRatio = sumOfAllWeightedTotals > 0 ? weightedTotals[defenderName] / sumOfAllWeightedTotals : (1 / defenderUnitNames.length);
@@ -209,11 +194,13 @@ function handleInfantryAttack(
 
         if (isInfantryUnit(defenderName, defenderRace)) {
             unitEffectiveDefense *= 0.25;
-            buildingEffects.push(`Infantry Attack Penalty: -75% defense`);
+            // This is now handled by getStrategyEffects, so we can remove the manual push
+            // buildingEffects.push(`Infantry Attack Penalty: -75% defense`);
         } else if (nonInfantryUnitCount > 0) {
             const bonusPerUnit = totalInfantryDefenseLoss / nonInfantryUnitCount;
             unitEffectiveDefense += bonusPerUnit;
-            buildingEffects.push(`Infantry Attack Bonus: +${bonusPerUnit.toFixed(2)} defense`);
+            // This is now handled by getStrategyEffects
+            // buildingEffects.push(`Infantry Attack Bonus: +${bonusPerUnit.toFixed(2)} defense`);
         }
     }
 
@@ -241,17 +228,37 @@ function handleInfantryAttack(
 
 // Helper functions to break down the main function's logic.
 
-function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number): number {
+function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number, defendingArmy: Army): number {
     let totalDamage = 0;
     for (const [attackerName, attackerCount] of Object.entries(attackingArmy)) {
         if (attackerCount <= 0) continue;
         const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, attackerStrategy, true, ksDifferenceFactor);
         let attackValue = 0;
         if (phaseType === 'range') attackValue = attackerStats.range;
-        else if (phaseType === 'short') attackValue = attackerStats.short;
-        else if (phaseType === 'melee') attackValue = attackerStats.melee;
-        totalDamage += attackerCount * attackValue;
+        else if (phaseType === 'short') {
+            attackValue = attackerStats.short;
+            // Orc Surrounding: Shadow Warriors deal full damage in short phase
+            if (attackerStrategy === 'Orc Surrounding' && isShadowWarriorUnit(attackerName, attackerRace)) {
+                attackValue += attackerStats.melee + attackerStats.range;
+            }
+        }
+        else if (phaseType === 'melee') {
+            attackValue = attackerStats.melee;
+        }
+
+        // Anti-Cavalry: Pikemen get a bonus against mounted units
+        if (attackerStrategy === 'Anti-Cavalry' && isPikemanUnit(attackerName, attackerRace) && Object.keys(defendingArmy).some(unit => isMountedUnit(unit, attackerRace))) {
+            attackValue *= 3.5;
+        }
+
+        totalDamage += (attackerCount as number) * attackValue;
     }
+
+    // Gnome Far Fighting: Doubles range damage for both sides
+    if (phaseType === 'range' && (attackerStrategy === 'Gnome Far Fighting')) {
+        totalDamage *= 2;
+    }
+    
     return totalDamage;
 }
 
@@ -307,6 +314,27 @@ function applySpecialReductions(defenderName: string, defenderRace: string, defe
     let reduction = 0;
     const effects: string[] = [];
 
+    // Archer Protection: Infantry absorbs damage for archers
+    if (defenderStrategy === 'Archer Protection' && isArcherUnit(defenderName, defenderRace)) {
+        const infantryCount = Object.entries(defendingArmy).filter(([name, count]) => isInfantryUnit(name, defenderRace) && count > 0).reduce((sum, [, count]) => sum + count, 0);
+        const archerCount = defendingArmy[defenderName] || 0;
+        if (infantryCount > 0 && archerCount > 0) {
+            reduction = Math.min(1.0, (infantryCount / archerCount) * 0.5); // Example: 50% damage reduction if equal numbers
+            effects.push(`Infantry protects archers, reducing damage by ${(reduction * 100).toFixed(0)}%`);
+        }
+    }
+
+    // Dwarf Shield Line: Reduces enemy long-range attack damage
+    if (defenderStrategy === 'Dwarf Shield Line' && phaseType === 'range') {
+        const shieldbearerCount = defendingArmy['Shieldbearer'] || 0;
+        const totalUnits = Object.values(defendingArmy).reduce((sum, count) => sum + count, 0);
+        if (totalUnits > 0) {
+            const shieldbearerPercentage = shieldbearerCount / totalUnits;
+            reduction += Math.min(1.0, 2 * shieldbearerPercentage);
+            effects.push(`Dwarf Shield Line reduces ranged damage by ${(reduction * 100).toFixed(0)}%`);
+        }
+    }
+
     if (phaseType === 'melee' && isMageUnit(defenderName, defenderRace) && defenderStrategy !== 'Elf Energy Gathering') {
         reduction = 1.0; // 100%
     }
@@ -330,6 +358,53 @@ function applySpecialReductions(defenderName: string, defenderRace: string, defe
     }
 
     return { reduction, effects };
+}
+
+function getStrategyEffects(unitName: string, race: string, strategy: StrategyName | null, phaseType: PhaseType, isAttacker: boolean, defendingArmy: Army): string[] {
+    const effects: string[] = [];
+    if (!strategy) return effects;
+
+    const strategyEffects = STRATEGY_DATA[strategy]?.effects;
+    if (!strategyEffects) return effects;
+
+    if (strategy === 'Human Charging!' && isKnightUnit(unitName, race)) {
+        effects.push(`Charge: +${((strategyEffects.knights_attack_multiplier - 1) * 100).toFixed(0)}% Attack, -${(strategyEffects.knights_defense_reduction_percent * 100).toFixed(0)}% Defense`);
+    }
+    if (strategy === 'Elf Energy Gathering' && isMageUnit(unitName, race)) {
+        effects.push(`Energy Gathering: +${strategyEffects.wizards_defense_increase} Defense, +${((strategyEffects.wizards_close_combat_damage_multiplier - 1) * 100).toFixed(0)}% Melee Damage, +${strategyEffects.wizards_ranged_attack_increase} Ranged Attack`);
+    }
+    if (strategy === 'Orc Berserker') {
+        effects.push(`Berserker: +${strategyEffects.all_units_damage_increase} Damage, Defense /${strategyEffects.all_units_defense_divide_by}`);
+    }
+    if (strategy === 'Orc Surrounding' && isShadowWarriorUnit(unitName, race)) {
+        effects.push(`Surrounding: +${strategyEffects.shadow_warriors_defense_increase} Defense, deals full damage in short phase.`);
+    }
+    if (strategy === 'Quick Retreat') {
+        effects.push(`Quick Retreat: -${((1 - strategyEffects.all_unit_attack_multiplier) * 100).toFixed(0)}% Attack, 50% chance to lose on victory.`);
+    }
+    if (strategy === 'Anti-Cavalry' && isPikemanUnit(unitName, race) && isAttacker && Object.keys(defendingArmy).some(unit => isMountedUnit(unit, race))) {
+        effects.push(`Anti-Cavalry: +${((strategyEffects.pikemen_attack_vs_mounted_multiplier - 1) * 100).toFixed(0)}% damage vs. mounted units.`);
+    }
+    if (strategy === 'Archer Protection' && isInfantryUnit(unitName, race)) {
+        effects.push(`Archer Protection: -${((1 - strategyEffects.infantry_attack_multiplier) * 100).toFixed(0)}% Attack to protect archers.`);
+    }
+    if (strategy === 'Dwarf Shield Line') {
+        if (isShieldbearerUnit(unitName, race)) {
+            effects.push(`Shield Line: +${(strategyEffects.shieldbearers_close_combat_damage_increase_percent * 100).toFixed(0)}% Melee Damage`);
+        } else if (isInfantryUnit(unitName, race)) {
+            effects.push(`Shield Line: -${(strategyEffects.all_units_close_combat_attack_reduction_percent * 100).toFixed(0)}% Melee Attack`);
+        }
+    }
+    if (strategy === 'Gnome Far Fighting' && phaseType === 'range') {
+        effects.push('Gnome Far Fighting: Doubles ranged attacks this phase.');
+    }
+    if (strategy === 'Infantry Attack' && isInfantryUnit(unitName, race)) {
+        effects.push(`Infantry Attack Penalty: -${(strategyEffects.infantry_defense_reduction_percent * 100).toFixed(0)}% Defense`);
+    } else if (strategy === 'Infantry Attack' && !isInfantryUnit(unitName, race)) {
+        effects.push('Infantry Attack Bonus: Receives redistributed defense.');
+    }
+    
+    return effects;
 }
 
 // New: BattleState and PhaseResult types for UI-driven simulation
@@ -374,8 +449,8 @@ export function simulateBattlePhase(
     state.yourArmy,
     phase,
     state.enemyTechLevels,
-    state.enemyStrategy,
-    state.yourStrategy,
+    state.enemyStrategy as StrategyName,
+    state.yourStrategy as StrategyName,
     state.yourStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
     1,
     state.enemyBuildings,
@@ -389,8 +464,8 @@ export function simulateBattlePhase(
     state.enemyArmy,
     phase,
     state.yourTechLevels,
-    state.yourStrategy,
-    state.enemyStrategy,
+    state.yourStrategy as StrategyName,
+    state.enemyStrategy as StrategyName,
     state.enemyStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
     1,
     state.yourBuildings,
@@ -420,9 +495,28 @@ export function simulateBattlePhase(
     updatedEnemyCasualties[unit] = (updatedEnemyCasualties[unit] || 0) + lost;
   });
 
-  // Collect effects (for now, just concatenate per-unit effects)
-  const yourEffects = yourDamageResult.damageLog.flatMap(log => log.buildingEffects || []);
-  const enemyEffects = enemyDamageResult.damageLog.flatMap(log => log.buildingEffects || []);
+  // Collect effects and remove duplicates
+  const yourEffectsLog = yourDamageResult.damageLog.flatMap(log => log.buildingEffects || []);
+  const enemyEffectsLog = enemyDamageResult.damageLog.flatMap(log => log.buildingEffects || []);
+
+  // Add attacker strategy effects
+  if (state.yourStrategy) {
+    for (const unitName of Object.keys(state.yourArmy)) {
+      if (state.yourArmy[unitName] > 0) {
+        enemyEffectsLog.push(...getStrategyEffects(unitName, state.yourRace, state.yourStrategy as StrategyName, phase, true, state.enemyArmy));
+      }
+    }
+  }
+  if (state.enemyStrategy) {
+    for (const unitName of Object.keys(state.enemyArmy)) {
+      if (state.enemyArmy[unitName] > 0) {
+        yourEffectsLog.push(...getStrategyEffects(unitName, state.enemyRace, state.enemyStrategy as StrategyName, phase, true, state.yourArmy));
+      }
+    }
+  }
+  
+  const yourEffects = [...new Set(yourEffectsLog)];
+  const enemyEffects = [...new Set(enemyEffectsLog)];
 
   return {
     phase,

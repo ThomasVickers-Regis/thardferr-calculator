@@ -94,7 +94,7 @@ const UnitDetail: React.FC<UnitDetailProps> = ({ unitName, count, survived, lost
             <div className="mt-2 pt-2 border-t border-gray-600">
               <div className="text-gray-400 text-xs mb-1">Effects:</div>
               {damageEntry.buildingEffects.map((effect: string, i: number) => {
-                const isDebuff = effect.includes('Penalty');
+                const isDebuff = effect.includes('Penalty') || effect.includes('reduces') || effect.includes('reduction') || effect.includes('-');
                 const textColor = isDebuff ? 'text-red-400' : 'text-green-300';
                 return (
                   <div key={i} className={`text-xs ${textColor}`}>• {effect}</div>
