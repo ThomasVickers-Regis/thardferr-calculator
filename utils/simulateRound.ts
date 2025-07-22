@@ -48,94 +48,72 @@ export function simulateRound(
   enemyInitialArmy?: Army
 ): RoundResult {
   // Deep clone armies to avoid mutating input
-  let yourArmyState: Army = JSON.parse(JSON.stringify(yourArmy));
-  let enemyArmyState: Army = JSON.parse(JSON.stringify(enemyArmy));
-  
-  // Use initial army state for healing calculations, fallback to current if not provided
-  const initialYourArmy = yourInitialArmy || yourArmy;
-  const initialEnemyArmy = enemyInitialArmy || enemyArmy;
-  const phaseLogs: RoundResult['phaseLogs'] = [];
-  const phases: PhaseType[] = ['range', 'short', 'melee'];
-  
-  // Save the original armies at the start of the round
-  const roundStartYourArmy = { ...yourArmyState };
-  const roundStartEnemyArmy = { ...enemyArmyState };
+  let currentYourArmy = { ...yourArmy };
+  let currentEnemyArmy = { ...enemyArmy };
+  const phaseLogs = [];
 
-  for (const phase of phases) {
-    // Record army state at START of this phase
-    const phaseStartYourArmy = { ...yourArmyState };
-    const phaseStartEnemyArmy = { ...enemyArmyState };
-    
-    // Both sides attack simultaneously in this phase
-    // Calculate losses for each side
-    // For yourDamageResult, processedArmyStrategy should be strategyYour (your army's defense strategy)
-    // For enemyDamageResult, processedArmyStrategy should be strategyEnemy (enemy army's defense strategy)
-    const yourProcessedStrategy = strategyYour === 'Infantry Attack' ? 'Infantry Attack' : null;
-    const enemyProcessedStrategy = strategyEnemy === 'Infantry Attack' ? 'Infantry Attack' : null;
-    // Determine if your army is defending in this phase
-    const youAreDefending = phase === 'melee' ? false : true; // Only defend in melee if you are the defender
-    const enemyIsDefending = !youAreDefending;
+  for (const phase of ['range', 'short', 'melee'] as const) {
+    const yourArmyAtStart = { ...currentYourArmy };
+    const enemyArmyAtStart = { ...currentEnemyArmy };
+
+    // Calculate damage for both sides based on their state at the start of the phase
     const yourDamageResult = calculatePhaseDamage(
-      enemyArmyState,
-      { ...yourArmyState },
+      enemyArmyAtStart,
+      yourArmyAtStart,
       phase,
       techLevelsEnemy,
       strategyEnemy,
       strategyYour,
-      yourProcessedStrategy,
-      ksDifferenceFactor,
+      strategyYour === 'Infantry Attack' ? 'Infantry Attack' : null,
+      1,
       enemyBuildings,
       yourBuildings,
-      !youAreDefending, // isAttacker: true if you are attacking
+      false, // isAttacker flag
       enemyRace,
-      yourRace,
-      phase === 'melee' ? { ...roundStartYourArmy } : undefined,
-      youAreDefending // isDefender: true if you are defending
+      yourRace
     );
+
     const enemyDamageResult = calculatePhaseDamage(
-      yourArmyState,
-      { ...enemyArmyState },
+      yourArmyAtStart,
+      enemyArmyAtStart,
       phase,
       techLevelsYour,
       strategyYour,
       strategyEnemy,
-      enemyProcessedStrategy,
-      ksDifferenceFactor,
+      strategyEnemy === 'Infantry Attack' ? 'Infantry Attack' : null,
+      1,
       yourBuildings,
       enemyBuildings,
-      !enemyIsDefending, // isAttacker: true if enemy is attacking
+      true, // isAttacker flag
       yourRace,
-      enemyRace,
-      phase === 'melee' ? { ...roundStartEnemyArmy } : undefined,
-      enemyIsDefending // isDefender: true if enemy is defending
+      enemyRace
     );
-    
-    // Apply losses to yourArmyState
-    for (const [unit, lost] of Object.entries(yourDamageResult.losses)) {
-      yourArmyState[unit] = Math.max(0, (yourArmyState[unit] || 0) - lost);
+
+    // Apply losses to the current army states for the next phase
+    const yourLosses = yourDamageResult.losses;
+    for (const unit in yourLosses) {
+      currentYourArmy[unit] = Math.max(0, (currentYourArmy[unit] || 0) - yourLosses[unit]);
     }
-    // Apply losses to enemyArmyState
-    for (const [unit, lost] of Object.entries(enemyDamageResult.losses)) {
-      enemyArmyState[unit] = Math.max(0, (enemyArmyState[unit] || 0) - lost);
+
+    const enemyLosses = enemyDamageResult.losses;
+    for (const unit in enemyLosses) {
+      currentEnemyArmy[unit] = Math.max(0, (currentEnemyArmy[unit] || 0) - enemyLosses[unit]);
     }
-    
-    // Log this phase with army state at START of phase
-    phaseLogs.push({ 
-      phase, 
-      yourLosses: yourDamageResult.losses, 
-      enemyLosses: enemyDamageResult.losses,
+
+    phaseLogs.push({
+      phase,
+      yourArmyAtStart,
+      enemyArmyAtStart,
+      yourLosses,
+      enemyLosses,
       yourDamageLog: yourDamageResult.damageLog,
-      enemyDamageLog: enemyDamageResult.damageLog,
-      yourArmyAtStart: phaseStartYourArmy,
-      enemyArmyAtStart: phaseStartEnemyArmy
+      enemyDamageLog: enemyDamageResult.damageLog
     });
   }
 
-
-
   return {
-    yourArmy: yourArmyState,
-    enemyArmy: enemyArmyState,
+    yourArmy: currentYourArmy,
+    enemyArmy: currentEnemyArmy,
     phaseLogs
   };
 } 
