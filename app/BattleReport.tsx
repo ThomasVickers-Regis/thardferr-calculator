@@ -4,6 +4,14 @@ import { getEffectiveUnitStats } from '../utils/getEffectiveUnitStats';
 import { UNIT_DATA } from '../data/unitData';
 import { STRATEGY_DATA } from '../data/strategyData';
 
+const formatNumber = (value: any, decimalPlaces = 2) => {
+    const num = Number(value);
+    if (isNaN(num)) {
+        return (0).toFixed(decimalPlaces);
+    }
+    return num.toFixed(decimalPlaces);
+};
+
 // HealingDisplay: renders healing for a side in the end phase
 const HealingDisplay = ({ side, healing }: { side: 'your' | 'enemy'; healing: Record<string, number> }) => (
   <div className="bg-gray-800 p-4 rounded">
@@ -33,8 +41,8 @@ const PhaseStats = ({ stats, side }: { stats: any; side: 'your' | 'enemy' }) => 
   <div className="bg-gray-700 p-3 rounded">
     <div className="text-gray-300 font-medium mb-2">Army Stats:</div>
     <div className="grid grid-cols-2 gap-2 text-xs">
-      <div className="capitalize">Attack: <span className={`font-bold ${side === 'your' ? 'text-blue-400' : 'text-red-400'}`}>{isNaN(stats.attack) ? 0 : stats.attack}</span></div>
-      <div>Defense: <span className={`font-bold ${side === 'your' ? 'text-blue-400' : 'text-red-400'}`}>{isNaN(stats.defense) ? 0 : stats.defense}</span></div>
+      <div className="capitalize">Attack: <span className={`font-bold ${side === 'your' ? 'text-blue-400' : 'text-red-400'}`}>{isNaN(stats.attack) ? '0.00' : formatNumber(stats.attack)}</span></div>
+      <div>Defense: <span className={`font-bold ${side === 'your' ? 'text-blue-400' : 'text-red-400'}`}>{isNaN(stats.defense) ? '0.00' : formatNumber(stats.defense)}</span></div>
     </div>
     {stats.modifiers && stats.modifiers.length > 0 && (
       <div className="mt-2 pt-2 border-t border-gray-600">
@@ -257,8 +265,8 @@ const BattlePhase = ({
                 <div className="bg-gray-700 p-3 rounded">
                   <div className="text-gray-300 font-medium mb-2">Army Stats:</div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="capitalize">{phaseLog.phase}: <span className="font-bold text-blue-400">{isNaN(yourPhaseStats.attack) ? 0 : yourPhaseStats.attack}</span></div>
-                    <div>Defense: <span className="font-bold text-blue-400">{isNaN(yourPhaseStats.defense) ? 0 : yourPhaseStats.defense}</span></div>
+                    <div className="capitalize">{phaseLog.phase}: <span className="font-bold text-blue-400">{isNaN(yourPhaseStats.attack) ? '0.00' : formatNumber(yourPhaseStats.attack)}</span></div>
+                    <div>Defense: <span className="font-bold text-blue-400">{isNaN(yourPhaseStats.defense) ? '0.00' : formatNumber(yourPhaseStats.defense)}</span></div>
                   </div>
                   {yourPhaseStats.modifiers.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-gray-600">
@@ -300,8 +308,8 @@ const BattlePhase = ({
                               <div className="text-gray-400 text-xs">{count as number} → {survived} ({lost > 0 ? `-${lost}` : '0'})</div>
                             </div>
                             <div className="text-right">
-                              <div className="text-blue-400 font-bold">{isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)}</div>
-                              <div className="text-gray-400 text-xs">{isNaN(totalDamage) ? '0' : totalDamage.toFixed(0)}</div>
+                              <div className="text-blue-400 font-bold">{isNaN(attackValue) ? '0.00' : formatNumber(attackValue)}</div>
+                              <div className="text-gray-400 text-xs">{isNaN(totalDamage) ? '0' : formatNumber(totalDamage, 0)}</div>
                             </div>
                           </div>
                         );
@@ -312,23 +320,27 @@ const BattlePhase = ({
                 <div className="bg-gray-700 p-3 rounded">
                   <div className="text-gray-300 font-medium mb-2">{phaseLog.phase} Attackers:</div>
                   <div className="space-y-1 text-xs">
-                    {Object.entries(entry.yourArmy || {})
+                    {Object.entries(phaseLog.yourArmyAtStart || entry.yourArmy || {})
+                      .filter(([unit, count]) => {
+                        const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1);
+                        if (phaseLog.phase === 'range') return stats.range > 0 && (count as number) > 0;
+                        if (phaseLog.phase === 'short') return stats.short > 0 && (count as number) > 0;
+                        if (phaseLog.phase === 'melee') return stats.melee > 0 && (count as number) > 0;
+                        return false;
+                      })
                       .map(([unit, count]) => {
                         const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1);
                         let attackValue = 0;
                         if (phaseLog.phase === 'range') attackValue = stats.range;
                         else if (phaseLog.phase === 'short') attackValue = stats.short;
                         else if (phaseLog.phase === 'melee') attackValue = stats.melee;
-                        if ((count as number) > 0 && attackValue > 0) {
-                          return (
-                            <div key={unit} className="flex justify-between items-center">
-                              <span className="text-gray-300">{unit}</span>
-                              <span className="font-bold text-blue-400">{count as number} × {isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)} = {isNaN((count as number) * attackValue) ? '0.0' : ((count as number) * attackValue).toFixed(1)}</span>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }).filter((x): x is React.JSX.Element => x !== null)}
+                        return (
+                          <div key={unit} className="flex justify-between items-center">
+                            <span className="text-gray-300">{unit}</span>
+                            <span className="font-bold text-blue-400">{count as number} × {isNaN(attackValue) ? '0.00' : formatNumber(attackValue)} = {isNaN((count as number) * attackValue) ? '0.00' : formatNumber((count as number) * attackValue)}</span>
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
               </div>
@@ -341,8 +353,8 @@ const BattlePhase = ({
                 <div className="bg-gray-700 p-3 rounded">
                   <div className="text-gray-300 font-medium mb-2">Army Stats:</div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="capitalize">{phaseLog.phase}: <span className="font-bold text-red-400">{isNaN(enemyPhaseStats.attack) ? 0 : enemyPhaseStats.attack}</span></div>
-                    <div>Defense: <span className="font-bold text-red-400">{isNaN(enemyPhaseStats.defense) ? 0 : enemyPhaseStats.defense}</span></div>
+                    <div className="capitalize">{phaseLog.phase}: <span className="font-bold text-red-400">{isNaN(enemyPhaseStats.attack) ? '0.00' : formatNumber(enemyPhaseStats.attack)}</span></div>
+                    <div>Defense: <span className="font-bold text-red-400">{isNaN(enemyPhaseStats.defense) ? '0.00' : formatNumber(enemyPhaseStats.defense)}</span></div>
                   </div>
                   {enemyPhaseStats.modifiers.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-gray-600">
@@ -403,8 +415,8 @@ const BattlePhase = ({
                               <div className="text-gray-400 text-xs">{count as number} → {survived} ({lost > 0 ? `-${lost}` : '0'})</div>
                             </div>
                             <div className="text-right">
-                              <div className="text-red-400 font-bold">{isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)}</div>
-                              <div className="text-gray-400 text-xs">{isNaN(totalDamage) ? '0' : totalDamage.toFixed(0)}</div>
+                              <div className="text-red-400 font-bold">{isNaN(attackValue) ? '0.00' : formatNumber(attackValue)}</div>
+                              <div className="text-gray-400 text-xs">{isNaN(totalDamage) ? '0' : formatNumber(totalDamage, 0)}</div>
                             </div>
                           </div>
                         );
@@ -415,22 +427,26 @@ const BattlePhase = ({
                 <div className="bg-gray-700 p-3 rounded">
                   <div className="text-gray-300 font-medium mb-2">{phaseLog.phase} Attackers:</div>
                   <div className="space-y-1 text-xs">
-                    {Object.entries(entry.enemyArmy || {})
+                    {Object.entries(phaseLog.enemyArmyAtStart || entry.enemyArmy || {})
+                      .filter(([unit, count]) => {
+                        const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1);
+                        if (phaseLog.phase === 'range') return stats.range > 0 && (count as number) > 0;
+                        if (phaseLog.phase === 'short') return stats.short > 0 && (count as number) > 0;
+                        if (phaseLog.phase === 'melee') return stats.melee > 0 && (count as number) > 0;
+                        return false;
+                      })
                       .map(([unit, count]) => {
                         const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1);
                         let attackValue = 0;
                         if (phaseLog.phase === 'range') attackValue = stats.range;
                         else if (phaseLog.phase === 'short') attackValue = stats.short;
                         else if (phaseLog.phase === 'melee') attackValue = stats.melee;
-                        if ((count as number) > 0 && attackValue > 0) {
-                          return (
-                            <div key={unit} className="flex justify-between items-center">
-                              <span className="text-gray-300">{unit}</span>
-                              <span className="font-bold text-red-400">{count as number} × {isNaN(attackValue) ? '0.0' : attackValue.toFixed(1)} = {isNaN((count as number) * attackValue) ? '0.0' : ((count as number) * attackValue).toFixed(1)}</span>
-                            </div>
-                          );
-                        }
-                        return null;
+                        return (
+                          <div key={unit} className="flex justify-between items-center">
+                            <span className="text-gray-300">{unit}</span>
+                            <span className="font-bold text-red-400">{count as number} × {isNaN(attackValue) ? '0.00' : formatNumber(attackValue)} = {isNaN((count as number) * attackValue) ? '0.00' : formatNumber((count as number) * attackValue)}</span>
+                          </div>
+                        );
                       }).filter((x): x is React.JSX.Element => x !== null)}
                   </div>
                 </div>
@@ -492,25 +508,25 @@ const BattlePhase = ({
                               <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
                                   <span className="text-gray-400">Received</span>:
-                                  <span className="text-red-300 font-bold" title="Raw damage before any mitigation">{damageEntry.damageReceived}</span>
+                                  <span className="text-red-300 font-bold" title="Raw damage before any mitigation">{formatNumber(damageEntry.damageReceived)}</span>
                                   <span className="text-gray-400 ml-2">Total:</span>
-                                  <span className="text-red-200 font-bold">{(damageEntry.damageReceived * (count as number)).toFixed(3)}</span>
+                                  <span className="text-red-200 font-bold">{formatNumber(damageEntry.damageReceived * (count as number))}</span>
                                 </div>
                                 <div>
                                   <span className="text-gray-400">Mitigated</span>:
-                                  <span className="text-green-400 font-bold" title="Total mitigation from buildings, redistribution, immunity, etc.">{damageEntry.damageMitigated}</span>
+                                  <span className="text-green-400 font-bold" title="Total mitigation from buildings, redistribution, immunity, etc.">{formatNumber(damageEntry.damageMitigated)}</span>
                                   <span className="text-gray-400 ml-2">Total:</span>
-                                  <span className="text-green-200 font-bold">{(damageEntry.damageMitigated * (count as number)).toFixed(3)}</span>
+                                  <span className="text-green-200 font-bold">{formatNumber(damageEntry.damageMitigated * (count as number))}</span>
                                 </div>
                                 <div>
                                   <span className="text-gray-400">Final</span>:
-                                  <span className="text-yellow-400 font-bold" title="Actual damage taken after all mitigation">{damageEntry.finalDamage}</span>
+                                  <span className="text-yellow-400 font-bold" title="Actual damage taken after all mitigation">{formatNumber(damageEntry.finalDamage)}</span>
                                   <span className="text-gray-400 ml-2">Total:</span>
-                                  <span className="text-yellow-200 font-bold">{(damageEntry.finalDamage * (count as number)).toFixed(3)}</span>
+                                  <span className="text-yellow-200 font-bold">{formatNumber(damageEntry.finalDamage * (count as number))}</span>
                                 </div>
                                 <div>
                                   <span className="text-gray-400">Total Effective Defense</span>:
-                                  <span className="text-blue-300 font-bold">{(damageEntry.damageMitigated || 0) + (stats.defense * (count as number)).toFixed(1)}</span>
+                                  <span className="text-blue-300 font-bold">{formatNumber((damageEntry.damageMitigated || 0) + (stats.defense * (count as number)), 1)}</span>
                                 </div>
                               </div>
                               {damageEntry.buildingEffects.length > 0 && (
@@ -530,25 +546,25 @@ const BattlePhase = ({
                             {phaseLog.phase === 'melee' && (
                               <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>Melee: <span className="text-red-300">{baseStats?.melee || 0}</span></div>
-                                <div>Effective: <span className="text-red-400 font-bold">{stats.melee?.toFixed(1)}</span></div>
-                                <div>Multiplier: <span className="text-red-300">{baseStats?.melee ? (stats.melee / baseStats.melee).toFixed(2) : '1.00'}x</span></div>
-                                <div>Total: <span className="text-red-400 font-bold">{(stats.melee * (count as number)).toFixed(1)}</span></div>
+                                <div>Effective: <span className="text-red-400 font-bold">{formatNumber(stats.melee, 1)}</span></div>
+                                <div>Multiplier: <span className="text-red-300">{baseStats?.melee ? formatNumber(stats.melee / baseStats.melee, 2) : '1.00'}x</span></div>
+                                <div>Total: <span className="text-red-400 font-bold">{formatNumber(stats.melee * (count as number), 1)}</span></div>
                               </div>
                             )}
                             {phaseLog.phase === 'short' && (
                               <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>Short: <span className="text-orange-300">{baseStats?.short || 0}</span></div>
-                                <div>Effective: <span className="text-orange-400 font-bold">{stats.short?.toFixed(1)}</span></div>
-                                <div>Multiplier: <span className="text-orange-300">{baseStats?.short ? (stats.short / baseStats.short).toFixed(2) : '1.00'}x</span></div>
-                                <div>Total: <span className="text-orange-400 font-bold">{(stats.short * (count as number)).toFixed(1)}</span></div>
+                                <div>Effective: <span className="text-orange-400 font-bold">{formatNumber(stats.short, 1)}</span></div>
+                                <div>Multiplier: <span className="text-orange-300">{baseStats?.short ? formatNumber(stats.short / baseStats.short, 2) : '1.00'}x</span></div>
+                                <div>Total: <span className="text-orange-400 font-bold">{formatNumber(stats.short * (count as number), 1)}</span></div>
                               </div>
                             )}
                             {phaseLog.phase === 'range' && (
                               <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>Range: <span className="text-blue-300">{baseStats?.range || 0}</span></div>
-                                <div>Effective: <span className="text-blue-400 font-bold">{stats.range?.toFixed(1)}</span></div>
-                                <div>Multiplier: <span className="text-blue-300">{baseStats?.range ? (stats.range / baseStats.range).toFixed(2) : '1.00'}x</span></div>
-                                <div>Total: <span className="text-blue-400 font-bold">{(stats.range * (count as number)).toFixed(1)}</span></div>
+                                <div>Effective: <span className="text-blue-400 font-bold">{formatNumber(stats.range, 1)}</span></div>
+                                <div>Multiplier: <span className="text-blue-300">{baseStats?.range ? formatNumber(stats.range / baseStats.range, 2) : '1.00'}x</span></div>
+                                <div>Total: <span className="text-blue-400 font-bold">{formatNumber(stats.range * (count as number), 1)}</span></div>
                               </div>
                             )}
                           </div>
@@ -558,12 +574,12 @@ const BattlePhase = ({
                             <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
-                              <div>Effective: <span className="text-purple-400 font-bold">{(damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense).toFixed(1)}</span></div>
+                              <div>Effective: <span className="text-purple-400 font-bold">{formatNumber((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense), 1)}</span></div>
                               {damageEntry?.appliedRedistributionBonus !== undefined && (
-                                <div className="col-span-2 text-green-300">+{damageEntry.appliedRedistributionBonus.toFixed(2)} defense redistributed from infantry</div>
+                                <div className="col-span-2 text-green-300">+{formatNumber(damageEntry.appliedRedistributionBonus, 2)} defense redistributed from infantry</div>
                               )}
-                              <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? ((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense) / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
-                              <div>Total Defense: <span className="text-purple-400 font-bold">{(damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense).toFixed(1)}</span></div>
+                              <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? formatNumber(((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense) / baseStats.defense), 2) : '1.00'}x</span></div>
+                              <div>Total Defense: <span className="text-purple-400 font-bold">{formatNumber((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense), 1)}</span></div>
                             </div>
                           </div>
                         </div>
@@ -592,125 +608,28 @@ const BattlePhase = ({
                     .map(([unit, count]) => {
                       const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1);
                       const baseStats = UNIT_DATA[enemyProps.race.toLowerCase()]?.[unit];
-                      let attackValue = 0;
-                      if (phaseLog.phase === 'range') attackValue = stats.range;
-                      else if (phaseLog.phase === 'short') attackValue = stats.short;
-                      else if (phaseLog.phase === 'melee') attackValue = stats.melee;
-                      
-                      const totalDamage = (count as number) * attackValue;
                       const lost = phaseLog.enemyLosses[unit] || 0;
-                      const survived = (count as number) - lost;
+                      // Use the count at the start of the phase for all calculations
+                      const phaseStartCount = (phaseLog.enemyArmyAtStart && phaseLog.enemyArmyAtStart[unit] !== undefined)
+                        ? phaseLog.enemyArmyAtStart[unit]
+                        : (count as number);
+                      const survived = phaseStartCount - lost;
                       const damageEntry = (phaseLog.enemyDamageLog || []).find((d: any) => d.unitName === unit);
-                      
                       return (
-                        <div key={unit} className="border border-gray-700 p-3 rounded bg-gray-750">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-gray-200 font-bold text-base">{unit}</span>
-                            <span className={`font-bold text-lg ${lost > 0 ? 'text-green-400' : 'text-gray-500'}`}>
-                              {lost > 0 ? `-${lost}` : '0'}
-                            </span>
-                          </div>
-                          
-                          {/* Unit Status */}
-                          <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
-                            <div className="bg-gray-700 p-1 rounded text-center">
-                              <div className="text-gray-400">Count</div>
-                              <div className="text-red-300 font-bold">{count as number}</div>
-                            </div>
-                            <div className="bg-gray-700 p-1 rounded text-center">
-                              <div className="text-gray-400">Survived</div>
-                              <div className="text-green-400 font-bold">{survived}</div>
-                            </div>
-                            <div className="bg-gray-700 p-1 rounded text-center">
-                              <div className="text-gray-400">Loss Rate</div>
-                              <div className="text-yellow-400 font-bold">{count as number > 0 ? Math.round((lost / (count as number)) * 100) : 0}%</div>
-                            </div>
-                          </div>
-                          
-                          {/* Damage Details */}
-                          {damageEntry && (
-                            <div className="bg-gray-700 p-2 rounded mb-2">
-                              <div className="text-gray-300 font-medium mb-1">Damage Analysis:</div>
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div>
-                                  <span className="text-gray-400">Received</span>:
-                                  <span className="text-red-300 font-bold" title="Raw damage before any mitigation">{damageEntry.damageReceived}</span>
-                                  <span className="text-gray-400 ml-2">Total:</span>
-                                  <span className="text-red-200 font-bold">{(damageEntry.damageReceived * (count as number)).toFixed(3)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-400">Mitigated</span>:
-                                  <span className="text-green-400 font-bold" title="Total mitigation from buildings, redistribution, immunity, etc.">{damageEntry.damageMitigated}</span>
-                                  <span className="text-gray-400 ml-2">Total:</span>
-                                  <span className="text-green-200 font-bold">{(damageEntry.damageMitigated * (count as number)).toFixed(3)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-400">Final</span>:
-                                  <span className="text-yellow-400 font-bold" title="Actual damage taken after all mitigation">{damageEntry.finalDamage}</span>
-                                  <span className="text-gray-400 ml-2">Total:</span>
-                                  <span className="text-yellow-200 font-bold">{(damageEntry.finalDamage * (count as number)).toFixed(3)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-400">Lost</span>:
-                                  <span className="text-green-400 font-bold">{damageEntry.unitsLost}</span>
-                                </div>
-                              </div>
-                              {damageEntry.buildingEffects.length > 0 && (
-                                <div className="mt-2 pt-2 border-t border-gray-600">
-                                  <div className="text-gray-400 text-xs">Effects:</div>
-                                  {damageEntry.buildingEffects.map((effect: any, i: number) => (
-                                    <div key={i} className="text-green-300 text-xs">• {effect}</div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Attack Stats */}
-                          <div className="bg-gray-700 p-2 rounded mb-2">
-                            <div className="text-gray-300 font-medium mb-1">Attack Stats:</div>
-                            {phaseLog.phase === 'melee' && (
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div>Melee: <span className="text-red-300">{baseStats?.melee || 0}</span></div>
-                                <div>Effective: <span className="text-red-400 font-bold">{stats.melee?.toFixed(1)}</span></div>
-                                <div>Multiplier: <span className="text-red-300">{baseStats?.melee ? (stats.melee / baseStats.melee).toFixed(2) : '1.00'}x</span></div>
-                                <div>Total: <span className="text-red-400 font-bold">{(stats.melee * (count as number)).toFixed(1)}</span></div>
-                              </div>
-                            )}
-                            {phaseLog.phase === 'short' && (
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div>Short: <span className="text-orange-300">{baseStats?.short || 0}</span></div>
-                                <div>Effective: <span className="text-orange-400 font-bold">{stats.short?.toFixed(1)}</span></div>
-                                <div>Multiplier: <span className="text-orange-300">{baseStats?.short ? (stats.short / baseStats.short).toFixed(2) : '1.00'}x</span></div>
-                                <div>Total: <span className="text-orange-400 font-bold">{(stats.short * (count as number)).toFixed(1)}</span></div>
-                              </div>
-                            )}
-                            {phaseLog.phase === 'range' && (
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div>Range: <span className="text-blue-300">{baseStats?.range || 0}</span></div>
-                                <div>Effective: <span className="text-blue-400 font-bold">{stats.range?.toFixed(1)}</span></div>
-                                <div>Multiplier: <span className="text-blue-300">{baseStats?.range ? (stats.range / baseStats.range).toFixed(2) : '1.00'}x</span></div>
-                                <div>Total: <span className="text-blue-400 font-bold">{(stats.range * (count as number)).toFixed(1)}</span></div>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Defense Stats */}
-                          <div className="bg-gray-700 p-2 rounded">
-                            <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
-                              <div>Effective: <span className="text-purple-400 font-bold">{(damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense).toFixed(1)}</span></div>
-                              {damageEntry?.appliedRedistributionBonus !== undefined && (
-                                <div className="col-span-2 text-green-300">+{damageEntry.appliedRedistributionBonus.toFixed(2)} defense redistributed from infantry</div>
-                              )}
-                              <div>Multiplier: <span className="text-purple-300">{baseStats?.defense ? ((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense) / baseStats.defense).toFixed(2) : '1.00'}x</span></div>
-                              <div>Total Defense: <span className="text-purple-400 font-bold">{(damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense).toFixed(1)}</span></div>
-                            </div>
-                          </div>
-                        </div>
+                        <UnitDetail
+                          key={unit}
+                          unitName={unit}
+                          count={phaseStartCount}
+                          survived={survived}
+                          lost={lost}
+                          stats={stats}
+                          baseStats={baseStats}
+                          damageEntry={damageEntry}
+                          side={"enemy"}
+                          phase={phaseLog.phase}
+                        />
                       );
-                    }).filter((x): x is React.JSX.Element => x !== null)}
+                    })}
                 </div>
               </div>
             </div>
