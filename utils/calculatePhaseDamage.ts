@@ -97,7 +97,7 @@ export function calculatePhaseDamage(
   const damageLog: DamageLog[] = [];
 
   // Pre-calculate raw damage and mitigation pools.
-  const rawTotalDamage = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy);
+  const { totalDamage, pikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy);
   const { totalMitigation, buildingEffectsLog } = calculateTotalMitigation(defendingArmy, defenderBuildings, phaseType, isAttacker);
 
   const defenderUnitNames = Object.keys(defendingArmy).filter(u => defendingArmy[u] > 0);
@@ -116,7 +116,9 @@ export function calculatePhaseDamage(
           techLevels,
           defenderStrategy,
           ksDifferenceFactor,
-          rawTotalDamage,
+          totalDamage,
+          pikemenDamage,
+          attackerStrategy,
           totalMitigation,
           buildingEffectsLog,
           phaseType,
@@ -160,6 +162,8 @@ function handleInfantryAttack(
     defenderStrategy: StrategyName | null,
     ksDifferenceFactor: number,
     rawTotalDamage: number,
+    pikemenDamage: number,
+    attackerStrategy: StrategyName | null,
     totalMitigation: number,
     buildingEffectsLog: string[],
     phaseType: PhaseType,
@@ -177,8 +181,26 @@ function handleInfantryAttack(
 
     // Calculate raw damage share before anything else
     const weightRatio = sumOfAllWeightedTotals > 0 ? weightedTotals[defenderName] / sumOfAllWeightedTotals : (1 / defenderUnitNames.length);
-    const rawDamageAllocatedToStack = rawTotalDamage * weightRatio;
+    let rawDamageAllocatedToStack = rawTotalDamage * weightRatio;
 
+    // Apply Pikemen bonus vs. mounted units
+    if (isMountedUnit(defenderName, defenderRace) && pikemenDamage > 0 && rawTotalDamage > 0) {
+        const pikemenDamageRatio = pikemenDamage / rawTotalDamage;
+        const damageShareFromPikemen = rawDamageAllocatedToStack * pikemenDamageRatio;
+        
+        let bonusMultiplier = 2.0; // Base 2x damage vs mounted
+        let effectMsg = `Pikemen deal 2x damage vs mounted.`;
+
+        if (attackerStrategy === 'Anti-Cavalry') {
+            bonusMultiplier *= 3.5;
+            effectMsg = `Pikemen deal 2x damage, multiplied by 3.5x from Anti-Cavalry.`;
+        }
+
+        const bonusDamage = damageShareFromPikemen * (bonusMultiplier - 1);
+        rawDamageAllocatedToStack += bonusDamage;
+        buildingEffects.push(effectMsg);
+    }
+    
     if (defenderStrategy === 'Infantry Attack') {
         let totalInfantryDefenseLoss = 0;
         const infantryUnits = defenderUnitNames.filter(name => isInfantryUnit(name, defenderRace));
@@ -228,10 +250,12 @@ function handleInfantryAttack(
 
 // Helper functions to break down the main function's logic.
 
-function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number, defendingArmy: Army): number {
+function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number, defendingArmy: Army): { totalDamage: number; pikemenDamage: number } {
     let totalDamage = 0;
+    let pikemenDamage = 0;
+
     for (const [attackerName, attackerCount] of Object.entries(attackingArmy)) {
-        if (attackerCount <= 0) continue;
+        if ((attackerCount as number) <= 0) continue;
         const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, attackerStrategy, true, ksDifferenceFactor);
         let attackValue = 0;
         if (phaseType === 'range') attackValue = attackerStats.range;
@@ -246,20 +270,21 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
             attackValue = attackerStats.melee;
         }
 
-        // Anti-Cavalry: Pikemen get a bonus against mounted units
-        if (attackerStrategy === 'Anti-Cavalry' && isPikemanUnit(attackerName, attackerRace) && Object.keys(defendingArmy).some(unit => isMountedUnit(unit, attackerRace))) {
-            attackValue *= 3.5;
+        const currentUnitDamage = (attackerCount as number) * attackValue;
+        if (isPikemanUnit(attackerName, attackerRace)) {
+            pikemenDamage += currentUnitDamage;
         }
-
-        totalDamage += (attackerCount as number) * attackValue;
+        
+        totalDamage += currentUnitDamage;
     }
 
     // Gnome Far Fighting: Doubles range damage for both sides
     if (phaseType === 'range' && (attackerStrategy === 'Gnome Far Fighting')) {
         totalDamage *= 2;
+        pikemenDamage *= 2;
     }
     
-    return totalDamage;
+    return { totalDamage, pikemenDamage };
 }
 
 function calculateTotalMitigation(defendingArmy: Army, defenderBuildings: any, phaseType: PhaseType, isAttacker: boolean): { totalMitigation: number, buildingEffectsLog: string[] } {
@@ -382,8 +407,14 @@ function getStrategyEffects(unitName: string, race: string, strategy: StrategyNa
     if (strategy === 'Quick Retreat') {
         effects.push(`Quick Retreat: -${((1 - strategyEffects.all_unit_attack_multiplier) * 100).toFixed(0)}% Attack, 50% chance to lose on victory.`);
     }
-    if (strategy === 'Anti-Cavalry' && isPikemanUnit(unitName, race) && isAttacker && Object.keys(defendingArmy).some(unit => isMountedUnit(unit, race))) {
-        effects.push(`Anti-Cavalry: +${((strategyEffects.pikemen_attack_vs_mounted_multiplier - 1) * 100).toFixed(0)}% damage vs. mounted units.`);
+    if (strategy === 'Anti-Cavalry') {
+        if (isPikemanUnit(unitName, race)) {
+            if (isAttacker && Object.keys(defendingArmy).some(unit => isMountedUnit(unit, race))) {
+                effects.push(`Anti-Cavalry Bonus: +${((strategyEffects.pikemen_attack_vs_mounted_multiplier - 1) * 100).toFixed(0)}% damage vs. mounted units.`);
+            }
+        } else {
+            effects.push(`Anti-Cavalry Penalty: -${((1 - strategyEffects.all_units_attack_multiplier) * 100).toFixed(0)}% Attack`);
+        }
     }
     if (strategy === 'Archer Protection' && isInfantryUnit(unitName, race)) {
         effects.push(`Archer Protection: -${((1 - strategyEffects.infantry_attack_multiplier) * 100).toFixed(0)}% Attack to protect archers.`);

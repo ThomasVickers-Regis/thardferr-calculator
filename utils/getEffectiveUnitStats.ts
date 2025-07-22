@@ -106,9 +106,11 @@ export function getEffectiveUnitStats(
             stats.range *= strategyEffects.all_unit_attack_multiplier;
         }
         if (strategy === 'Anti-Cavalry' && strategyEffects.all_units_attack_multiplier) {
-            stats.melee *= strategyEffects.all_units_attack_multiplier;
-            stats.short *= strategyEffects.all_units_attack_multiplier;
-            stats.range *= strategyEffects.all_units_attack_multiplier;
+            if (!isPikemanUnit(unitName, race)) {
+                stats.melee *= strategyEffects.all_units_attack_multiplier;
+                stats.short *= strategyEffects.all_units_attack_multiplier;
+                stats.range *= strategyEffects.all_units_attack_multiplier;
+            }
         }
         if (strategy === 'Archer Protection' && isInfantryUnit(unitName, race)) {
             stats.melee *= strategyEffects.infantry_attack_multiplier || 1;
@@ -216,10 +218,11 @@ export function getStatModifiers(
       if (strategy === 'Anti-Cavalry') {
         if (isPikemanUnit(unitName, race)) {
           modifiers.melee.positive += (effects.pikemen_attack_vs_mounted_multiplier - 1) * 100;
+        } else {
+          modifiers.melee.negative += (1 - effects.all_units_attack_multiplier) * 100;
+          modifiers.short.negative += (1 - effects.all_units_attack_multiplier) * 100;
+          modifiers.range.negative += (1 - effects.all_units_attack_multiplier) * 100;
         }
-        modifiers.melee.negative += (1 - effects.all_units_attack_multiplier) * 100;
-        modifiers.short.negative += (1 - effects.all_units_attack_multiplier) * 100;
-        modifiers.range.negative += (1 - effects.all_units_attack_multiplier) * 100;
       }
       
       if (strategy === 'Dwarf Shield Line') {
