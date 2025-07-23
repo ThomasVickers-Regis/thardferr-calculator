@@ -1,4 +1,14 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Thardferr Battle Calculator
+
+This is a battle calculator for the online strategy game [Thardferr](https://thardferr.com). It is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Features
+
+*   **Detailed Battle Simulation**: Simulates battles with a high degree of accuracy, taking into account unit stats, racial abilities, and strategic advantages.
+*   **Dynamic Loss Calculation**: Accurately calculates land, castle, and building losses based on the decisiveness of the battle.
+*   **Advanced Stat Analysis**: Provides a detailed breakdown of unit performance, including damage dealt, mitigation, and casualties.
+*   **Race and Strategy Modifiers**: Correctly applies bonuses and penalties for all racial strategies, ensuring an authentic simulation of in-game mechanics.
+*   **Building Passives**: Accurately models the effects of defensive buildings like Guard Towers and Medical Centers.
 
 ## Getting Started
 

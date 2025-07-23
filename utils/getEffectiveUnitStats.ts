@@ -229,13 +229,13 @@ export function getStatModifiers(
         modifiers.melee.negative += effects.all_units_close_combat_attack_reduction_percent * 100;
         modifiers.short.negative += effects.all_units_close_combat_attack_reduction_percent * 100;
         
-        if (isInfantryUnit(unitName, race)) {
+        if (isShieldbearerUnit(unitName, race)) {
           modifiers.melee.positive += effects.shieldbearers_close_combat_damage_increase_percent * 100;
         }
       }
       
       if (strategy === 'Elf Energy Gathering') {
-        if (isInfantryUnit(unitName, race)) {
+        if (isMageUnit(unitName, race)) {
           modifiers.defense.positiveFlat += effects.wizards_defense_increase; // Flat +2
           modifiers.melee.positive += (effects.wizards_close_combat_damage_multiplier - 1) * 100; // +100%
           modifiers.range.positiveFlat += effects.wizards_ranged_attack_increase; // Flat +4
@@ -259,7 +259,7 @@ export function getStatModifiers(
       }
       
       if (strategy === 'Orc Surrounding') {
-        if (isMountedUnit(unitName, race)) {
+        if (isShadowWarriorUnit(unitName, race)) {
           modifiers.defense.positiveFlat += effects.shadow_warriors_defense_increase; // Flat +2
         }
       }
