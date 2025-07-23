@@ -1,29 +1,13 @@
-import { Army } from './calculatePhaseDamage';
-import { TechLevels, StrategyName } from './getEffectiveUnitStats';
-import { simulateRound, RoundResult } from './simulateRound';
+import { Army, TechLevels, StrategyName, Buildings, RoundResult, BattleOutcome, BattleLogEntry, KingdomStats } from '@/types';
+import { simulateRound } from './simulateRound';
+import { UNIT_DATA } from '@/data/unitData';
 
-export interface KingdomStats {
-  KS: number; // Kingdom Strength (total attack + defense, or similar)
-  [key: string]: any;
-}
-
-export interface BattleLogEntry {
-  round: number;
-  roundResult: RoundResult;
-  yourArmy: Army;
-  enemyArmy: Army;
-}
-
-export interface BattleOutcome {
-  winner: 'yourArmy' | 'enemyArmy' | 'draw';
-  rounds: number;
-  finalYourArmy: Army;
-  finalEnemyArmy: Army;
-  finalYourArmyBeforeHealing: Army;
-  finalEnemyArmyBeforeHealing: Army;
-  battleLog: BattleLogEntry[];
-  yourHealing: Record<string, number>;
-  enemyHealing: Record<string, number>;
+function getCastlePenalty(castles: number): number {
+    if (castles <= 1) return 1.0;
+    if (castles >= 2 && castles <= 9) return 0.8;
+    if (castles >= 10 && castles <= 19) return 0.75;
+    if (castles >= 20) return 0.7;
+    return 1.0;
 }
 
 /**
@@ -49,43 +33,26 @@ export function simulateBattle(
   techLevelsEnemy: TechLevels,
   enemyStrategy: StrategyName | null,
   maxRounds: number = 20,
-  yourBuildings: any = {},
-  enemyBuildings: any = {},
+  yourBuildings: Buildings = {},
+  enemyBuildings: Buildings = {},
   yourRace: string = 'dwarf',
   enemyRace: string = 'dwarf'
 ): BattleOutcome {
     let yourArmy = { ...yourInitialArmy };
   let enemyArmy = { ...enemyInitialArmy };
-  
-  // Apply Castle-Based Defense Scaling (from changelog)
-  // "Castle Based Defense Scaling, the more castles you have the fewer men you have to defend it (always at least 70%)"
-  const enemyCastles = enemyBuildings['Castle'] || 0;
-  
 
-  
-  if (enemyCastles > 0) {
-    // Calculate garrison efficiency based on castle count
-    // More castles = lower efficiency, but always at least 70%
-    let garrisonEfficiency = 1.0;
-    if (enemyCastles >= 10) {
-      garrisonEfficiency = 0.70; // 70% minimum as per changelog
-    } else if (enemyCastles >= 5) {
-      garrisonEfficiency = 0.75; // 75% for medium castle count
-    } else if (enemyCastles >= 2) {
-      garrisonEfficiency = 0.80; // 80% for low castle count
-    } else if (enemyCastles === 1) {
-      garrisonEfficiency = 0.90; // 90% for single castle (less aggressive scaling)
-    }
-    
-    // Apply garrison efficiency to all units
-    for (const [unit, count] of Object.entries(enemyArmy)) {
-      const originalCount = count;
-      enemyArmy[unit] = Math.floor(count * garrisonEfficiency);
-    }
-  }
-  
-  // Store the scaled enemy army as the "initial" army for retreat calculations
+  // Store the original enemy army for retreat calculations before applying any penalties
   const enemyInitialArmyForRetreat = { ...enemyArmy };
+
+  // Apply castle penalty to the defending (enemy) army
+  const castleCount = enemyBuildings['Castle'] || 0;
+  if (castleCount > 1) {
+      const penalty = getCastlePenalty(castleCount);
+      for (const unit in enemyArmy) {
+          enemyArmy[unit] = Math.floor(enemyArmy[unit] * penalty);
+      }
+  }
+
   const battleLog: BattleLogEntry[] = [];
 
   // Calculate KS difference factor (bottomfeeding)
