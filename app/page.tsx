@@ -444,6 +444,8 @@ export default function MainApp() {
           originalEnemyArmy={enemyArmy}
           yourBuildings={yourBuildings}
           enemyBuildings={enemyBuildings}
+          yourKingdomStats={yourKingdomStats}
+          enemyKingdomStats={enemyKingdomStats}
         />
       </div>
     </main>

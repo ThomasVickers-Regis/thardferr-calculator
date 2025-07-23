@@ -203,44 +203,42 @@ export function simulateBattle(
   const yourHealing: Record<string, number> = {};
   const enemyHealing: Record<string, number> = {};
   
-  // Calculate healing for your army
-  if (yourBuildings['Medical Center'] && yourBuildings['Medical Center'] > 0) {
-    const medicalCenters = yourBuildings['Medical Center'];
-    const healingPercent = 20; // 20% of deaths are healed back
-    
-    // Check all units that were in the initial army
-    for (const [unit, originalCount] of Object.entries(yourInitialArmy)) {
-      if (originalCount > 0) {
+  // Your army healing
+  const yourLand = yourKingdomStats.Land || 0;
+  if (yourBuildings['Medical Center'] && yourLand > 0) {
+    const healingPercent = (yourBuildings['Medical Center'] / yourLand) >= 1 ? 0.20 : 
+                           (yourBuildings['Medical Center'] / yourLand) >= 0.5 ? 0.10 : 0;
+
+    if (healingPercent > 0) {
+      for (const [unit, originalCount] of Object.entries(yourInitialArmy)) {
         const currentCount = yourArmy[unit] || 0;
-        const lostInBattle = originalCount - currentCount;
-        
-        if (lostInBattle > 0) {
-          const healed = Math.round(lostInBattle * (healingPercent / 100));
+        const losses = originalCount - currentCount;
+        if (losses > 0) {
+          const healed = Math.floor(losses * healingPercent);
           if (healed > 0) {
             yourHealing[unit] = healed;
-            yourArmy[unit] = Math.min(originalCount, currentCount + healed);
+            yourArmy[unit] += healed;
           }
         }
       }
     }
   }
-  
-  // Calculate healing for enemy army
-  if (enemyBuildings['Medical Center'] && enemyBuildings['Medical Center'] > 0) {
-    const medicalCenters = enemyBuildings['Medical Center'];
-    const healingPercent = 20; // 20% of deaths are healed back
-    
-    // Check all units that were in the initial army
-    for (const [unit, originalCount] of Object.entries(enemyInitialArmy)) {
-      if (originalCount > 0) {
+
+  // Enemy army healing
+  const enemyLand = enemyKingdomStats.Land || 0;
+  if (enemyBuildings['Medical Center'] && enemyLand > 0) {
+    const healingPercent = (enemyBuildings['Medical Center'] / enemyLand) >= 1 ? 0.20 : 
+                           (enemyBuildings['Medical Center'] / enemyLand) >= 0.5 ? 0.10 : 0;
+
+    if (healingPercent > 0) {
+      for (const [unit, originalCount] of Object.entries(enemyInitialArmy)) {
         const currentCount = enemyArmy[unit] || 0;
-        const lostInBattle = originalCount - currentCount;
-        
-        if (lostInBattle > 0) {
-          const healed = Math.round(lostInBattle * (healingPercent / 100));
+        const losses = originalCount - currentCount;
+        if (losses > 0) {
+          const healed = Math.floor(losses * healingPercent);
           if (healed > 0) {
             enemyHealing[unit] = healed;
-            enemyArmy[unit] = Math.min(originalCount, currentCount + healed);
+            enemyArmy[unit] += healed;
           }
         }
       }
@@ -265,37 +263,6 @@ export function simulateBattle(
     }
   }
 
-  // End-of-battle healing
-  const calculateHealing = (army: Army, buildings: any, land: number, battleLog: any[], isYourArmy: boolean) => {
-      const healing: Record<string, number> = {};
-      if (buildings['Medical Center'] && land > 0) {
-          const mcRatio = buildings['Medical Center'] / land;
-          const healingPercent = mcRatio >= 1 ? 0.20 : (mcRatio >= 0.5 ? 0.10 : 0);
-          if (healingPercent > 0) {
-              const lossKey = isYourArmy ? 'yourLosses' : 'enemyLosses';
-              for (const unitName in army) {
-                  const losses = battleLog.reduce((acc, log: any) => acc + (log.roundResult[lossKey][unitName] || 0), 0);
-                  const healedCount = Math.floor(losses * healingPercent);
-                  if (healedCount > 0) {
-                      healing[unitName] = healedCount;
-                  }
-              }
-          }
-      }
-      return healing;
-  };
-
-  const yourHealed: Record<string, number> = calculateHealing(yourArmy, yourBuildings, yourBuildings.Land || 20, battleLog, true); 
-  const enemyHealed: Record<string, number> = calculateHealing(enemyArmy, enemyBuildings, enemyBuildings.Land || 20, battleLog, false);
-  
-  for(const unit in yourHealed) {
-      if(yourArmy[unit]) yourArmy[unit] += yourHealed[unit];
-  }
-  for(const unit in enemyHealed) {
-      if(enemyArmy[unit]) enemyArmy[unit] += enemyHealed[unit];
-  }
-
-
   return {
     winner,
     rounds: round - 1,
@@ -304,7 +271,7 @@ export function simulateBattle(
     finalYourArmyBeforeHealing: yourArmyBeforeHealing,
     finalEnemyArmyBeforeHealing: enemyArmyBeforeHealing,
     battleLog,
-    yourHealing: yourHealed,
-    enemyHealing: enemyHealed,
+    yourHealing,
+    enemyHealing,
   };
 } 
