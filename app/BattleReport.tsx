@@ -184,15 +184,15 @@ const BattlePhase = ({
     for (const [unit, initialCount] of Object.entries(initialArmy || {})) {
       const finalCount = finalArmy[unit] || 0;
       const lost = (initialCount as number) - finalCount;
-      casualties[unit] = lost;
+      if (lost > 0) {
+        casualties[unit] = lost;
+      }
     }
     return casualties;
   };
-  // For enemy casualties, use the scaled army as the starting point (not the original)
-  const enemyCasualties = battleLog.length > 0 
-    ? calculateCasualties(battleLog[0].enemyArmy, battleOutcome.finalEnemyArmyBeforeHealing)
-    : calculateCasualties(originalEnemyArmy, battleOutcome.finalEnemyArmyBeforeHealing);
-  const yourCasualties = calculateCasualties(originalYourArmy, battleOutcome.finalYourArmyBeforeHealing);
+  // Use the final, post-healing army state for the summary.
+  const yourFinalCasualties = calculateCasualties(originalYourArmy, battleOutcome.finalYourArmy);
+  const enemyFinalCasualties = calculateCasualties(originalEnemyArmy, battleOutcome.finalEnemyArmyBeforeHealing);
   // Simulate land gain/loss based on battle outcome (attacker perspective)
   const calculateLandGainLoss = () => {
     if (winner === 'yourArmy') {
@@ -636,15 +636,15 @@ const BattleReport = ({
     for (const [unit, initialCount] of Object.entries(initialArmy || {})) {
       const finalCount = finalArmy[unit] || 0;
       const lost = (initialCount as number) - finalCount;
-      casualties[unit] = lost;
+      if (lost > 0) {
+        casualties[unit] = lost;
+      }
     }
     return casualties;
   };
-  // For enemy casualties, use the scaled army as the starting point (not the original)
-  const enemyCasualties = battleLog.length > 0 
-    ? calculateCasualties(battleLog[0].enemyArmy, battleOutcome.finalEnemyArmyBeforeHealing)
-    : calculateCasualties(originalEnemyArmy, battleOutcome.finalEnemyArmyBeforeHealing);
-  const yourCasualties = calculateCasualties(originalYourArmy, battleOutcome.finalYourArmyBeforeHealing);
+  // Use the final, post-healing army state for the summary.
+  const yourFinalCasualties = calculateCasualties(originalYourArmy, finalYourArmy);
+  const enemyFinalCasualties = calculateCasualties(originalEnemyArmy, finalEnemyArmy);
   // Simulate land gain/loss based on battle outcome (attacker perspective)
   const calculateLandGainLoss = () => {
     if (winner === 'yourArmy') {
@@ -788,9 +788,8 @@ const BattleReport = ({
           <div>
             <div className="text-red-400 font-bold">But we lost:</div>
             <div className="text-sm mt-1">
-              {Object.values(yourTotalLosses).some((v: number) => v > 0)
-                ? Object.entries(yourTotalLosses)
-                    .filter(([_, loss]) => (loss as number) > 0)
+              {Object.keys(yourFinalCasualties).length > 0
+                ? Object.entries(yourFinalCasualties)
                     .map(([unit, loss]) => `${loss} ${unit}`)
                     .join(', ')
                 : 'No units lost'}
@@ -799,9 +798,8 @@ const BattleReport = ({
           <div>
             <div className="text-green-400 font-bold">We managed to kill:</div>
             <div className="text-sm mt-1">
-              {Object.values(enemyTotalLosses).some((v: number) => v > 0)
-                ? Object.entries(enemyTotalLosses)
-                    .filter(([_, loss]) => (loss as number) > 0)
+              {Object.keys(enemyFinalCasualties).length > 0
+                ? Object.entries(enemyFinalCasualties)
                     .map(([unit, loss]) => `${loss} ${unit}`)
                     .join(', ')
                 : 'No enemy units killed'}
