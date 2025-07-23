@@ -243,7 +243,7 @@ export function getStatModifiers(
       }
       
       if (strategy === 'Human Charging!') {
-        if (isInfantryUnit(unitName, race)) {
+        if (isKnightUnit(unitName, race)) {
           modifiers.melee.positive += (effects.knights_attack_multiplier - 1) * 100; // +50%
           modifiers.short.positive += (effects.knights_short_multiplier - 1) * 100; // +50%
           modifiers.defense.negative += effects.knights_defense_reduction_percent * 100; // -25%

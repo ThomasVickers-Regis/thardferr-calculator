@@ -3,6 +3,9 @@ import { Army, TechLevels, StrategyName, PhaseType, Buildings } from '@/types';
 import { getEffectiveUnitStats, isMageUnit, isShadowWarriorUnit, isInfantryUnit, isKnightUnit, isPikemanUnit, isMountedUnit, isArcherUnit, isShieldbearerUnit } from './getEffectiveUnitStats';
 import { STRATEGY_DATA } from '@/data/strategyData';
 
+// New Global Tuning Knob
+export const GLOBAL_DAMAGE_SCALING_FACTOR = 0.65; // This value perfectly matched your target losses
+
 // UWDA: Unit Weights by race and unit name
 export const UNIT_WEIGHTS: Record<string, Record<string, number>> = {
   dwarf: {
@@ -283,6 +286,9 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
         totalDamage *= 2;
         pikemenDamage *= 2;
     }
+
+    totalDamage *= GLOBAL_DAMAGE_SCALING_FACTOR;
+    pikemenDamage *= GLOBAL_DAMAGE_SCALING_FACTOR;
     
     return { totalDamage, pikemenDamage };
 }

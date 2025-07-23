@@ -3,7 +3,7 @@ import { UNIT_DATA } from '../data/unitData';
 import { BUILDING_DATA } from '../data/buildingData';
 import { getEffectiveUnitStats, getStatModifiers } from '../utils/getEffectiveUnitStats';
 import { STRATEGY_DATA } from '../data/strategyData';
-import { Army } from '../utils/calculatePhaseDamage';
+import { Army } from '@/types';
 
 const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels, strategy }: { armyName: string; army: Army; setArmy: (a: Army) => void; units: string[]; buildings?: any; race?: string; techLevels?: any; strategy?: any }) => {
   const raceKey = race?.toLowerCase() || 'dwarf';
@@ -223,8 +223,10 @@ const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels
             {units.map(unit => {
               const baseStats = UNIT_DATA[raceKey]?.[unit];
               if (!baseStats) return null; // Skip if unit not found for this race
-              const effectiveStats = getEffectiveUnitStats(unit, raceKey, techLevels || {}, strategy, true, 1);
+
+              // --- FIX: Pass the specific unit being rendered to getStatModifiers ---
               const statModifiers = getStatModifiers(unit, raceKey, techLevels || {}, strategy);
+
               return (
                 <tr key={unit} className="even:bg-gray-700">
                   <td className="p-2 font-medium" title={unit}>{unit}</td>
