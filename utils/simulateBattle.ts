@@ -76,8 +76,8 @@ export function simulateBattle(
     const enemyRemainingPercent = enemyInitialTotal > 0 ? (enemyTotalUnits / enemyInitialTotal) * 100 : 0;
     
     // Determine retreat thresholds based on strategies
-    const yourRetreatThreshold = yourStrategy === 'Quick Retreat' ? 35 : 17.5;
-    const enemyRetreatThreshold = enemyStrategy === 'Quick Retreat' ? 35 : 17.5;
+    const yourRetreatThreshold = yourStrategy === 'Quick Retreat' ? 35 : 20;
+    const enemyRetreatThreshold = enemyStrategy === 'Quick Retreat' ? 35 : 20;
     
     // Check for retreat conditions
     if (yourRemainingPercent < yourRetreatThreshold && enemyRemainingPercent < enemyRetreatThreshold) {
@@ -169,9 +169,9 @@ export function simulateBattle(
     
 
     
-    // Determine retreat thresholds based on strategies
-    const yourRetreatThreshold = yourStrategy === 'Quick Retreat' ? 35 : 17.5;
-    const enemyRetreatThreshold = enemyStrategy === 'Quick Retreat' ? 35 : 17.5;
+    // Determine retreat thresholds based on strategies (final check)
+    const yourRetreatThreshold = yourStrategy === 'Quick Retreat' ? 35 : 20;
+    const enemyRetreatThreshold = enemyStrategy === 'Quick Retreat' ? 35 : 20;
     
     // Check for retreat conditions
     if (yourRemainingPercent < yourRetreatThreshold && enemyRemainingPercent < enemyRetreatThreshold) {
@@ -273,7 +273,15 @@ export function simulateBattle(
           const healingPercent = mcRatio >= 1 ? 0.20 : (mcRatio >= 0.5 ? 0.10 : 0);
           if (healingPercent > 0) {
               const lossKey = isYourArmy ? 'yourLosses' : 'enemyLosses';
-              for (const unitName in army) {
+              // Collect all units that took losses in the battle log
+              const allUnits = new Set<string>();
+              battleLog.forEach(log => {
+                  const losses = log.roundResult[lossKey];
+                  if (losses) {
+                      Object.keys(losses).forEach(unit => allUnits.add(unit));
+                  }
+              });
+              for (const unitName of allUnits) {
                   const losses = battleLog.reduce((acc, log: any) => acc + (log.roundResult[lossKey][unitName] || 0), 0);
                   const healedCount = Math.floor(losses * healingPercent);
                   if (healedCount > 0) {
@@ -289,10 +297,14 @@ export function simulateBattle(
   const enemyHealed: Record<string, number> = calculateHealing(enemyArmy, enemyBuildings, enemyBuildings.Land || 20, battleLog, false);
   
   for(const unit in yourHealed) {
-      if(yourArmy[unit]) yourArmy[unit] += yourHealed[unit];
+      const originalCount = yourInitialArmy[unit] || 0;
+      const currentCount = yourArmy[unit] || 0;
+      yourArmy[unit] = Math.min(originalCount, currentCount + yourHealed[unit]);
   }
   for(const unit in enemyHealed) {
-      if(enemyArmy[unit]) enemyArmy[unit] += enemyHealed[unit];
+      const originalCount = enemyInitialArmy[unit] || 0;
+      const currentCount = enemyArmy[unit] || 0;
+      enemyArmy[unit] = Math.min(originalCount, currentCount + enemyHealed[unit]);
   }
 
 

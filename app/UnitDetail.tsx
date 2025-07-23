@@ -94,8 +94,9 @@ const UnitDetail: React.FC<UnitDetailProps> = ({ unitName, count, survived, lost
             <div className="mt-2 pt-2 border-t border-gray-600">
               <div className="text-gray-400 text-xs mb-1">Effects:</div>
               {damageEntry.buildingEffects.map((effect: string, i: number) => {
+                const isPikemenRed = effect.includes('Pikemen deal 2x damage vs mounted.') || effect.includes('Pikemen deal 2x damage, multiplied by 3.5x from Anti-Cavalry.');
                 const isDebuff = effect.includes('Penalty') || effect.includes('reduces') || effect.includes('reduction') || effect.includes('-');
-                const textColor = isDebuff ? 'text-red-400' : 'text-green-300';
+                const textColor = isPikemenRed ? 'text-red-400' : (isDebuff ? 'text-red-400' : 'text-green-300');
                 return (
                   <div key={i} className={`text-xs ${textColor}`}>• {effect}</div>
                 );
@@ -104,49 +105,8 @@ const UnitDetail: React.FC<UnitDetailProps> = ({ unitName, count, survived, lost
           )}
         </div>
       )}
-      {/* Attack Stats */}
-      <div className="bg-gray-700 p-2 rounded mb-2">
-        <div className="text-gray-300 font-medium mb-1">Attack Stats:</div>
-        {baseStats && (
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            {phase === 'melee' && (
-              <>
-                <div>Melee: <span className="text-red-300">{baseStats.melee || 0}</span></div>
-                <div>Effective: <span className="text-red-400 font-bold">{formatNumber(stats.melee, 1)}</span></div>
-                <div>Multiplier: <span className="text-red-300">{baseStats.melee ? formatNumber(stats.melee / baseStats.melee, 2) : '1.00'}x</span></div>
-                <div>Total: <span className="text-red-400 font-bold">{formatNumber(stats.melee * count, 1)}</span></div>
-              </>
-            )}
-            {phase === 'short' && (
-              <>
-                <div>Short: <span className="text-orange-300">{baseStats.short || 0}</span></div>
-                <div>Effective: <span className="text-orange-400 font-bold">{formatNumber(stats.short, 1)}</span></div>
-                <div>Multiplier: <span className="text-orange-300">{baseStats.short ? formatNumber(stats.short / baseStats.short, 2) : '1.00'}x</span></div>
-                <div>Total: <span className="text-orange-400 font-bold">{formatNumber(stats.short * count, 1)}</span></div>
-              </>
-            )}
-            {phase === 'range' && (
-              <>
-                <div>Range: <span className="text-blue-300">{baseStats.range || 0}</span></div>
-                <div>Effective: <span className="text-blue-400 font-bold">{formatNumber(stats.range, 1)}</span></div>
-                <div>Multiplier: <span className="text-blue-300">{baseStats.range ? formatNumber(stats.range / baseStats.range, 2) : '1.00'}x</span></div>
-                <div>Total: <span className="text-blue-400 font-bold">{formatNumber(stats.range * count, 1)}</span></div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-      {/* Defense Stats */}
-      <div className="bg-gray-700 p-2 rounded">
-        <div className="text-gray-300 font-medium mb-1">Defense Stats:</div>
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div>Base: <span className="text-purple-300">{baseStats?.defense || 0}</span></div>
-          <div>Effective: <span className="text-purple-400 font-bold">{formatNumber(damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense, 1)}</span></div>
-          <div>Total Defense: <span className="text-purple-400 font-bold">{formatNumber((damageEntry?.trueEffectiveDefense !== undefined ? damageEntry.trueEffectiveDefense : stats.defense) * count, 1)}</span></div>
-        </div>
-      </div>
     </div>
   );
 };
 
-export default UnitDetail; 
+export default UnitDetail;

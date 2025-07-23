@@ -76,6 +76,13 @@ export interface DamageLog {
     final: number;
     mitigationDetails: string[];
     unitWeight: number;
+    rawDamageAllocatedToStack?: number;
+    mitigationAllocatedToStack?: number;
+    totalMitigation?: number;
+    totalRawDamage?: number;
+    maxTotalMitigation?: number;
+    preScaledTotalDamage?: number;
+    preScaledPikemenDamage?: number;
   };
 }
 
@@ -95,23 +102,43 @@ export function calculatePhaseDamage(
   defenderRace: string = 'dwarf',
   originalDefendingArmy?: Army,
   isDefender?: boolean // new optional flag
-): { losses: Record<string, number>; damageLog: DamageLog[] } {
+): { losses: Record<string, number>; damageLog: DamageLog[]; rawTotalDamage: number; totalMitigation: number; mitigationPerUnit: Record<string, number>; rawDamagePerUnit: Record<string, number>; maxTotalMitigation: number; preScaledTotalDamage: number; preScaledPikemenDamage: number; } {
   const losses: Record<string, number> = {};
   const damageLog: DamageLog[] = [];
+  const mitigationPerUnit: Record<string, number> = {};
+  const rawDamagePerUnit: Record<string, number> = {};
 
   // Pre-calculate raw damage and mitigation pools.
-  const { totalDamage, pikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy);
+  const { totalDamage, pikemenDamage, preScaledTotalDamage, preScaledPikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy);
+  // Calculate the maximum possible mitigation pool (before capping by total damage)
+  let maxTotalMitigation = 0;
+  const totalDefenders = Object.values(defendingArmy).reduce((sum, count) => sum + count, 0);
+  if (phaseType === 'range' && defenderBuildings['Guard Towers']) {
+    const towerCount = defenderBuildings['Guard Towers'];
+    const potentialMitigationPool = towerCount * 40;
+    const perUnitCap = 2;
+    const maxMitigationByUnitCap = totalDefenders * perUnitCap;
+    maxTotalMitigation += Math.min(potentialMitigationPool, maxMitigationByUnitCap);
+  }
+  if (phaseType === 'melee' && defenderBuildings['Medical Center']) {
+    const centerCount = defenderBuildings['Medical Center'];
+    const perCenterPool = isAttacker ? 50 : 75;
+    const perUnitCap = isAttacker ? 1 : 2;
+    const potentialMitigationPool = centerCount * perCenterPool;
+    const maxMitigationByUnitCap = totalDefenders * perUnitCap;
+    maxTotalMitigation += Math.min(potentialMitigationPool, maxMitigationByUnitCap);
+  }
   const { totalMitigation, buildingEffectsLog } = calculateTotalMitigation(defendingArmy, defenderBuildings, phaseType, isAttacker);
 
   const defenderUnitNames = Object.keys(defendingArmy).filter(u => defendingArmy[u] > 0);
-  if (defenderUnitNames.length === 0) return { losses: {}, damageLog: [] };
+  if (defenderUnitNames.length === 0) return { losses: {}, damageLog: [], rawTotalDamage: totalDamage, totalMitigation, mitigationPerUnit: {}, rawDamagePerUnit: {}, maxTotalMitigation, preScaledTotalDamage, preScaledPikemenDamage };
   
   // Now, calculate losses and create the final log entries.
   for (const defenderName of defenderUnitNames) {
       const unitCount = defendingArmy[defenderName];
       if (unitCount <= 0) continue;
 
-      let { rawDamageReceived, finalDamagePerUnit, unitLosses, buildingEffects, unitEffectiveDefense } = handleInfantryAttack(
+      let { rawDamageReceived, finalDamagePerUnit, unitLosses, buildingEffects, unitEffectiveDefense, rawDamageAllocatedToStack, mitigationAllocatedToStack } = handleInfantryAttack(
           defenderName,
           defenderUnitNames,
           defendingArmy,
@@ -131,6 +158,8 @@ export function calculatePhaseDamage(
 
       losses[defenderName] = Math.min(unitCount, unitLosses);
       const mitigatedDamage = rawDamageReceived - finalDamagePerUnit;
+      mitigationPerUnit[defenderName] = mitigationAllocatedToStack;
+      rawDamagePerUnit[defenderName] = rawDamageAllocatedToStack;
 
       damageLog.push({
           unitName: defenderName,
@@ -148,12 +177,19 @@ export function calculatePhaseDamage(
               afterImmunity: finalDamagePerUnit, // Combined for simplicity
               final: finalDamagePerUnit,
               mitigationDetails: [],
-              unitWeight: UNIT_WEIGHTS[defenderRace.toLowerCase()]?.[defenderName] || 1
+              unitWeight: UNIT_WEIGHTS[defenderRace.toLowerCase()]?.[defenderName] || 1,
+              rawDamageAllocatedToStack,
+              mitigationAllocatedToStack,
+              totalMitigation,
+              totalRawDamage: totalDamage,
+              maxTotalMitigation,
+              preScaledTotalDamage,
+              preScaledPikemenDamage
           }
       });
   }
 
-  return { losses, damageLog };
+  return { losses, damageLog, rawTotalDamage: totalDamage, totalMitigation, mitigationPerUnit, rawDamagePerUnit, maxTotalMitigation, preScaledTotalDamage, preScaledPikemenDamage };
 }
 
 function handleInfantryAttack(
@@ -247,15 +283,19 @@ function handleInfantryAttack(
         unitLosses,
         buildingEffects,
         unitEffectiveDefense,
+        rawDamageAllocatedToStack,
+        mitigationAllocatedToStack
     };
 }
 
 
 // Helper functions to break down the main function's logic.
 
-function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number, defendingArmy: Army): { totalDamage: number; pikemenDamage: number } {
+function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number, defendingArmy: Army): { totalDamage: number; pikemenDamage: number; preScaledTotalDamage: number; preScaledPikemenDamage: number; } {
     let totalDamage = 0;
     let pikemenDamage = 0;
+    let preScaledTotalDamage = 0;
+    let preScaledPikemenDamage = 0;
 
     for (const [attackerName, attackerCount] of Object.entries(attackingArmy)) {
         if ((attackerCount as number) <= 0) continue;
@@ -274,23 +314,33 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
         }
 
         const currentUnitDamage = (attackerCount as number) * attackValue;
+        preScaledTotalDamage += currentUnitDamage;
+        if (isPikemanUnit(attackerName, attackerRace)) {
+            preScaledPikemenDamage += currentUnitDamage;
+        }
+        totalDamage += currentUnitDamage;
         if (isPikemanUnit(attackerName, attackerRace)) {
             pikemenDamage += currentUnitDamage;
         }
-        
-        totalDamage += currentUnitDamage;
     }
 
     // Gnome Far Fighting: Doubles range damage for both sides
     if (phaseType === 'range' && (attackerStrategy === 'Gnome Far Fighting')) {
         totalDamage *= 2;
         pikemenDamage *= 2;
+        preScaledTotalDamage *= 2;
+        preScaledPikemenDamage *= 2;
     }
+
+    // Save pre-scaled values before scaling
+    const preScaleTotal = preScaledTotalDamage;
+    const preScalePikemen = preScaledPikemenDamage;
 
     totalDamage *= GLOBAL_DAMAGE_SCALING_FACTOR;
     pikemenDamage *= GLOBAL_DAMAGE_SCALING_FACTOR;
+    // (preScaledTotalDamage and preScaledPikemenDamage remain unscaled)
     
-    return { totalDamage, pikemenDamage };
+    return { totalDamage, pikemenDamage, preScaledTotalDamage: preScaleTotal, preScaledPikemenDamage: preScalePikemen };
 }
 
 function calculateTotalMitigation(defendingArmy: Army, defenderBuildings: any, phaseType: PhaseType, isAttacker: boolean): { totalMitigation: number, buildingEffectsLog: string[] } {
@@ -480,7 +530,7 @@ export function simulateBattlePhase(
   state: BattleState,
   phase: 'range' | 'short' | 'melee'
 ): PhaseResult {
-  // Calculate damage for this phase (your army defends, then enemy army defends)
+  // Your army is being attacked (you are the defender)
   const yourDamageResult = calculatePhaseDamage(
     state.enemyArmy,
     state.yourArmy,
@@ -492,10 +542,11 @@ export function simulateBattlePhase(
     1,
     state.enemyBuildings,
     state.yourBuildings,
-    true,
+    false, // isAttacker = false, you are the defender
     state.enemyRace,
     state.yourRace
   );
+  // Enemy army is being attacked (they are the defender)
   const enemyDamageResult = calculatePhaseDamage(
     state.yourArmy,
     state.enemyArmy,
@@ -507,7 +558,7 @@ export function simulateBattlePhase(
     1,
     state.yourBuildings,
     state.enemyBuildings,
-    true,
+    true, // isAttacker = true, they are the attacker
     state.yourRace,
     state.enemyRace
   );
@@ -551,7 +602,7 @@ export function simulateBattlePhase(
       }
     }
   }
-  
+
   const yourEffects = [...new Set(yourEffectsLog)];
   const enemyEffects = [...new Set(enemyEffectsLog)];
 

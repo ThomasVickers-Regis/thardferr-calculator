@@ -284,6 +284,7 @@ const BattlePhase = ({
                       ))}
                     </div>
                   )}
+                  <div className="text-xs text-blue-300 font-bold mt-2">• Global: All battle damage is reduced by 0.65× for game balance.</div>
                 </div>
                 
                 {/* Condensed Unit Summary */}
@@ -391,6 +392,10 @@ const BattlePhase = ({
                     }
                     return null;
                   })()}
+                  {/* Global damage reduction note */}
+                  <div className="mt-2 pt-2 border-t border-gray-600">
+                    <div className="text-xs text-blue-300 font-bold">• Global: All battle damage is reduced by 0.65× for game balance.</div>
+                  </div>
                 </div>
                 
                 {/* Condensed Unit Summary */}
