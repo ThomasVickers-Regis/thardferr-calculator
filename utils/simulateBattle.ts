@@ -140,7 +140,8 @@ export function simulateBattle(
       yourKingdomStats.Land || 20,
       enemyKingdomStats.Land || 20,
       yourInitialArmy,
-      enemyInitialArmy
+      enemyInitialArmy,
+      false // isYourArmyTheDefender
     );
     
     // Log round with army state at START of round
