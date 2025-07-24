@@ -12,6 +12,8 @@ interface BuildingTableProps {
   setKingdomStats: React.Dispatch<React.SetStateAction<KingdomStats>>;
   ratios: Record<string, number>;
   setRatios: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  manualOverride?: Record<string, boolean>;
+  setManualOverride?: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
 const DEFAULT_RATIOS: Record<string, number> = {
@@ -30,9 +32,11 @@ const DEFAULT_RATIOS: Record<string, number> = {
   'Castle': 0 // handled separately
 };
 
-const BuildingTable: React.FC<BuildingTableProps> = ({ buildings, setBuildings, land, castles, race, population, setKingdomStats, ratios, setRatios }) => {
+const BuildingTable: React.FC<BuildingTableProps> = ({ buildings, setBuildings, land, castles, race, population, setKingdomStats, ratios, setRatios, manualOverride: propManualOverride, setManualOverride: propSetManualOverride }) => {
   // Manual override state
-  const [manualOverride, setManualOverride] = useState<Record<string, boolean>>({});
+  const [internalManualOverride, internalSetManualOverride] = useState<Record<string, boolean>>({});
+  const manualOverride = propManualOverride || internalManualOverride;
+  const setManualOverride = propSetManualOverride || internalSetManualOverride;
   const prevLandRef = useRef(land);
 
   // Helper: get default ratio for a building

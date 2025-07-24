@@ -20,6 +20,7 @@ import KingdomSummary from './KingdomSummary';
 import PopulationAssignment from './PopulationAssignment';
 import BattleReport from './BattleReport';
 import EnemyCounterOptimizer from './EnemyCounterOptimizer';
+import QuickKingdomImport from './QuickKingdomImport';
 
 // List of available races
 const RACES = ["Dwarf", "Elf", "Gnome", "Human", "Orc", "Undead"];
@@ -163,6 +164,13 @@ export default function MainApp() {
   // Add building ratios state for each kingdom
   const [yourBuildingRatios, setYourBuildingRatios] = useState<Record<string, number>>({});
   const [enemyBuildingRatios, setEnemyBuildingRatios] = useState<Record<string, number>>({});
+  // Add pendingArmy and pendingBuildings state for import timing
+  const [yourPendingArmy, setYourPendingArmy] = useState<Army | null>(null);
+  const [enemyPendingArmy, setEnemyPendingArmy] = useState<Army | null>(null);
+  const [yourPendingBuildings, setYourPendingBuildings] = useState<Buildings | null>(null);
+  const [enemyPendingBuildings, setEnemyPendingBuildings] = useState<Buildings | null>(null);
+  const [yourManualOverride, setYourManualOverride] = useState<Record<string, boolean>>({});
+  const [enemyManualOverride, setEnemyManualOverride] = useState<Record<string, boolean>>({});
 
   // Handler for simulating the battle
   const handleSimulateBattle = () => {
@@ -250,6 +258,33 @@ export default function MainApp() {
     setEnemyArmy(getDefaultArmy(enemyRace));
   }, [enemyRace]);
 
+  // useEffect to apply pendingBuildings after land update
+  useEffect(() => {
+    if (yourPendingBuildings) {
+      setYourBuildings(yourPendingBuildings);
+      setYourPendingBuildings(null);
+    }
+  }, [yourKingdomStats.Land]);
+  useEffect(() => {
+    if (enemyPendingBuildings) {
+      setEnemyBuildings(enemyPendingBuildings);
+      setEnemyPendingBuildings(null);
+    }
+  }, [enemyKingdomStats.Land]);
+  // useEffect to apply pendingArmy after buildings/land update
+  useEffect(() => {
+    if (yourPendingArmy) {
+      setYourArmy(yourPendingArmy);
+      setYourPendingArmy(null);
+    }
+  }, [yourBuildings, yourKingdomStats.Land]);
+  useEffect(() => {
+    if (enemyPendingArmy) {
+      setEnemyArmy(enemyPendingArmy);
+      setEnemyPendingArmy(null);
+    }
+  }, [enemyBuildings, enemyKingdomStats.Land]);
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 text-gray-100 font-sans p-6 flex flex-col items-center" style={{ fontFamily: 'Inter, sans-serif' }}>
       <div className="w-full max-w-8xl rounded-2xl bg-gray-900 shadow-lg p-8 mt-8">
@@ -271,6 +306,29 @@ export default function MainApp() {
                 ))}
               </select>
             </div>
+            {/* Quick Import for your kingdom */}
+            <QuickKingdomImport
+              setArmy={setYourArmy}
+              setBuildings={setYourBuildings}
+              setStats={setYourKingdomStats}
+              army={yourArmy}
+              buildings={yourBuildings}
+              stats={yourKingdomStats}
+              label="Quick Kingdom Import"
+              setRace={setYourRace}
+              // After import, update castles and building ratios
+              onAfterImport={(buildings: Buildings, stats: Partial<KingdomStats>, army: Army) => {
+                const totalBuildings = buildings ? Object.values(buildings).reduce((a, b) => Number(a) + Number(b), 0) : 0;
+                const land = stats.Land || (totalBuildings ? totalBuildings / 10 : 0);
+                setYourKingdomStats(prev => ({ ...prev, Land: Number(land), Castles: Math.max(1, Math.floor(Number(land)/20)) }));
+                setYourPendingBuildings(buildings);
+                setYourPendingArmy(army);
+                // Set manual override for all imported buildings
+                const overrides: Record<string, boolean> = {};
+                for (const b of Object.keys(buildings)) overrides[b] = true;
+                setYourManualOverride(overrides);
+              }}
+            />
             {/* Move KingdomStatsInput above ArmyInput */}
             <KingdomStatsInput
               kingdomName="Your Kingdom"
@@ -311,6 +369,8 @@ export default function MainApp() {
               setKingdomStats={setYourKingdomStats}
               ratios={yourBuildingRatios}
               setRatios={setYourBuildingRatios}
+              manualOverride={yourManualOverride}
+              setManualOverride={setYourManualOverride}
             />
             <ProjectedProduction
               population={yourPopulation}
@@ -356,6 +416,29 @@ export default function MainApp() {
                 ))}
               </select>
             </div>
+            {/* Quick Import for enemy kingdom */}
+            <QuickKingdomImport
+              setArmy={setEnemyArmy}
+              setBuildings={setEnemyBuildings}
+              setStats={setEnemyKingdomStats}
+              army={enemyArmy}
+              buildings={enemyBuildings}
+              stats={enemyKingdomStats}
+              label="Quick Enemy Import"
+              setRace={setEnemyRace}
+              // After import, update castles and building ratios
+              onAfterImport={(buildings: Buildings, stats: Partial<KingdomStats>, army: Army) => {
+                const totalBuildings = buildings ? Object.values(buildings).reduce((a, b) => Number(a) + Number(b), 0) : 0;
+                const land = stats.Land || (totalBuildings ? totalBuildings / 10 : 0);
+                setEnemyKingdomStats(prev => ({ ...prev, Land: Number(land), Castles: Math.max(1, Math.floor(Number(land)/20)) }));
+                setEnemyPendingBuildings(buildings);
+                setEnemyPendingArmy(army);
+                // Set manual override for all imported buildings
+                const overrides: Record<string, boolean> = {};
+                for (const b of Object.keys(buildings)) overrides[b] = true;
+                setEnemyManualOverride(overrides);
+              }}
+            />
             {/* Move KingdomStatsInput above ArmyInput */}
             <KingdomStatsInput
               kingdomName="Enemy Kingdom"
@@ -396,6 +479,8 @@ export default function MainApp() {
               setKingdomStats={setEnemyKingdomStats}
               ratios={enemyBuildingRatios}
               setRatios={setEnemyBuildingRatios}
+              manualOverride={enemyManualOverride}
+              setManualOverride={setEnemyManualOverride}
             />
             <ProjectedProduction
               population={enemyPopulation}
