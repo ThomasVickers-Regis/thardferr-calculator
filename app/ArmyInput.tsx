@@ -237,9 +237,18 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
 
               // Use getEffectiveUnitStats for display values, with special case for Orc Surrounding + ShadowWarrior
               // For enemy army, pass yourStrategy as enemyStrategy; for your army, pass enemyStrategy as enemyStrategy
-              const stats = getEffectiveUnitStats(unit, raceKey, techLevels, strategy, true, 1, enemyStrategy);
+              const stats = getEffectiveUnitStats(unit, raceKey, techLevels, strategy, true, 1, enemyStrategy, army);
               const statModifiers = getStatModifiers(unit, raceKey, techLevels || {}, strategy);
-              const displayShort = stats.short;
+              // Add WolfMaster bonus to short positiveFlat for Rusher/Slother (Orc only)
+              let shortWolfBonus = 0;
+              if (raceKey === 'orc' && (unit === 'Rusher' || unit === 'Slother')) {
+                const wolfMasterCount = army['WolfMaster'] || 0;
+                const unitCount = army[unit] || 0;
+                if (unitCount > 0 && wolfMasterCount > 0) {
+                  shortWolfBonus = Math.floor(wolfMasterCount / unitCount);
+                }
+              }
+              const displayShortPositiveFlat = statModifiers.short.positiveFlat + shortWolfBonus;
               const isOrcSurroundingShadowWarrior = strategy === 'Orc Surrounding' && unit === 'ShadowWarrior';
 
               return (
@@ -274,8 +283,8 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                     )}
                     {(() => {
                       const modifiers = [];
-                      if (statModifiers.short.positiveFlat > 0) {
-                        modifiers.push(<span key="positiveFlat" className="text-green-400 ml-1">(+{statModifiers.short.positiveFlat})</span>);
+                      if (displayShortPositiveFlat > 0) {
+                        modifiers.push(<span key="positiveFlat" className="text-green-400 ml-1">(+{displayShortPositiveFlat})</span>);
                       }
                       if (statModifiers.short.positive > 0) {
                         modifiers.push(<span key="positive" className="text-green-400 ml-1">(+{Math.round(statModifiers.short.positive)}%)</span>);

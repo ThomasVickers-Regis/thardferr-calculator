@@ -308,7 +308,7 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
 
     for (const [attackerName, attackerCount] of Object.entries(attackingArmy)) {
         if ((attackerCount as number) <= 0) continue;
-        const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, attackerStrategy, true, ksDifferenceFactor);
+        const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, attackerStrategy, true, ksDifferenceFactor, undefined, attackingArmy);
         let attackValue = 0;
         if (phaseType === 'range') attackValue = attackerStats.range;
         else if (phaseType === 'short') {

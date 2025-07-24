@@ -38,7 +38,8 @@ export function getEffectiveUnitStats(
   strategy: StrategyName | null = null,
   isAttacker: boolean = true,
   ksDifferenceFactor: number = 1,
-  enemyStrategy: StrategyName | null = null
+  enemyStrategy: StrategyName | null = null,
+  army?: Record<string, number> // Optional army composition for special logic
 ): UnitStats & { rangeModifier?: number } {
   const raceKey = race?.toLowerCase() || 'dwarf';
   const base = UNIT_DATA[raceKey]?.[unitName];
@@ -150,6 +151,15 @@ export function getEffectiveUnitStats(
   let rangeModifier: number | undefined = undefined;
   if (strategy === 'Gnome Far Fighting' || enemyStrategy === 'Gnome Far Fighting') {
     rangeModifier = 100;
+  }
+
+  // --- Orc Rusher/Slother/WolfMaster special logic (additive short, integer ratio) ---
+  if (raceKey === 'orc' && army && (unitName === 'Rusher' || unitName === 'Slother')) {
+    const wolfMasterCount = army['WolfMaster'] || 0;
+    const unitCount = army[unitName] || 0;
+    if (unitCount > 0 && wolfMasterCount > 0) {
+      stats.short += Math.floor(wolfMasterCount / unitCount);
+    }
   }
 
   return { ...stats, rangeModifier };
