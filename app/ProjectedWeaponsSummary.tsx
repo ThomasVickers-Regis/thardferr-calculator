@@ -54,7 +54,7 @@ const ProjectedWeaponsSummary: React.FC<ProjectedWeaponsSummaryProps> = ({ race,
   const weapons = WEAPON_DATA_BY_RACE[race] || [];
   const forges = typeof buildings['Forge'] === 'number' ? buildings['Forge'] : parseInt(buildings['Forge'] || '0', 10) || 0;
   const assigned = population['Blacksmithing'] || 0;
-  let perForge = forges > 0 ? assigned / forges : 0;
+  const perForge = forges > 0 ? assigned / forges : 0;
   let outputPerForge = 0;
   if (perForge <= 80) {
     outputPerForge = (perForge / 80) * 1.5;

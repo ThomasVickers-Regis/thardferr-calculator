@@ -151,7 +151,7 @@ const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population,
   };
   const handleEfficiencyChange = (job: string, value: string) => {
     if (job === 'Building') return;
-    let eff = Math.max(0, parseInt(value) || 0);
+    const eff = Math.max(0, parseInt(value) || 0);
     let val = 0;
     if (job === 'Training' || job === 'Exploration') val = eff;
     else if (job === 'Blacksmithing') {

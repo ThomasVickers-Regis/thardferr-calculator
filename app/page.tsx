@@ -205,14 +205,14 @@ export default function MainApp() {
   useEffect(() => {
     const currentCastlesInBuildings = yourBuildings['Castle'] || 0;
     if (yourKingdomStats.Castles !== currentCastlesInBuildings) {
-      setYourBuildings((prev: Buildings) => ({ ...prev, Castle: yourKingdomStats.Castles }));
+      setYourBuildings((prev: Buildings) => ({ ...prev, Castle: Number(yourKingdomStats.Castles) || 0 }));
     }
   }, [yourKingdomStats.Castles]);
 
   useEffect(() => {
     const currentCastlesInBuildings = enemyBuildings['Castle'] || 0;
     if (enemyKingdomStats.Castles !== currentCastlesInBuildings) {
-      setEnemyBuildings((prev: Buildings) => ({ ...prev, Castle: enemyKingdomStats.Castles }));
+      setEnemyBuildings((prev: Buildings) => ({ ...prev, Castle: Number(enemyKingdomStats.Castles) || 0 }));
     }
   }, [enemyKingdomStats.Castles]);
 
@@ -303,8 +303,8 @@ export default function MainApp() {
             <BuildingTable
               buildings={yourBuildings}
               setBuildings={setYourBuildings}
-              land={yourKingdomStats.Land}
-              castles={yourKingdomStats.Castles}
+              land={Number(yourKingdomStats.Land) || 0}
+              castles={Number(yourKingdomStats.Castles) || 0}
               race={yourRace}
               population={yourPopulation}
               setKingdomStats={setYourKingdomStats}
@@ -315,7 +315,7 @@ export default function MainApp() {
               population={yourPopulation}
               buildings={yourBuildings}
               army={yourArmy}
-              land={yourKingdomStats.Land}
+              land={Number(yourKingdomStats.Land) || 0}
               race={yourRace}
             />
             <ProjectedWeaponsSummary
@@ -387,8 +387,8 @@ export default function MainApp() {
             <BuildingTable
               buildings={enemyBuildings}
               setBuildings={setEnemyBuildings}
-              land={enemyKingdomStats.Land}
-              castles={enemyKingdomStats.Castles}
+              land={Number(enemyKingdomStats.Land) || 0}
+              castles={Number(enemyKingdomStats.Castles) || 0}
               race={enemyRace}
               population={enemyPopulation}
               setKingdomStats={setEnemyKingdomStats}
@@ -399,7 +399,7 @@ export default function MainApp() {
               population={enemyPopulation}
               buildings={enemyBuildings}
               army={enemyArmy}
-              land={enemyKingdomStats.Land}
+              land={Number(enemyKingdomStats.Land) || 0}
               race={enemyRace}
             />
             <ProjectedWeaponsSummary

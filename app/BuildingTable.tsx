@@ -140,7 +140,7 @@ const BuildingTable: React.FC<BuildingTableProps> = ({ buildings, setBuildings, 
   const getBuildingDetails = (b: string) => {
     const data = BUILDING_DATA[b];
     if (!data) return '';
-    let details = [];
+    const details = [];
     if (data.optimal_workers) details.push(`Optimal workers: ${data.optimal_workers}`);
     if (data.production_per_day) details.push(`Production/day: ${data.production_per_day}`);
     if (data.housing && Object.keys(data.housing).length > 0) {

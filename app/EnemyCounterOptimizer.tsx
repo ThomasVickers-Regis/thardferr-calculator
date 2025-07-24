@@ -48,7 +48,7 @@ const EnemyCounterOptimizer: React.FC<EnemyCounterOptimizerProps> = ({
       totalDefense: effectiveStats.defense * countNum,
       isRangedImmune: unit.includes('Skeleton') || unit.includes('Phantom'),
       isMeleeImmune: unit.includes('Mage'),
-      hasGuardTower: enemyKingdomStats.GuardTower > 0
+      hasGuardTower: Number(enemyKingdomStats.GuardTower) > 0
     };
   }).filter(Boolean);
   const enemyPhaseDamage = {
@@ -112,7 +112,7 @@ const EnemyCounterOptimizer: React.FC<EnemyCounterOptimizerProps> = ({
     }
   }
   const calculateRangedRequirements = () => {
-    let requirements = [];
+    const requirements = [];
     let difficulty = 'Easy';
     if (enemyGuardTowers > 0) {
       requirements.push(`Enemy has ${enemyGuardTowers} Guard Tower(s) - ranged damage reduced by ~50%`);
@@ -133,7 +133,7 @@ const EnemyCounterOptimizer: React.FC<EnemyCounterOptimizerProps> = ({
     return { requirements, difficulty };
   };
   const calculateMeleeRequirements = () => {
-    let requirements = [];
+    const requirements = [];
     let difficulty = 'Easy';
     if (enemyAnalysis.some(unit => unit?.isMeleeImmune)) {
       requirements.push('Enemy has melee-immune units - cannot damage with melee');
