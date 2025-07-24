@@ -137,8 +137,8 @@ export function simulateBattle(
       enemyBuildings,
       yourRace,
       enemyRace,
-      yourKingdomStats.Land || 20,
-      enemyKingdomStats.Land || 20,
+      Number(yourKingdomStats.Land || 20),
+      Number(enemyKingdomStats.Land || 20),
       yourInitialArmy,
       enemyInitialArmy,
       false // isYourArmyTheDefender
@@ -205,7 +205,7 @@ export function simulateBattle(
   const enemyHealing: Record<string, number> = {};
   
   // Your army healing
-  const yourLand = yourKingdomStats.Land || 0;
+  const yourLand = Number(yourKingdomStats.Land || 0);
   if (yourBuildings['Medical Center'] && yourLand > 0) {
     const healingPercent = (yourBuildings['Medical Center'] / yourLand) >= 1 ? 0.20 : 
                            (yourBuildings['Medical Center'] / yourLand) >= 0.5 ? 0.10 : 0;
@@ -226,7 +226,7 @@ export function simulateBattle(
   }
 
   // Enemy army healing
-  const enemyLand = enemyKingdomStats.Land || 0;
+  const enemyLand = Number(enemyKingdomStats.Land || 0);
   if (enemyBuildings['Medical Center'] && enemyLand > 0) {
     const healingPercent = (enemyBuildings['Medical Center'] / enemyLand) >= 1 ? 0.20 : 
                            (enemyBuildings['Medical Center'] / enemyLand) >= 0.5 ? 0.10 : 0;
