@@ -37,82 +37,16 @@ const HealingDisplay = ({ side, healing }: { side: 'your' | 'enemy'; healing: Re
   </div>
 );
 
-// PhaseStats: renders attack, defense, modifiers, and building effects for a side in a phase
-const PhaseStats = ({ stats, side }: { stats: any; side: 'your' | 'enemy' }) => (
-  <div className="bg-gray-700 p-3 rounded">
-    <div className="text-gray-300 font-medium mb-2">Army Stats:</div>
-    <div className="grid grid-cols-2 gap-2 text-xs">
-      <div className="capitalize">Attack: <span className={`font-bold ${side === 'your' ? 'text-blue-400' : 'text-red-400'}`}>{isNaN(stats.attack) ? '0.00' : formatNumber(stats.attack)}</span></div>
-      <div>Defense: <span className={`font-bold ${side === 'your' ? 'text-blue-400' : 'text-red-400'}`}>{isNaN(stats.defense) ? '0.00' : formatNumber(stats.defense)}</span></div>
-    </div>
-    {stats.modifiers && stats.modifiers.length > 0 && (
-      <div className="mt-2 pt-2 border-t border-gray-600">
-        <div className="text-xs text-yellow-300">Modifiers:</div>
-        {stats.modifiers.map((mod: string, i: number) => (
-          <div key={i} className="text-xs text-gray-300">• {mod}</div>
-        ))}
-      </div>
-    )}
-    {stats.buildingEffects && stats.buildingEffects.length > 0 && (
-      <div className="mt-2 pt-2 border-t border-gray-600">
-        <div className="text-xs text-green-300">Building Effects:</div>
-        {stats.buildingEffects.map((effect: string, i: number) => (
-          <div key={i} className="text-xs text-gray-300">• {effect}</div>
-        ))}
-      </div>
-    )}
-  </div>
-);
-
-// ArmySideSection: renders one side's stats, units, losses, damage, etc.
-const ArmySideSection = ({
-  side,
-  phaseLog,
-  entry,
-  race,
-  techLevels,
-  strategy,
-  originalArmy,
-  buildings,
-  isAttacker,
-  phase,
-  damageLogKey,
-  lossesKey,
-  armyKey,
-}: any) => {
-  const armyAtStart = phaseLog[armyKey] || entry[armyKey];
-  return (
-    <div className="bg-gray-800 p-4 rounded">
-      <div className={`font-medium mb-3 border-b border-gray-600 pb-2 text-lg ${side === 'your' ? 'text-blue-300' : 'text-red-300'}`}>{side === 'your' ? 'Your Army Details' : 'Enemy Army Details'}</div>
-      <div className="space-y-3 text-sm">
-        {(Object.entries(armyAtStart).filter(([_, v]: [string, any]) => v > 0)).map(([unit, count]) => {
-          const stats = getEffectiveUnitStats(unit, race, techLevels, strategy, isAttacker, 1);
-          const baseStats = UNIT_DATA[race.toLowerCase()]?.[unit];
-          const lost = phaseLog[lossesKey][unit] || 0;
-          const survived = (count as number) - lost;
-          const damageEntry = (phaseLog[damageLogKey] || []).find((d: any) => d.unitName === unit);
-          return (
-            <UnitDetail
-              key={unit}
-              unitName={unit}
-              count={count as number}
-              survived={survived}
-              lost={lost}
-              stats={stats}
-              baseStats={baseStats}
-              damageEntry={damageEntry}
-              side={side}
-              phase={phaseLog.phase}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-// BattlePhase: renders a single phase in a round
-const calculatePhaseStats = (army: any, race: string, techLevels: any = {}, strategy: any = null, isAttacker: boolean = true, phase: string, buildings: any = {}) => {
+// Define types for calculatePhaseStats
+const calculatePhaseStats = (
+  army: Army,
+  race: string,
+  techLevels: TechLevels = {},
+  strategy: StrategyName | null = null,
+  isAttacker: boolean = true,
+  phase: string,
+  buildings: Buildings = {}
+) => {
   let totalAttack = 0;
   let totalDefense = 0;
   let range = 0, short = 0, melee = 0;
@@ -148,6 +82,7 @@ const calculatePhaseStats = (army: any, race: string, techLevels: any = {}, stra
   };
 };
 
+// BattlePhase: renders a single phase in a round
 const BattlePhase = ({
   phaseLog,
   entry,
@@ -180,7 +115,7 @@ const BattlePhase = ({
     enemyProps.buildings
   );
   // Calculate casualties for both sides (comparing initial to final army)
-  const calculateCasualties = (initialArmy: any, finalArmy: any) => {
+  const calculateCasualties = (initialArmy: Army, finalArmy: Army) => {
     const casualties: Record<string, number> = {};
     for (const [unit, initialCount] of Object.entries(initialArmy || {})) {
       const finalCount = finalArmy[unit] || 0;
@@ -699,7 +634,7 @@ const BattleReport: React.FC<BattleReportProps> = ({
   });
   const damageAdvantage = totalDamage.your - totalDamage.enemy;
   // Calculate casualties for both sides (comparing initial to final army)
-  const calculateCasualties = (initialArmy: any, finalArmy: any) => {
+  const calculateCasualties = (initialArmy: Army, finalArmy: Army) => {
     const casualties: Record<string, number> = {};
     for (const [unit, initialCount] of Object.entries(initialArmy || {})) {
       const finalCount = finalArmy[unit] || 0;
