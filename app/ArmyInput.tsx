@@ -105,7 +105,7 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
       unitCounts[mappedUnit] = (unitCounts[mappedUnit] || 0) + castle;
     }
     const summary = Object.entries(unitCounts)
-      .filter(([_, n]) => n > 0)
+      .filter(([, n]) => n > 0)
       .map(([unit, n]) => `${n} ${unit}`)
       .join(', ');
     return summary ? `You can currently train ${summary} per day.` : '';
@@ -154,7 +154,6 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
   const getStrategyAbilities = () => {
     if (!strategy || !STRATEGY_DATA[strategy]) return [];
     const strategyData = STRATEGY_DATA[strategy];
-    const effects = strategyData.effects;
     const abilities: { text: string; isPositive: boolean }[] = [];
     switch (strategy) {
       case 'Archer Protection':
@@ -240,8 +239,7 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
               // For enemy army, pass yourStrategy as enemyStrategy; for your army, pass enemyStrategy as enemyStrategy
               const stats = getEffectiveUnitStats(unit, raceKey, techLevels, strategy, true, 1, enemyStrategy);
               const statModifiers = getStatModifiers(unit, raceKey, techLevels || {}, strategy);
-              let displayMelee = stats.melee;
-              let displayShort = stats.short;
+              const displayShort = stats.short;
               const isOrcSurroundingShadowWarrior = strategy === 'Orc Surrounding' && unit === 'ShadowWarrior';
 
               return (
