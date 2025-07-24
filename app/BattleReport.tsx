@@ -184,15 +184,15 @@ const BattlePhase = ({
     for (const [unit, initialCount] of Object.entries(initialArmy || {})) {
       const finalCount = finalArmy[unit] || 0;
       const lost = (initialCount as number) - finalCount;
-      casualties[unit] = lost;
+      if (lost > 0) {
+        casualties[unit] = lost;
+      }
     }
     return casualties;
   };
-  // For enemy casualties, use the scaled army as the starting point (not the original)
-  const enemyCasualties = battleLog.length > 0 
-    ? calculateCasualties(battleLog[0].enemyArmy, battleOutcome.finalEnemyArmyBeforeHealing)
-    : calculateCasualties(originalEnemyArmy, battleOutcome.finalEnemyArmyBeforeHealing);
-  const yourCasualties = calculateCasualties(originalYourArmy, battleOutcome.finalYourArmyBeforeHealing);
+  // Use the final, post-healing army state for the summary.
+  const yourFinalCasualties = calculateCasualties(originalYourArmy, battleOutcome.finalYourArmy);
+  const enemyFinalCasualties = calculateCasualties(originalEnemyArmy, battleOutcome.finalEnemyArmyBeforeHealing);
   // Simulate land gain/loss based on battle outcome (attacker perspective)
   const calculateLandGainLoss = () => {
     if (winner === 'yourArmy') {
@@ -590,6 +590,8 @@ const BattleReport = ({
   originalEnemyArmy,
   yourBuildings = {},
   enemyBuildings = {},
+  yourKingdomStats = {},
+  enemyKingdomStats = {},
 }: any) => {
   if (!battleOutcome || !battleOutcome.battleLog) {
     return (
@@ -639,15 +641,15 @@ const BattleReport = ({
     for (const [unit, initialCount] of Object.entries(initialArmy || {})) {
       const finalCount = finalArmy[unit] || 0;
       const lost = (initialCount as number) - finalCount;
-      casualties[unit] = lost;
+      if (lost > 0) {
+        casualties[unit] = lost;
+      }
     }
     return casualties;
   };
-  // For enemy casualties, use the scaled army as the starting point (not the original)
-  const enemyCasualties = battleLog.length > 0 
-    ? calculateCasualties(battleLog[0].enemyArmy, battleOutcome.finalEnemyArmyBeforeHealing)
-    : calculateCasualties(originalEnemyArmy, battleOutcome.finalEnemyArmyBeforeHealing);
-  const yourCasualties = calculateCasualties(originalYourArmy, battleOutcome.finalYourArmyBeforeHealing);
+  // Use the final, post-healing army state for the summary.
+  const yourFinalCasualties = calculateCasualties(originalYourArmy, finalYourArmy);
+  const enemyFinalCasualties = calculateCasualties(originalEnemyArmy, finalEnemyArmy);
   // Simulate land gain/loss based on battle outcome (attacker perspective)
   const calculateLandGainLoss = () => {
     if (winner === 'yourArmy') {
@@ -699,6 +701,53 @@ const BattleReport = ({
   };
   const yourTotalLosses = aggregateLosses('yourLosses');
   const enemyTotalLosses = aggregateLosses('enemyLosses');
+
+  // Calculate land and building losses dynamically
+  const calculateLandAndBuildingLosses = () => {
+    if (winner !== 'yourArmy') {
+      return {
+        landLost: 0,
+        castlesLost: 0,
+        peasantsLost: 0,
+        buildingsLost: {},
+      };
+    }
+
+    // Determine loss percentage based on how close the battle was
+    const yourInitialStrength = Object.values(originalYourArmy).reduce((sum: number, count: any) => sum + count, 0);
+    const enemyInitialStrength = Object.values(originalEnemyArmy).reduce((sum: number, count: any) => sum + count, 0);
+    const yourFinalStrength = Object.values(finalYourArmy).reduce((sum: number, count: any) => sum + count, 0);
+    const enemyFinalStrength = Object.values(finalEnemyArmy).reduce((sum: number, count: any) => sum + count, 0);
+
+    const yourLossRatio = yourFinalStrength / yourInitialStrength;
+    const enemyLossRatio = enemyFinalStrength / enemyInitialStrength;
+
+    let lossPercentage = 0;
+    if (enemyLossRatio <= 0.1) { // Crushing victory
+      lossPercentage = 0.30;
+    } else if (enemyLossRatio <= 0.5) { // Solid victory
+      lossPercentage = 0.20;
+    } else { // Close victory
+      lossPercentage = 0.10;
+    }
+
+    // Apply loss percentage to defender's assets
+    const landLost = Math.floor((enemyKingdomStats.Land || 0) * lossPercentage);
+    const castlesLost = Math.floor((enemyKingdomStats.Castles || 0) * lossPercentage);
+    const peasantsLost = Math.floor((enemyKingdomStats.Peasants || 0) * lossPercentage);
+
+    const buildingsLost: Record<string, number> = {};
+    for (const [building, count] of Object.entries(enemyBuildings)) {
+      if (building !== 'Land' && building !== 'Castle' && building !== 'Peasants') {
+        buildingsLost[building] = Math.floor((count as number) * lossPercentage);
+      }
+    }
+
+    return { landLost, castlesLost, peasantsLost, buildingsLost };
+  };
+
+  const { landLost, castlesLost, peasantsLost, buildingsLost } = calculateLandAndBuildingLosses();
+
   return (
     <div className="p-6 bg-gray-800 rounded-lg mb-6">
       <h3 className="text-2xl font-semibold mb-6 text-center">Battle Report</h3>
@@ -715,16 +764,16 @@ const BattleReport = ({
         )}
       </div>
       {/* Land Results */}
-      {landResults.land > 0 && (
+      {landLost > 0 && (
         <div className="mb-4 p-3 bg-gray-700 rounded">
           <div className="text-green-400">
-            <div className="font-bold">We won {landResults.castles} Castle(s) surrounded by {landResults.land} lands.</div>
-            <div className="text-sm mt-1">In this lands also lived {landResults.peasants.toLocaleString()} people who are grateful to join our Kingdom.</div>
+            <div className="font-bold">We won {castlesLost} Castle(s) surrounded by {landLost} lands.</div>
+            <div className="text-sm mt-1">In this lands also lived {peasantsLost.toLocaleString()} people who are grateful to join our Kingdom.</div>
           </div>
         </div>
       )}
       {/* Building Gains */}
-      {Object.keys(buildingGains).length > 0 && (
+      {Object.keys(buildingsLost).length > 0 && (
         <div className="mb-4 p-3 bg-gray-700 rounded">
           <div className="text-green-400 font-bold">In this lands are also constructed :</div>
           <div className="text-sm mt-1">
@@ -732,7 +781,7 @@ const BattleReport = ({
               'Advanced Training Center', 'Training Center', 'Farm', 'House', 'Forge', 
               'Guard House', 'Guard Tower', 'Market', 'Medical Center', 'Mill', 'Mine', 'School'
             ].map(building => {
-              const count = buildingGains[building] || 0;
+              const count = buildingsLost[building] || 0;
               return `${count} ${building}`;
             }).join(' , ')}
           </div>
@@ -744,9 +793,8 @@ const BattleReport = ({
           <div>
             <div className="text-red-400 font-bold">But we lost:</div>
             <div className="text-sm mt-1">
-              {Object.values(yourTotalLosses).some((v: number) => v > 0)
-                ? Object.entries(yourTotalLosses)
-                    .filter(([_, loss]) => (loss as number) > 0)
+              {Object.keys(yourFinalCasualties).length > 0
+                ? Object.entries(yourFinalCasualties)
                     .map(([unit, loss]) => `${loss} ${unit}`)
                     .join(', ')
                 : 'No units lost'}
@@ -755,9 +803,8 @@ const BattleReport = ({
           <div>
             <div className="text-green-400 font-bold">We managed to kill:</div>
             <div className="text-sm mt-1">
-              {Object.values(enemyTotalLosses).some((v: number) => v > 0)
-                ? Object.entries(enemyTotalLosses)
-                    .filter(([_, loss]) => (loss as number) > 0)
+              {Object.keys(enemyFinalCasualties).length > 0
+                ? Object.entries(enemyFinalCasualties)
                     .map(([unit, loss]) => `${loss} ${unit}`)
                     .join(', ')
                 : 'No enemy units killed'}
