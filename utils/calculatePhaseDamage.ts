@@ -95,8 +95,8 @@ export function calculatePhaseDamage(
   defenderStrategy: StrategyName | null,
   processedArmyStrategy: StrategyName | null,
   ksDifferenceFactor: number = 1,
-  attackerBuildings: any = {},
-  defenderBuildings: any = {},
+  attackerBuildings: Record<string, number> = {},
+  defenderBuildings: Record<string, number> = {},
   attackerRace: string = 'dwarf',
   defenderRace: string = 'dwarf',
   originalDefendingArmy?: Army,
@@ -340,7 +340,7 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
     return { totalDamage, pikemenDamage, preScaledTotalDamage: preScaleTotal, preScaledPikemenDamage: preScalePikemen };
 }
 
-function calculateTotalMitigation(defendingArmy: Army, defenderBuildings: any, phaseType: PhaseType, isBattleDefender: boolean): { totalMitigation: number, buildingEffectsLog: string[] } {
+function calculateTotalMitigation(defendingArmy: Army, defenderBuildings: Record<string, number>, phaseType: PhaseType, isBattleDefender: boolean): { totalMitigation: number, buildingEffectsLog: string[] } {
     let totalMitigation = 0;
     const buildingEffectsLog: string[] = [];
     const totalDefenders = Object.values(defendingArmy).reduce((sum, count) => sum + count, 0);
@@ -495,8 +495,8 @@ function getStrategyEffects(unitName: string, race: string, strategy: StrategyNa
 export interface BattleState {
   yourArmy: Army;
   enemyArmy: Army;
-  yourTechLevels: any;
-  enemyTechLevels: any;
+  yourTechLevels: TechLevels;
+  enemyTechLevels: TechLevels;
   yourStrategy: string | null;
   enemyStrategy: string | null;
   yourBuildings: Record<string, number>;
@@ -517,8 +517,8 @@ export interface PhaseResult {
   enemyLosses: Record<string, number>;
   yourEffects: string[];
   enemyEffects: string[];
-  yourDamageLog: any[];
-  enemyDamageLog: any[];
+  yourDamageLog: DamageLog[];
+  enemyDamageLog: DamageLog[];
   updatedYourCasualties: Record<string, number>;
   updatedEnemyCasualties: Record<string, number>;
 }
@@ -614,4 +614,4 @@ export function simulateBattlePhase(
     updatedYourCasualties,
     updatedEnemyCasualties
   };
-} 
+}

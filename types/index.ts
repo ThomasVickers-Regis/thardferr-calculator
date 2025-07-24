@@ -22,14 +22,30 @@ export type StrategyName =
 export type Buildings = Record<string, number>;
 
 // Placeholder types, can be refined later
-export type BattleLog = any;
-export type UnitBattleLog = any;
-export type PhaseLog = any;
-export type RoundResult = any;
+export type BattleLog = BattleLogEntry[];
+export type UnitBattleLog = Record<string, unknown>; // Replace with a more specific type if available
+export type PhaseLog = {
+  phase: string;
+  yourArmyAtStart: Army;
+  enemyArmyAtStart: Army;
+  yourLosses: Record<string, number>;
+  enemyLosses: Record<string, number>;
+  yourDamageLog: import('../utils/calculatePhaseDamage').DamageLog[];
+  enemyDamageLog: import('../utils/calculatePhaseDamage').DamageLog[];
+  yourHealing?: Record<string, number>;
+  enemyHealing?: Record<string, number>;
+};
+export type RoundResult = {
+  yourArmy: Army;
+  enemyArmy: Army;
+  yourLosses: Record<string, number>;
+  enemyLosses: Record<string, number>;
+  phaseLogs: PhaseLog[];
+};
 
 export interface KingdomStats {
   KS: number; // Kingdom Strength (total attack + defense, or similar)
-  [key: string]: any;
+  [key: string]: number | string | undefined;
 }
 
 export interface BattleLogEntry {

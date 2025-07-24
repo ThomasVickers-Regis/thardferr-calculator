@@ -1,5 +1,6 @@
 import React from 'react';
 import { DamageLog } from '../utils/calculatePhaseDamage';
+import type { UnitStats } from '../data/unitData';
 
 const formatNumber = (value: number, decimalPlaces = 2) => {
     if (isNaN(value)) {
@@ -13,8 +14,8 @@ interface UnitDetailProps {
   count: number;
   survived: number;
   lost: number;
-  stats: Record<string, any>;
-  baseStats: Record<string, any>;
+  stats: UnitStats;
+  baseStats: UnitStats;
   damageEntry: DamageLog | undefined;
   side: 'your' | 'enemy';
   phase: 'range' | 'short' | 'melee' | string;

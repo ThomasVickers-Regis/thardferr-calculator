@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BUILDING_DATA } from '../data/buildingData';
+import { BUILDING_DATA, BuildingData } from '../data/buildingData';
 import { Buildings, KingdomStats } from '@/types';
 
 interface BuildingTableProps {
@@ -126,7 +126,7 @@ const BuildingTable: React.FC<BuildingTableProps> = ({ buildings, setBuildings, 
     let count = Math.max(0, parseInt(value) || 0);
     if (b === 'Castle') {
       if (count > castleCap) count = castleCap;
-      if (setKingdomStats) setKingdomStats((prev: any) => ({ ...prev, Castles: count }));
+      if (setKingdomStats) setKingdomStats((prev: KingdomStats) => ({ ...prev, Castles: count }));
     } else {
       const otherCounts = Object.entries(buildings).filter(([key]) => key !== 'Castle' && key !== b).reduce((sum, [_, v]) => sum + (typeof v === 'number' ? v : 0), 0);
       if (otherCounts + count > maxBuildings) count = Math.max(0, maxBuildings - otherCounts);

@@ -26,7 +26,7 @@ Before you begin, make sure you have the following software installed on your co
 1.  **Download the Code**
     Open your terminal (on Mac/Linux) or Command Prompt/PowerShell (on Windows) and run the following command to copy the project's code to your computer:
     ```bash
-    git clone https://github.com/vicke/thardferr-calculator.git
+    git clone https://github.com/ThomasVickers-Regis/thardferr-calculator.git
     ```
 
 2.  **Navigate to the Project Directory**
