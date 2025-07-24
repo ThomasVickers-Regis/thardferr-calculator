@@ -1,8 +1,21 @@
 import React from 'react';
 import { TECHNOLOGY_DATA, TECHNOLOGY_TREES } from '../data/technologyData';
 import { STRATEGY_DATA } from '../data/strategyData';
+import { KingdomStats, TechLevels, StrategyName } from '@/types';
 
-const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLevels, strategy, setStrategy, calculatedPopulation, race }: any) => {
+interface KingdomStatsInputProps {
+  kingdomName: string;
+  stats: KingdomStats;
+  setStats: React.Dispatch<React.SetStateAction<KingdomStats>>;
+  techLevels: TechLevels;
+  setTechLevels: React.Dispatch<React.SetStateAction<TechLevels>>;
+  strategy: StrategyName | null;
+  setStrategy: React.Dispatch<React.SetStateAction<StrategyName | null>>;
+  calculatedPopulation: number;
+  race: string;
+}
+
+const KingdomStatsInput: React.FC<KingdomStatsInputProps> = ({ kingdomName, stats, setStats, techLevels, setTechLevels, strategy, setStrategy, calculatedPopulation, race }) => {
   // Handler for stat changes
   const handleStatChange = (field: string, value: string) => {
     const newValue = parseInt(value) || 0;
@@ -18,7 +31,7 @@ const KingdomStatsInput = ({ kingdomName, stats, setStats, techLevels, setTechLe
   };
   // Handler for strategy change
   const handleStrategyChange = (value: string) => {
-    setStrategy(value || null);
+    setStrategy((value || null) as StrategyName | null);
   };
 
   return (

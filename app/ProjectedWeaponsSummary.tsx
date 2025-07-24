@@ -1,5 +1,12 @@
 import React from 'react';
 
+interface ProjectedWeaponsSummaryProps {
+  race: string;
+  blacksmithingEfficiency: number;
+  population: Record<string, number>;
+  buildings: Record<string, number>;
+}
+
 const WEAPON_DATA_BY_RACE: Record<string, Array<{ name: string; iron: number; wood: number; gold: number }>> = {
   Elf: [
     { name: 'Horse', iron: 1, wood: 0, gold: 300 },
@@ -43,7 +50,7 @@ const WEAPON_DATA_BY_RACE: Record<string, Array<{ name: string; iron: number; wo
   ],
 };
 
-const ProjectedWeaponsSummary = ({ race, blacksmithingEfficiency, population, buildings }: any) => {
+const ProjectedWeaponsSummary: React.FC<ProjectedWeaponsSummaryProps> = ({ race, blacksmithingEfficiency, population, buildings }) => {
   const weapons = WEAPON_DATA_BY_RACE[race] || [];
   const forges = typeof buildings['Forge'] === 'number' ? buildings['Forge'] : parseInt(buildings['Forge'] || '0', 10) || 0;
   const assigned = population['Blacksmithing'] || 0;

@@ -1,7 +1,16 @@
 import React from 'react';
 import { UNIT_DATA } from '../data/unitData';
+import { Army } from '@/types';
 
-const ProjectedProduction = ({ population, buildings, army, land, race }: any) => {
+interface ProjectedProductionProps {
+  population: Record<string, number>;
+  buildings: Record<string, number>;
+  army: Army;
+  land: number;
+  race: string;
+}
+
+const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, buildings, army, land, race }) => {
   const raceKey = race?.toLowerCase() || 'dwarf';
   const get = (b: string) => typeof buildings[b] === 'number' ? buildings[b] : parseInt(buildings[b] || '0', 10) || 0;
   let maxPop = 0;

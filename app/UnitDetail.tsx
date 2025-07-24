@@ -1,4 +1,5 @@
 import React from 'react';
+import { DamageLog } from '../utils/calculatePhaseDamage';
 
 const formatNumber = (value: any, decimalPlaces = 2) => {
     const num = Number(value);
@@ -13,9 +14,9 @@ interface UnitDetailProps {
   count: number;
   survived: number;
   lost: number;
-  stats: any;
-  baseStats: any;
-  damageEntry: any;
+  stats: Record<string, any>;
+  baseStats: Record<string, any>;
+  damageEntry: DamageLog | undefined;
   side: 'your' | 'enemy';
   phase: 'range' | 'short' | 'melee' | string;
 }
@@ -67,7 +68,7 @@ const UnitDetail: React.FC<UnitDetailProps> = ({ unitName, count, survived, lost
             </div>
             <div>
               <span className="text-gray-400">Total Effective Defense</span>:
-              <span className="text-blue-300 font-bold">{formatNumber(damageEntry.trueEffectiveDefense * count)}</span>
+              <span className="text-blue-300 font-bold">{formatNumber((damageEntry.trueEffectiveDefense ?? 0) * count)}</span>
             </div>
             {typeof damageEntry.unitsLost === 'number' && (
               <div>
@@ -81,13 +82,13 @@ const UnitDetail: React.FC<UnitDetailProps> = ({ unitName, count, survived, lost
             <div className="mt-2 pt-2 border-t border-gray-600">
               <div className="text-gray-400 text-xs mb-1">Breakdown:</div>
               <div className="text-xs text-gray-300">Unit weight: <span className="text-purple-300">{damageEntry.breakdown?.unitWeight ?? '1'}</span></div>
-              <div className="text-xs text-gray-300">Initial share: <span className="text-blue-300">{formatNumber(damageEntry.breakdown?.initialShare)}</span></div>
-              <div className="text-xs text-gray-300">After mitigation: <span className="text-blue-300">{formatNumber(damageEntry.breakdown?.afterMitigation)}</span></div>
-              {damageEntry.breakdown?.mitigationDetails && damageEntry.breakdown.mitigationDetails.length > 0 && (
-                <div className="text-xs text-gray-400 ml-2">Mitigation: {damageEntry.breakdown.mitigationDetails.map((m: string, i: number) => <span key={i} className="text-green-300">{m}{i < damageEntry.breakdown.mitigationDetails.length - 1 ? ', ' : ''}</span>)}</div>
+              <div className="text-xs text-gray-300">Initial share: <span className="text-blue-300">{formatNumber(damageEntry.breakdown?.initialShare ?? 0)}</span></div>
+              <div className="text-xs text-gray-300">After mitigation: <span className="text-blue-300">{formatNumber(damageEntry.breakdown?.afterMitigation ?? 0)}</span></div>
+              {damageEntry.breakdown?.mitigationDetails && damageEntry.breakdown?.mitigationDetails.length > 0 && (
+                <div className="text-xs text-gray-400 ml-2">Mitigation: {damageEntry.breakdown?.mitigationDetails?.map((m: string, i: number) => <span key={i} className="text-green-300">{m}{i < (damageEntry.breakdown?.mitigationDetails?.length ?? 0) - 1 ? ', ' : ''}</span>)}</div>
               )}
-              <div className="text-xs text-gray-300">After immunity: <span className="text-blue-300">{formatNumber(damageEntry.breakdown?.afterImmunity)}</span></div>
-              <div className="text-xs text-gray-300">Final: <span className="text-yellow-300">{formatNumber(damageEntry.breakdown?.final)}</span></div>
+              <div className="text-xs text-gray-300">After immunity: <span className="text-blue-300">{formatNumber(damageEntry.breakdown?.afterImmunity ?? 0)}</span></div>
+              <div className="text-xs text-gray-300">Final: <span className="text-yellow-300">{formatNumber(damageEntry.breakdown?.final ?? 0)}</span></div>
             </div>
           )}
           {damageEntry.buildingEffects && damageEntry.buildingEffects.length > 0 && (

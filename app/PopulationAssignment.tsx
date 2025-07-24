@@ -1,5 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+interface PopulationAssignmentProps {
+  population: Record<string, number>;
+  setPopulation: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  buildings: Record<string, number>;
+  totalPop: number;
+}
+
 const JOBS = [
   { key: 'Mine', label: 'Mine' },
   { key: 'Lumber', label: 'Lumber' },
@@ -18,8 +25,8 @@ const JOB_EFFICIENCY = {
 
 const isEfficiencyJob = (job: string): job is keyof typeof JOB_EFFICIENCY => job in JOB_EFFICIENCY;
 
-const calculateOptimalPopulation = (buildings: any, totalPop: number) => {
-  const optimal: any = {};
+const calculateOptimalPopulation = (buildings: Record<string, number>, totalPop: number) => {
+  const optimal: Record<string, number> = {};
   for (const job of JOBS) {
     if (job.key === 'Training' || job.key === 'Exploration') {
       optimal[job.key] = 0;
@@ -46,10 +53,10 @@ const calculateOptimalPopulation = (buildings: any, totalPop: number) => {
   return optimal;
 };
 
-const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }: any) => {
-  const [efficiencyValues, setEfficiencyValues] = useState<any>({});
-  const [manualOverride, setManualOverride] = useState<any>({});
-  const prevBuildingsRef = useRef<any>(buildings);
+const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population, setPopulation, buildings, totalPop }) => {
+  const [efficiencyValues, setEfficiencyValues] = useState<Record<string, number>>({});
+  const [manualOverride, setManualOverride] = useState<Record<string, boolean>>({});
+  const prevBuildingsRef = useRef<Record<string, number>>(buildings);
 
   // Ratio-based scaling on buildings/land change
   useEffect(() => {
@@ -63,7 +70,7 @@ const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }
     }
     // If buildings/land changed, update jobs not manually overridden
     if (buildings !== prevBuildingsRef.current) {
-      const newPopulation: any = { ...population };
+      const newPopulation: Record<string, number> = { ...population };
       for (const job of JOBS) {
         if (!manualOverride[job.key]) {
           const newBuildings = getBuildings(job.key, buildings);
@@ -102,7 +109,7 @@ const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }
     }
     return 0;
   };
-  function getBuildings(job: string, bldgs: any) {
+  function getBuildings(job: string, bldgs: Record<string, number>) {
     if (job === 'Training') return 1;
     if (job === 'Building') return bldgs['Building'] || 0;
     if (job === 'Blacksmithing') return bldgs['Forge'] || 0;
@@ -128,17 +135,17 @@ const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }
     if (newTotal > totalPop) val -= (newTotal - totalPop);
     if (getJobMax(job) && val > getJobMax(job)) val = getJobMax(job);
     setPopulation({ ...population, [job]: val });
-    setManualOverride((prev: any) => ({ ...prev, [job]: true }));
+    setManualOverride((prev: Record<string, boolean>) => ({ ...prev, [job]: true }));
     if (job === 'Training' || job === 'Exploration') {
-      setEfficiencyValues((prev: any) => ({ ...prev, [job]: val }));
+      setEfficiencyValues((prev: Record<string, number>) => ({ ...prev, [job]: val }));
     } else if (job === 'Building') {
       const eff = Math.floor(val / 150);
-      setEfficiencyValues((prev: any) => ({ ...prev, [job]: eff }));
+      setEfficiencyValues((prev: Record<string, number>) => ({ ...prev, [job]: eff }));
     } else {
       const buildingsForJob = getBuildings(job, buildings);
       if (buildingsForJob > 0) {
         const eff = Math.floor(val / buildingsForJob);
-        setEfficiencyValues((prev: any) => ({ ...prev, [job]: eff }));
+        setEfficiencyValues((prev: Record<string, number>) => ({ ...prev, [job]: eff }));
       }
     }
   };
@@ -159,7 +166,7 @@ const PopulationAssignment = ({ population, setPopulation, buildings, totalPop }
     if (newTotal > totalPop) val -= (newTotal - totalPop);
     if (getJobMax(job) && val > getJobMax(job)) val = getJobMax(job);
     setPopulation({ ...population, [job]: val });
-    setEfficiencyValues((prev: any) => ({ ...prev, [job]: eff }));
+    setEfficiencyValues((prev: Record<string, number>) => ({ ...prev, [job]: eff }));
   };
   const totalAssigned = Object.values(population).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
   return (

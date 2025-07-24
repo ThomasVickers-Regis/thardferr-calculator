@@ -1,6 +1,17 @@
 import React from 'react';
+import { Army } from '@/types';
 
-const KingdomSummary = ({ population, buildings, army, land, castles, ks, label }: any) => {
+interface KingdomSummaryProps {
+  population: Record<string, number>;
+  buildings: Record<string, number>;
+  army: Army;
+  land: number;
+  castles: number;
+  ks: number;
+  label: string;
+}
+
+const KingdomSummary: React.FC<KingdomSummaryProps> = ({ population, buildings, army, land, castles, ks, label }) => {
   const maxPop = (() => {
     let total = 0;
     for (const [b, count] of Object.entries(buildings)) {

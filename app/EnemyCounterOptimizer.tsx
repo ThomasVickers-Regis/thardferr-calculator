@@ -1,13 +1,26 @@
 import React, { useState } from 'react';
 import { UNIT_DATA } from '../data/unitData';
 import { getEffectiveUnitStats } from '../utils/getEffectiveUnitStats';
+import { Army, TechLevels, StrategyName, Buildings, KingdomStats } from '@/types';
 
-const EnemyCounterOptimizer = ({ 
+interface EnemyCounterOptimizerProps {
+  yourArmy: Army;
+  yourKingdomStats: KingdomStats;
+  yourRace: string;
+  yourTechLevels: TechLevels;
+  yourStrategy: StrategyName | null;
+  yourBuildings: Buildings;
+  enemyArmy: Army;
+  enemyKingdomStats: KingdomStats;
+  enemyRace: string;
+  enemyTechLevels: TechLevels;
+  enemyStrategy: StrategyName | null;
+  enemyBuildings: Buildings;
+}
+
+const EnemyCounterOptimizer: React.FC<EnemyCounterOptimizerProps> = ({
   yourArmy, yourKingdomStats, yourRace, yourTechLevels, yourStrategy, yourBuildings,
   enemyArmy, enemyKingdomStats, enemyRace, enemyTechLevels, enemyStrategy, enemyBuildings
-}: { 
-  yourArmy: any; yourKingdomStats: any; yourRace: string; yourTechLevels: any; yourStrategy: any; yourBuildings: any;
-  enemyArmy: any; enemyKingdomStats: any; enemyRace: string; enemyTechLevels: any; enemyStrategy: any; enemyBuildings: any;
 }) => {
   const [minimized, setMinimized] = useState(true);
   const yourRaceKey = yourRace?.toLowerCase() || 'dwarf';

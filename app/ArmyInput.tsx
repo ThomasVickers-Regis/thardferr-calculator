@@ -3,9 +3,20 @@ import { UNIT_DATA } from '../data/unitData';
 import { BUILDING_DATA } from '../data/buildingData';
 import { getEffectiveUnitStats, getStatModifiers } from '../utils/getEffectiveUnitStats';
 import { STRATEGY_DATA } from '../data/strategyData';
-import { Army } from '@/types';
+import { Army, TechLevels, StrategyName, Buildings } from '@/types';
 
-const ArmyInput = ({ armyName, army, setArmy, units, buildings, race, techLevels, strategy }: { armyName: string; army: Army; setArmy: (a: Army) => void; units: string[]; buildings?: any; race?: string; techLevels?: any; strategy?: any }) => {
+interface ArmyInputProps {
+  armyName: string;
+  army: Army;
+  setArmy: React.Dispatch<React.SetStateAction<Army>>;
+  units: string[];
+  buildings?: Buildings;
+  race?: string;
+  techLevels?: TechLevels;
+  strategy?: StrategyName | null;
+}
+
+const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, buildings, race, techLevels, strategy }) => {
   const raceKey = race?.toLowerCase() || 'dwarf';
   // Guard House cap display
   const guardHouses = buildings?.['Guard House'] || 0;

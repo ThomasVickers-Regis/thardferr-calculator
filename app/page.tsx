@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { simulateBattle } from '@/utils/simulateBattle';
-import { Army, BattleOutcome, KingdomStats, TechLevels, StrategyName } from '@/types';
+import { Army, BattleOutcome, KingdomStats, TechLevels, StrategyName, Buildings } from '@/types';
 import '../app/globals.css';
 import { UNIT_DATA } from '../data/unitData';
 import { TECHNOLOGY_DATA, TECHNOLOGY_TREES, RACE_UNIQUE_TECHS } from '../data/technologyData';
@@ -105,7 +105,7 @@ const getDefaultArmy = (race: string) => {
 };
 
 // Utility: Calculate KS (Kingdom Strength) based on army and buildings
-function calculateKS(army: Army, buildings: any, population: any, techLevels: any, strategy: any, race: string) {
+function calculateKS(army: Army, buildings: Buildings, population: Record<string, number>, techLevels: TechLevels, strategy: StrategyName, race: string) {
   const raceKey = race?.toLowerCase() || 'dwarf';
   let ks = 0;
   // Units: 2.5 KS per unit
@@ -153,16 +153,16 @@ export default function MainApp() {
   const [yourRace, setYourRace] = useState<string>(RACES[0]);
   const [enemyRace, setEnemyRace] = useState<string>(RACES[0]);
   // Add building state for each kingdom
-  const [yourBuildings, setYourBuildings] = useState<any>({});
-  const [enemyBuildings, setEnemyBuildings] = useState<any>({}); // Start empty like your army side
+  const [yourBuildings, setYourBuildings] = useState<Buildings>({});
+  const [enemyBuildings, setEnemyBuildings] = useState<Buildings>({});
   // Add population state for each kingdom
-  const [yourPopulation, setYourPopulation] = useState<any>({});
-  const [enemyPopulation, setEnemyPopulation] = useState<any>({});
+  const [yourPopulation, setYourPopulation] = useState<Record<string, number>>({});
+  const [enemyPopulation, setEnemyPopulation] = useState<Record<string, number>>({});
   // Add a race state at the top of the component, e.g.:
   const [race, setRace] = useState<string>('dwarf'); // default to dwarf
   // Add building ratios state for each kingdom
-  const [yourBuildingRatios, setYourBuildingRatios] = useState<any>({});
-  const [enemyBuildingRatios, setEnemyBuildingRatios] = useState<any>({});
+  const [yourBuildingRatios, setYourBuildingRatios] = useState<Record<string, number>>({});
+  const [enemyBuildingRatios, setEnemyBuildingRatios] = useState<Record<string, number>>({});
 
   // Handler for simulating the battle
   const handleSimulateBattle = () => {
@@ -205,19 +205,19 @@ export default function MainApp() {
   useEffect(() => {
     const currentCastlesInBuildings = yourBuildings['Castle'] || 0;
     if (yourKingdomStats.Castles !== currentCastlesInBuildings) {
-      setYourBuildings((prev: any) => ({ ...prev, Castle: yourKingdomStats.Castles }));
+      setYourBuildings((prev: Buildings) => ({ ...prev, Castle: yourKingdomStats.Castles }));
     }
   }, [yourKingdomStats.Castles]);
 
   useEffect(() => {
     const currentCastlesInBuildings = enemyBuildings['Castle'] || 0;
     if (enemyKingdomStats.Castles !== currentCastlesInBuildings) {
-      setEnemyBuildings((prev: any) => ({ ...prev, Castle: enemyKingdomStats.Castles }));
+      setEnemyBuildings((prev: Buildings) => ({ ...prev, Castle: enemyKingdomStats.Castles }));
     }
   }, [enemyKingdomStats.Castles]);
 
   // Calculate total population for each kingdom
-  const calcTotalPop = (buildings: any) => {
+  const calcTotalPop = (buildings: Buildings) => {
     let total = 0;
     for (const [b, count] of Object.entries(buildings)) {
       const n = typeof count === 'number' ? count : parseInt(count as string) || 0;

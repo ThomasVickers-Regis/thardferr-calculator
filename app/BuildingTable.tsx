@@ -1,5 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BUILDING_DATA } from '../data/buildingData';
+import { Buildings, KingdomStats } from '@/types';
+
+interface BuildingTableProps {
+  buildings: Buildings;
+  setBuildings: React.Dispatch<React.SetStateAction<Buildings>>;
+  land: number;
+  castles: number;
+  race: string;
+  population: Record<string, number>;
+  setKingdomStats: React.Dispatch<React.SetStateAction<KingdomStats>>;
+  ratios: Record<string, number>;
+  setRatios: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+}
 
 const DEFAULT_RATIOS: Record<string, number> = {
   'House': 2,
@@ -17,7 +30,7 @@ const DEFAULT_RATIOS: Record<string, number> = {
   'Castle': 0 // handled separately
 };
 
-const BuildingTable = ({ buildings, setBuildings, land, castles, race, population, setKingdomStats, ratios, setRatios }: any) => {
+const BuildingTable: React.FC<BuildingTableProps> = ({ buildings, setBuildings, land, castles, race, population, setKingdomStats, ratios, setRatios }) => {
   // Manual override state
   const [manualOverride, setManualOverride] = useState<any>({});
   const prevLandRef = useRef(land);

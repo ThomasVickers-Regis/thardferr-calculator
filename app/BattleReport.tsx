@@ -3,6 +3,7 @@ import UnitDetail from './UnitDetail';
 import { getEffectiveUnitStats } from '../utils/getEffectiveUnitStats';
 import { UNIT_DATA } from '../data/unitData';
 import { STRATEGY_DATA } from '../data/strategyData';
+import { Army, TechLevels, StrategyName, Buildings, KingdomStats, BattleOutcome } from '@/types';
 
 const formatNumber = (value: any, decimalPlaces = 2) => {
     const num = Number(value);
@@ -244,6 +245,7 @@ const BattlePhase = ({
   };
   const yourTotalLosses = aggregateLosses('yourLosses');
   const enemyTotalLosses = aggregateLosses('enemyLosses');
+
   return (
     <div className="mb-4 p-3 bg-gray-700 rounded border border-gray-600">
       <div className="font-bold text-purple-200 capitalize mb-4 text-center bg-gray-600 p-3 rounded text-xl border border-purple-400 shadow-lg">{phaseLog.phase === 'end' ? 'End Phase' : `${phaseLog.phase} Phase`}</div>
@@ -577,8 +579,23 @@ const BattleRound = ({
   </div>
 );
 
-// BattleReport: top-level component
-const BattleReport = ({
+interface BattleReportProps {
+  battleOutcome: BattleOutcome | null;
+  yourTechLevels: TechLevels;
+  yourStrategy: StrategyName | null;
+  enemyTechLevels: TechLevels;
+  enemyStrategy: StrategyName | null;
+  yourRace: string;
+  enemyRace: string;
+  originalYourArmy: Army;
+  originalEnemyArmy: Army;
+  yourBuildings?: Buildings;
+  enemyBuildings?: Buildings;
+  yourKingdomStats?: KingdomStats;
+  enemyKingdomStats?: KingdomStats;
+}
+
+const BattleReport: React.FC<BattleReportProps> = ({
   battleOutcome,
   yourTechLevels,
   yourStrategy,
@@ -592,7 +609,7 @@ const BattleReport = ({
   enemyBuildings = {},
   yourKingdomStats = {},
   enemyKingdomStats = {},
-}: any) => {
+}) => {
   if (!battleOutcome || !battleOutcome.battleLog) {
     return (
       <div className="p-4 bg-gray-800 rounded-lg mb-4 text-center text-gray-400">
@@ -601,6 +618,52 @@ const BattleReport = ({
     );
   }
   const { winner, rounds, finalYourArmy, finalEnemyArmy, battleLog } = battleOutcome;
+
+  // Calculate land and building losses dynamically
+  const calculateLandAndBuildingLosses = () => {
+    if (winner !== 'yourArmy') {
+      return {
+        landLost: 0,
+        castlesLost: 0,
+        peasantsLost: 0,
+        buildingsLost: {},
+      };
+    }
+
+    // Determine loss percentage based on how close the battle was
+    const yourInitialStrength = Object.values(originalYourArmy).reduce((sum: number, count: any) => sum + count, 0);
+    const enemyInitialStrength = Object.values(originalEnemyArmy).reduce((sum: number, count: any) => sum + count, 0);
+    const yourFinalStrength = Object.values(finalYourArmy).reduce((sum: number, count: any) => sum + count, 0);
+    const enemyFinalStrength = Object.values(finalEnemyArmy).reduce((sum: number, count: any) => sum + count, 0);
+
+    const yourLossRatio = yourFinalStrength / yourInitialStrength;
+    const enemyLossRatio = enemyFinalStrength / enemyInitialStrength;
+
+    let lossPercentage = 0;
+    if (enemyLossRatio <= 0.1) { // Crushing victory
+      lossPercentage = 0.30;
+    } else if (enemyLossRatio <= 0.5) { // Solid victory
+      lossPercentage = 0.20;
+    } else { // Close victory
+      lossPercentage = 0.10;
+    }
+
+    // Apply loss percentage to defender's assets
+    const landLost = Math.floor(((enemyKingdomStats as KingdomStats)?.Land || 0) * lossPercentage);
+    const castlesLost = Math.floor(((enemyKingdomStats as KingdomStats)?.Castles || 0) * lossPercentage);
+    const peasantsLost = Math.floor(((enemyKingdomStats as KingdomStats)?.Peasants || 0) * lossPercentage);
+
+    const buildingsLost: Record<string, number> = {};
+    for (const [building, count] of Object.entries((enemyBuildings as Buildings) || {})) {
+      if (building !== 'Land' && building !== 'Castle' && building !== 'Peasants') {
+        buildingsLost[building] = Math.floor((count as number) * lossPercentage);
+      }
+    }
+
+    return { landLost, castlesLost, peasantsLost, buildingsLost };
+  };
+
+  const { landLost, castlesLost, peasantsLost, buildingsLost } = calculateLandAndBuildingLosses();
   // Calculate total and phase-by-phase damage for both sides
   const totalDamage = { your: 0, enemy: 0 };
   const phaseDamage = { your: { range: 0, short: 0, melee: 0 }, enemy: { range: 0, short: 0, melee: 0 } };
@@ -701,52 +764,6 @@ const BattleReport = ({
   };
   const yourTotalLosses = aggregateLosses('yourLosses');
   const enemyTotalLosses = aggregateLosses('enemyLosses');
-
-  // Calculate land and building losses dynamically
-  const calculateLandAndBuildingLosses = () => {
-    if (winner !== 'yourArmy') {
-      return {
-        landLost: 0,
-        castlesLost: 0,
-        peasantsLost: 0,
-        buildingsLost: {},
-      };
-    }
-
-    // Determine loss percentage based on how close the battle was
-    const yourInitialStrength = Object.values(originalYourArmy).reduce((sum: number, count: any) => sum + count, 0);
-    const enemyInitialStrength = Object.values(originalEnemyArmy).reduce((sum: number, count: any) => sum + count, 0);
-    const yourFinalStrength = Object.values(finalYourArmy).reduce((sum: number, count: any) => sum + count, 0);
-    const enemyFinalStrength = Object.values(finalEnemyArmy).reduce((sum: number, count: any) => sum + count, 0);
-
-    const yourLossRatio = yourFinalStrength / yourInitialStrength;
-    const enemyLossRatio = enemyFinalStrength / enemyInitialStrength;
-
-    let lossPercentage = 0;
-    if (enemyLossRatio <= 0.1) { // Crushing victory
-      lossPercentage = 0.30;
-    } else if (enemyLossRatio <= 0.5) { // Solid victory
-      lossPercentage = 0.20;
-    } else { // Close victory
-      lossPercentage = 0.10;
-    }
-
-    // Apply loss percentage to defender's assets
-    const landLost = Math.floor((enemyKingdomStats.Land || 0) * lossPercentage);
-    const castlesLost = Math.floor((enemyKingdomStats.Castles || 0) * lossPercentage);
-    const peasantsLost = Math.floor((enemyKingdomStats.Peasants || 0) * lossPercentage);
-
-    const buildingsLost: Record<string, number> = {};
-    for (const [building, count] of Object.entries(enemyBuildings)) {
-      if (building !== 'Land' && building !== 'Castle' && building !== 'Peasants') {
-        buildingsLost[building] = Math.floor((count as number) * lossPercentage);
-      }
-    }
-
-    return { landLost, castlesLost, peasantsLost, buildingsLost };
-  };
-
-  const { landLost, castlesLost, peasantsLost, buildingsLost } = calculateLandAndBuildingLosses();
 
   return (
     <div className="p-6 bg-gray-800 rounded-lg mb-6">
