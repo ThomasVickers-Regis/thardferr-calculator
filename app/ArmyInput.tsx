@@ -235,14 +235,21 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
               const baseStats = UNIT_DATA[raceKey]?.[unit];
               if (!baseStats) return null; // Skip if unit not found for this race
 
-              // --- FIX: Pass the specific unit being rendered to getStatModifiers ---
+              // Use getEffectiveUnitStats for display values, with special case for Orc Surrounding + ShadowWarrior
+              const stats = getEffectiveUnitStats(unit, raceKey, techLevels, strategy, true, 1);
               const statModifiers = getStatModifiers(unit, raceKey, techLevels || {}, strategy);
+              let displayMelee = stats.melee;
+              let displayShort = stats.short;
+              const isOrcSurroundingShadowWarrior = strategy === 'Orc Surrounding' && unit === 'ShadowWarrior';
 
               return (
                 <tr key={unit} className="even:bg-gray-700">
                   <td className="p-2 font-medium" title={unit}>{unit}</td>
-                  <td className="p-2">
-                    {baseStats.melee}
+                  <td className="p-2 text-center">
+                    <span className="text-white font-bold">{baseStats.melee}</span>
+                    {isOrcSurroundingShadowWarrior && (
+                      <span className="text-red-400 ml-1">(-{baseStats.melee})</span>
+                    )}
                     {(() => {
                       const modifiers = [];
                       if (statModifiers.melee.positiveFlat > 0) {
@@ -260,8 +267,11 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                       return modifiers;
                     })()}
                   </td>
-                  <td className="p-2">
-                    {baseStats.short}
+                  <td className="p-2 text-center">
+                    <span className="text-white font-bold">{baseStats.short}</span>
+                    {isOrcSurroundingShadowWarrior && (
+                      <span className="text-green-400 ml-1">(+{baseStats.melee})</span>
+                    )}
                     {(() => {
                       const modifiers = [];
                       if (statModifiers.short.positiveFlat > 0) {
@@ -279,8 +289,7 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                       return modifiers;
                     })()}
                   </td>
-                  <td className="p-2">
-                    {baseStats.range}
+                  <td className="p-2 text-center">{stats.range}
                     {(() => {
                       const modifiers = [];
                       if (statModifiers.range.positiveFlat > 0) {
@@ -298,8 +307,7 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                       return modifiers;
                     })()}
                   </td>
-                  <td className="p-2">
-                    {baseStats.defense}
+                  <td className="p-2 text-center">{stats.defense}
                     {(() => {
                       const modifiers = [];
                       if (statModifiers.defense.positiveFlat > 0) {
@@ -317,18 +325,13 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                       return modifiers;
                     })()}
                   </td>
-                  <td className="p-2">
+                  <td className="p-2 text-center">
                     <input
                       type="number"
                       min={0}
-                      className={`w-20 p-1 rounded bg-gray-900 text-gray-100 border focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                        guardHouses > 0 && currentTotal >= maxUnits && (army[unit] || 0) > 0 
-                          ? 'border-yellow-500' 
-                          : 'border-gray-600'
-                      }`}
-                      value={army[unit] !== undefined ? army[unit] : 0}
+                      className="w-16 p-1 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 text-center"
+                      value={army[unit] || ''}
                       onChange={e => handleChange(unit, e.target.value)}
-                      title={`Set number of ${unit}${guardHouses > 0 ? ` (Guard House cap: ${maxUnits} total units)` : ''}`}
                     />
                   </td>
                 </tr>

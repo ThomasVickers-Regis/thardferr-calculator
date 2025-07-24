@@ -307,7 +307,12 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
             }
         }
         else if (phaseType === 'melee') {
-            attackValue = attackerStats.melee;
+            // Prevent ShadowWarrior from attacking in melee if Orc Surrounding is active
+            if (attackerStrategy === 'Orc Surrounding' && isShadowWarriorUnit(attackerName, attackerRace)) {
+                attackValue = 0;
+            } else {
+                attackValue = attackerStats.melee;
+            }
         }
 
         const currentUnitDamage = (attackerCount as number) * attackValue;
@@ -420,7 +425,14 @@ function applySpecialReductions(defenderName: string, defenderRace: string, defe
         reduction = 1.0; // 100%
     }
     if (phaseType === 'melee' && isShadowWarriorUnit(defenderName, defenderRace)) {
-        reduction = defenderStrategy === 'Orc' ? 0.75 : 0.80;
+        if (defenderStrategy === 'Orc Surrounding') {
+            reduction = 0.55;
+            effects.push('Detection chance: +25% (reduction lowered to 55%)');
+        } else if (defenderStrategy === 'Orc') {
+            reduction = 0.75;
+        } else {
+            reduction = 0.80;
+        }
     }
     if (phaseType === 'range' && defenderStrategy === 'Dwarf Shield Line') {
         const shieldbearerCount = defendingArmy['Shieldbearer'] || 0;

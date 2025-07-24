@@ -202,7 +202,16 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                     {(Object.entries(phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy || {}) || []).filter(([unit, count]) => {
                         const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1);
                         if (phaseLog.phase === 'range') return stats.range > 0 && (count as number) > 0;
-                        if (phaseLog.phase === 'short') return stats.short > 0 && (count as number) > 0;
+                        if (phaseLog.phase === 'short') {
+                          if (
+                            yourProps.strategy === 'Orc Surrounding' &&
+                            unit === 'ShadowWarrior' &&
+                            (count as number) > 0
+                          ) {
+                            return true;
+                          }
+                          return stats.short > 0 && (count as number) > 0;
+                        }
                         if (phaseLog.phase === 'melee') return stats.melee > 0 && (count as number) > 0;
                         return false;
                       })
@@ -294,7 +303,16 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                     {(Object.entries(phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy || {}) || []).filter(([unit, count]) => {
                         const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1);
                         if (phaseLog.phase === 'range') return stats.range > 0 && (count as number) > 0;
-                        if (phaseLog.phase === 'short') return stats.short > 0 && (count as number) > 0;
+                        if (phaseLog.phase === 'short') {
+                          if (
+                            enemyProps.strategy === 'Orc Surrounding' &&
+                            unit === 'ShadowWarrior' &&
+                            (count as number) > 0
+                          ) {
+                            return true;
+                          }
+                          return stats.short > 0 && (count as number) > 0;
+                        }
                         if (phaseLog.phase === 'melee') return stats.melee > 0 && (count as number) > 0;
                         return false;
                       })

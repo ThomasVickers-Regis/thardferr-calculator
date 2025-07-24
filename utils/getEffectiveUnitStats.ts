@@ -125,6 +125,11 @@ export function getEffectiveUnitStats(
             stats.melee *= 1 - (strategyEffects.all_units_close_combat_attack_reduction_percent || 0);
             stats.short *= 1 - (strategyEffects.all_units_close_combat_attack_reduction_percent || 0);
         }
+        // Orc Surrounding: ShadowWarrior does all damage in short phase, none in melee
+        if (strategy === 'Orc Surrounding' && isShadowWarriorUnit(unitName, race)) {
+            stats.short = (stats.short || 0) + (stats.melee || 0) + (stats.range || 0);
+            stats.melee = 0;
+        }
     }
   }
 
