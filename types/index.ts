@@ -65,4 +65,6 @@ export interface BattleOutcome {
   battleLog: BattleLogEntry[];
   yourHealing: Record<string, number>;
   enemyHealing: Record<string, number>;
+  scaledEnemyArmy?: Army;
+  scaledYourArmy?: Army;
 } 

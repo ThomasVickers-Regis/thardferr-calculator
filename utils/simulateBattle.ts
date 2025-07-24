@@ -52,6 +52,7 @@ export function simulateBattle(
           enemyArmy[unit] = Math.floor(enemyArmy[unit] * penalty);
       }
   }
+  const scaledEnemyArmy = { ...enemyArmy }; // Capture the post-penalty army
 
   const battleLog: BattleLogEntry[] = [];
 
@@ -274,5 +275,7 @@ export function simulateBattle(
     battleLog,
     yourHealing,
     enemyHealing,
+    scaledEnemyArmy,
+    scaledYourArmy: yourInitialArmy // For consistency, though your army is not scaled
   };
 } 

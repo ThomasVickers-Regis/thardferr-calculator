@@ -440,8 +440,8 @@ export default function MainApp() {
           enemyStrategy={enemyStrategy}
           yourRace={yourRace}
           enemyRace={enemyRace}
-          originalYourArmy={yourArmy}
-          originalEnemyArmy={enemyArmy}
+          originalYourArmy={battleOutcome?.scaledYourArmy || yourArmy}
+          originalEnemyArmy={battleOutcome?.scaledEnemyArmy || enemyArmy}
           yourBuildings={yourBuildings}
           enemyBuildings={enemyBuildings}
           yourKingdomStats={yourKingdomStats}
