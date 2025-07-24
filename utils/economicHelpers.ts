@@ -1,6 +1,6 @@
 import { UNIT_DATA } from '../data/unitData';
 import { MARKET_PRICES } from '../data/marketPrices';
-import { Army } from './calculatePhaseDamage';
+import { Army } from '@/types';
 
 /**
  * Get total initial gold cost for a unit and race.
