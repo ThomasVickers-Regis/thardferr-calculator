@@ -292,6 +292,7 @@ export default function MainApp() {
               race={yourRace}
               techLevels={yourTechLevels}
               strategy={yourStrategy}
+              enemyStrategy={enemyStrategy}
             />
             <PopulationAssignment
               population={yourPopulation}
@@ -376,6 +377,7 @@ export default function MainApp() {
               race={enemyRace}
               techLevels={enemyTechLevels}
               strategy={enemyStrategy}
+              enemyStrategy={yourStrategy}
             />
             <PopulationAssignment
               population={enemyPopulation}

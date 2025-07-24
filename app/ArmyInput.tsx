@@ -14,9 +14,10 @@ interface ArmyInputProps {
   race?: string;
   techLevels?: TechLevels;
   strategy?: StrategyName | null;
+  enemyStrategy?: StrategyName | null;
 }
 
-const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, buildings, race, techLevels, strategy }) => {
+const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, buildings, race, techLevels, strategy, enemyStrategy = null }) => {
   const raceKey = race?.toLowerCase() || 'dwarf';
   // Guard House cap display
   const guardHouses = buildings?.['Guard House'] || 0;
@@ -236,7 +237,8 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
               if (!baseStats) return null; // Skip if unit not found for this race
 
               // Use getEffectiveUnitStats for display values, with special case for Orc Surrounding + ShadowWarrior
-              const stats = getEffectiveUnitStats(unit, raceKey, techLevels, strategy, true, 1);
+              // For enemy army, pass yourStrategy as enemyStrategy; for your army, pass enemyStrategy as enemyStrategy
+              const stats = getEffectiveUnitStats(unit, raceKey, techLevels, strategy, true, 1, enemyStrategy);
               const statModifiers = getStatModifiers(unit, raceKey, techLevels || {}, strategy);
               let displayMelee = stats.melee;
               let displayShort = stats.short;
@@ -290,6 +292,9 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                     })()}
                   </td>
                   <td className="p-2 text-center">{stats.range}
+                    {stats.rangeModifier && (
+                      <span className="text-green-400 ml-1">(+{stats.rangeModifier}%)</span>
+                    )}
                     {(() => {
                       const modifiers = [];
                       if (statModifiers.range.positiveFlat > 0) {
@@ -330,7 +335,7 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                       type="number"
                       min={0}
                       className="w-16 p-1 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 text-center"
-                      value={army[unit] || ''}
+                      value={army[unit] ?? 0}
                       onChange={e => handleChange(unit, e.target.value)}
                     />
                   </td>

@@ -100,7 +100,8 @@ export function calculatePhaseDamage(
   attackerRace: string = 'dwarf',
   defenderRace: string = 'dwarf',
   originalDefendingArmy?: Army,
-  isBattleDefender: boolean = false
+  isBattleDefender: boolean = false,
+  doubleRangedDamage: boolean = false
 ): { losses: Record<string, number>; damageLog: DamageLog[]; rawTotalDamage: number; totalMitigation: number; mitigationPerUnit: Record<string, number>; rawDamagePerUnit: Record<string, number>; maxTotalMitigation: number; preScaledTotalDamage: number; preScaledPikemenDamage: number; } {
   const losses: Record<string, number> = {};
   const damageLog: DamageLog[] = [];
@@ -108,7 +109,7 @@ export function calculatePhaseDamage(
   const rawDamagePerUnit: Record<string, number> = {};
 
   // Pre-calculate raw damage and mitigation pools.
-  const { totalDamage, pikemenDamage, preScaledTotalDamage, preScaledPikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy);
+  const { totalDamage, pikemenDamage, preScaledTotalDamage, preScaledPikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy, doubleRangedDamage);
   // Calculate the maximum possible mitigation pool (before capping by total damage)
   let maxTotalMitigation = 0;
   const totalDefenders = Object.values(defendingArmy).reduce((sum, count) => sum + count, 0);
@@ -128,6 +129,14 @@ export function calculatePhaseDamage(
     maxTotalMitigation += Math.min(potentialMitigationPool, maxMitigationByUnitCap);
   }
   const { totalMitigation, buildingEffectsLog } = calculateTotalMitigation(defendingArmy, defenderBuildings, phaseType, isBattleDefender);
+
+  // Add Gnome Far Fighting effect to both sides if active in range phase
+  if (doubleRangedDamage && phaseType === 'range') {
+    const gffMsg = 'Gnome Far Fighting: Doubles ranged attacks this phase.';
+    if (!buildingEffectsLog.includes(gffMsg)) {
+      buildingEffectsLog.push(gffMsg);
+    }
+  }
 
   const defenderUnitNames = Object.keys(defendingArmy).filter(u => defendingArmy[u] > 0);
   if (defenderUnitNames.length === 0) return { losses: {}, damageLog: [], rawTotalDamage: totalDamage, totalMitigation, mitigationPerUnit: {}, rawDamagePerUnit: {}, maxTotalMitigation, preScaledTotalDamage, preScaledPikemenDamage };
@@ -209,7 +218,7 @@ function handleInfantryAttack(
     const totalDefenders = defenderUnitNames.reduce((sum, name) => sum + defendingArmy[name], 0);
 
     let unitEffectiveDefense = getEffectiveUnitStats(defenderName, defenderRace, techLevels, defenderStrategy, false, ksDifferenceFactor).defense;
-    const buildingEffects: string[] = [...buildingEffectsLog];
+    let buildingEffects: string[] = [...buildingEffectsLog];
 
     // Add defender strategy effects to the log
     buildingEffects.push(...getStrategyEffects(defenderName, defenderRace, defenderStrategy, phaseType, false, attackingArmy));
@@ -271,6 +280,9 @@ function handleInfantryAttack(
     finalDamageToStack *= (1 - reduction);
     buildingEffects.push(...effects);
 
+    // Remove duplicate effects
+    buildingEffects = [...new Set(buildingEffects)];
+
     const unitLosses = unitEffectiveDefense > 0 ? Math.floor(finalDamageToStack / unitEffectiveDefense) : defendingArmy[defenderName];
     
     return {
@@ -288,7 +300,7 @@ function handleInfantryAttack(
 
 // Helper functions to break down the main function's logic.
 
-function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number, defendingArmy: Army): { totalDamage: number; pikemenDamage: number; preScaledTotalDamage: number; preScaledPikemenDamage: number; } {
+function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number, defendingArmy: Army, doubleRangedDamage: boolean = false): { totalDamage: number; pikemenDamage: number; preScaledTotalDamage: number; preScaledPikemenDamage: number; } {
     let totalDamage = 0;
     let pikemenDamage = 0;
     let preScaledTotalDamage = 0;
@@ -327,7 +339,7 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
     }
 
     // Gnome Far Fighting: Doubles range damage for both sides
-    if (phaseType === 'range' && (attackerStrategy === 'Gnome Far Fighting')) {
+    if (phaseType === 'range' && doubleRangedDamage) {
         totalDamage *= 2;
         pikemenDamage *= 2;
         preScaledTotalDamage *= 2;

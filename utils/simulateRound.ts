@@ -26,6 +26,8 @@ export function simulateRound(
     const yourArmyAtStart = { ...yourArmy };
     const enemyArmyAtStart = { ...enemyArmy };
 
+    const doubleRangedDamage = (yourStrategy === 'Gnome Far Fighting' || enemyStrategy === 'Gnome Far Fighting');
+
     // Your army is attacked
     const yourDamageResult = calculatePhaseDamage(
       enemyArmyAtStart,
@@ -41,7 +43,8 @@ export function simulateRound(
       enemyRace,
       yourRace,
       undefined,
-      isYourArmyTheDefender
+      isYourArmyTheDefender,
+      doubleRangedDamage
     );
 
     // Enemy army is attacked
@@ -59,7 +62,8 @@ export function simulateRound(
       yourRace,
       enemyRace,
       undefined,
-      !isYourArmyTheDefender
+      !isYourArmyTheDefender,
+      doubleRangedDamage
     );
 
     const yourLosses = yourDamageResult.losses;

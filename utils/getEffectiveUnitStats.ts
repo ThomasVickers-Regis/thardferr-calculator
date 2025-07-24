@@ -37,8 +37,9 @@ export function getEffectiveUnitStats(
   techLevels: TechLevels = {},
   strategy: StrategyName | null = null,
   isAttacker: boolean = true,
-  ksDifferenceFactor: number = 1
-): UnitStats {
+  ksDifferenceFactor: number = 1,
+  enemyStrategy: StrategyName | null = null
+): UnitStats & { rangeModifier?: number } {
   const raceKey = race?.toLowerCase() || 'dwarf';
   const base = UNIT_DATA[raceKey]?.[unitName];
   if (!base) {
@@ -145,7 +146,13 @@ export function getEffectiveUnitStats(
   stats.range = Math.max(0, stats.range);
   stats.defense = Math.max(0, stats.defense);
 
-  return stats;
+  // Gnome Far Fighting: Double range for both sides (for display)
+  let rangeModifier: number | undefined = undefined;
+  if (strategy === 'Gnome Far Fighting' || enemyStrategy === 'Gnome Far Fighting') {
+    rangeModifier = 100;
+  }
+
+  return { ...stats, rangeModifier };
 }
 
 /**

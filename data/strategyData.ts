@@ -86,20 +86,5 @@ export const STRATEGY_DATA: Record<string, StrategyData> = {
       all_shadow_warriors_damages_in_short_ranged_phase: true,
       chances_of_being_detected_increased_percent: 0.25
     }
-  },
-  "Orc Berserker": {
-    type: "Orc Unique (from previous discussion, not changelog)",
-    description: "All units fight with increased fury but reduced defense.",
-    effects: {
-      all_units_damage_increase: 3,
-      all_units_defense_divide_by: 2
-    }
-  },
-  "Orc": {
-    type: "Orc Unique",
-    description: "Standard Orc strategy affecting Shadow Warrior immunity.",
-    effects: {
-      shadow_warrior_melee_immunity_reduction: 5 // Reduces from 80% to 75%
-    }
   }
 };
