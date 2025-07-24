@@ -28,7 +28,7 @@ const EnemyCounterOptimizer: React.FC<EnemyCounterOptimizerProps> = ({
   // Get your Guard House capacity from buildings
   const guardHouses = yourBuildings?.['Guard House'] || 0;
   const maxUnits = guardHouses * 40; // 40 units per Guard House
-  const currentUnits = Object.values(yourArmy).reduce((sum: number, count: any) => sum + (count || 0), 0);
+  const currentUnits = Object.values(yourArmy).reduce((sum: number, count: number) => sum + count, 0);
   const availableSlots = Math.max(0, maxUnits - currentUnits);
   // Analyze enemy army composition
   const enemyAnalysis = Object.entries(enemyArmy).map(([unit, count]) => {
@@ -174,7 +174,7 @@ const EnemyCounterOptimizer: React.FC<EnemyCounterOptimizerProps> = ({
   rangedStrategy = `Ranged Strategy (${rangedAnalysis.difficulty}): ${rangedAnalysis.requirements.join(', ')}`;
   meleeStrategy = `Melee Strategy (${meleeAnalysis.difficulty}): ${meleeAnalysis.requirements.join(', ')}`;
   const generateCounterArmy = () => {
-    const counterArmy: any = {};
+    const counterArmy: { [key: string]: number } = {};
     let remainingSlots = availableSlots;
     let totalCost = 0;
     let totalUpkeep = 0;
@@ -268,7 +268,7 @@ const EnemyCounterOptimizer: React.FC<EnemyCounterOptimizerProps> = ({
               <div>
                 <div className="flex justify-between">
                   <span>Total Units:</span>
-                  <span>{Object.values(enemyArmy).reduce((sum: number, count: any) => sum + (count || 0), 0)}</span>
+                  <span>{Object.values(enemyArmy).reduce((sum: number, count: number) => sum + count, 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Total Damage:</span>
@@ -379,7 +379,7 @@ const EnemyCounterOptimizer: React.FC<EnemyCounterOptimizerProps> = ({
             <div className="text-sm mb-2">
               <div className="flex justify-between">
                 <span>Units to Add:</span>
-                <span>{Object.values(optimalCounter.counterArmy).reduce((sum: number, count: any) => sum + count, 0)}</span>
+                <span>{Object.values(optimalCounter.counterArmy).reduce((sum: number, count: number) => sum + count, 0)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Total Cost:</span>

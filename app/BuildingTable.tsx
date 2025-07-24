@@ -32,7 +32,7 @@ const DEFAULT_RATIOS: Record<string, number> = {
 
 const BuildingTable: React.FC<BuildingTableProps> = ({ buildings, setBuildings, land, castles, race, population, setKingdomStats, ratios, setRatios }) => {
   // Manual override state
-  const [manualOverride, setManualOverride] = useState<any>({});
+  const [manualOverride, setManualOverride] = useState<Record<string, boolean>>({});
   const prevLandRef = useRef(land);
 
   // Helper: get default ratio for a building
@@ -53,8 +53,8 @@ const BuildingTable: React.FC<BuildingTableProps> = ({ buildings, setBuildings, 
   // Auto-fill logic: update building counts from ratios when land changes or ratios change (unless manually overridden)
   useEffect(() => {
     if (land === prevLandRef.current && Object.keys(buildings).length > 0) return;
-    const newBuildings: any = {};
-    const currentRatios: any = {};
+    const newBuildings: Record<string, number> = {};
+    const currentRatios: Record<string, number> = {};
     if (land && Object.keys(buildings).length > 0) {
       buildingOrder.forEach(b => {
         const currentCount = buildings[b] || 0;
@@ -87,7 +87,7 @@ const BuildingTable: React.FC<BuildingTableProps> = ({ buildings, setBuildings, 
     }
     setBuildings(newBuildings);
     // Update ratios to reflect new counts
-    const updatedRatios: any = {};
+    const updatedRatios: Record<string, number> = {};
     buildingOrder.forEach(b => {
       if (land) updatedRatios[b] = Math.round((newBuildings[b] / land) * 100) / 100;
     });
@@ -107,7 +107,9 @@ const BuildingTable: React.FC<BuildingTableProps> = ({ buildings, setBuildings, 
       setManualOverride({ ...manualOverride, [b]: false });
       return;
     }
-    const otherRatios = (Object.entries(ratios) as [string, number | string][]) .filter(([key]) => key !== 'Castle' && key !== b).reduce((sum, [_, v]) => sum + (typeof v === 'number' ? v : parseFloat(v as string) || 0), 0);
+    const otherRatios = (Object.entries(ratios) as [string, number | string][]) 
+      .filter(([key]) => key !== 'Castle' && key !== b)
+      .reduce((sum, [_, v]) => sum + (typeof v === 'number' ? v : parseFloat(v as string) || 0), 0);
     if (otherRatios + ratio > 10) ratio = Math.max(0, 10 - otherRatios);
     let newCount = Math.floor(ratio * (land || 0));
     const otherCounts = Object.entries(buildings).filter(([key]) => key !== 'Castle' && key !== b).reduce((sum, [_, v]) => sum + (typeof v === 'number' ? v : 0), 0);

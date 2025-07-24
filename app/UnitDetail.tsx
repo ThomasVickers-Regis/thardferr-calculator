@@ -1,12 +1,11 @@
 import React from 'react';
 import { DamageLog } from '../utils/calculatePhaseDamage';
 
-const formatNumber = (value: any, decimalPlaces = 2) => {
-    const num = Number(value);
-    if (isNaN(num)) {
+const formatNumber = (value: number, decimalPlaces = 2) => {
+    if (isNaN(value)) {
         return (0).toFixed(decimalPlaces);
     }
-    return num.toFixed(decimalPlaces);
+    return value.toFixed(decimalPlaces);
 };
 
 interface UnitDetailProps {

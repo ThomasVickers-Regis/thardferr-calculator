@@ -62,7 +62,7 @@ const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population,
   useEffect(() => {
     const currentTotal = Object.values(population).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
     // Calculate previous ratios
-    const prevRatios: any = {};
+    const prevRatios: Record<string, number> = {};
     for (const job of JOBS) {
       const prevCount = population[job.key] || 0;
       const prevBuildings = getBuildings(job.key, prevBuildingsRef.current);
