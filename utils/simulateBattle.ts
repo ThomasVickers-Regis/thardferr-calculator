@@ -41,6 +41,7 @@ export function simulateBattle(
     let yourArmy = { ...yourInitialArmy };
   let enemyArmy = { ...enemyInitialArmy };
 
+  const scaledYourArmy = { ...yourArmy };
   // Store the original enemy army for retreat calculations before applying any penalties
   const enemyInitialArmyForRetreat = { ...enemyArmy };
 
@@ -212,9 +213,9 @@ export function simulateBattle(
                            (yourBuildings['Medical Center'] / yourLand) >= 0.5 ? 0.10 : 0;
 
     if (healingPercent > 0) {
-      for (const [unit, originalCount] of Object.entries(yourInitialArmy)) {
+      for (const [unit, originalCount] of Object.entries(scaledYourArmy)) {
         const currentCount = yourArmy[unit] || 0;
-        const losses = originalCount - currentCount;
+        const losses = (originalCount as number) - currentCount;
         if (losses > 0) {
           const healed = Math.floor(losses * healingPercent);
           if (healed > 0) {
@@ -233,9 +234,9 @@ export function simulateBattle(
                            (enemyBuildings['Medical Center'] / enemyLand) >= 0.5 ? 0.10 : 0;
 
     if (healingPercent > 0) {
-      for (const [unit, originalCount] of Object.entries(enemyInitialArmy)) {
+      for (const [unit, originalCount] of Object.entries(scaledEnemyArmy)) {
         const currentCount = enemyArmy[unit] || 0;
-        const losses = originalCount - currentCount;
+        const losses = (originalCount as number) - currentCount;
         if (losses > 0) {
           const healed = Math.floor(losses * healingPercent);
           if (healed > 0) {
@@ -276,6 +277,6 @@ export function simulateBattle(
     yourHealing,
     enemyHealing,
     scaledEnemyArmy,
-    scaledYourArmy: yourInitialArmy // For consistency, though your army is not scaled
+    scaledYourArmy
   };
 } 
