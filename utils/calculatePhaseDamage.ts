@@ -12,7 +12,7 @@ export const UNIT_WEIGHTS: Record<string, Record<string, number>> = {
     Shieldbearer: 3,
     HammerWheilder: 2,
     AxeMan: 2,
-    Runner: 2,
+    Runner: 1,
     LightCrossbowman: 2,
     HeavyCrossbowman: 1
   },
@@ -27,9 +27,9 @@ export const UNIT_WEIGHTS: Record<string, Record<string, number>> = {
   gnome: {
     Catapult: 1,
     Infantry: 2,
-    Militia: 3,
+    Militia: 2.5,
     Rider: 2,
-    RockThrower: 3,
+    RockThrower: 2.5,
     Balista: 1
   },
   human: {
