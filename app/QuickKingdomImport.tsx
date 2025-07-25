@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Army, Buildings, KingdomStats } from '@/types';
+import { BUILDING_DATA } from '../data/buildingData';
 
 interface QuickKingdomImportProps {
   setArmy: (army: Army) => void;
@@ -39,6 +40,25 @@ function detectRace(army: Army): string | null {
   return bestMatch;
 }
 
+// Build a mapping of all possible building name variants to canonical keys
+const CANONICAL_BUILDING_KEYS = Object.keys(BUILDING_DATA);
+const BUILDING_NAME_MAP: Record<string, string> = {};
+CANONICAL_BUILDING_KEYS.forEach(key => {
+  BUILDING_NAME_MAP[key.toLowerCase()] = key;
+  BUILDING_NAME_MAP[key.replace(/\s+/g, '').toLowerCase()] = key;
+  BUILDING_NAME_MAP[key.replace(/\s+/g, '').toLowerCase().replace('house', 'house')] = key;
+  // Add more variants as needed
+});
+// Add common manual variants
+BUILDING_NAME_MAP['guardtower'] = 'Guard Towers';
+BUILDING_NAME_MAP['guardtowers'] = 'Guard Towers';
+BUILDING_NAME_MAP['guard house'] = 'Guard House';
+BUILDING_NAME_MAP['guardhouse'] = 'Guard House';
+BUILDING_NAME_MAP['medicalcenter'] = 'Medical Center';
+BUILDING_NAME_MAP['medical center'] = 'Medical Center';
+BUILDING_NAME_MAP['trainingcenter'] = 'Training Center';
+BUILDING_NAME_MAP['advancedtrainingcenter'] = 'Advanced Training Center';
+
 function parseKingdomText(text: string) {
   const army: Army = {};
   const buildings: Buildings = {};
@@ -70,9 +90,9 @@ function parseKingdomText(text: string) {
       const m = pair.match(/([A-Za-z ]+):\s*(\d+)/);
       if (m) {
         let name = m[1].trim();
-        // Normalize to match BUILDING_DATA keys
-        if (name === 'Guard Tower') name = 'Guard Towers';
-        buildings[name] = parseInt(m[2], 10);
+        // Normalize to canonical key
+        const canonical = BUILDING_NAME_MAP[name.toLowerCase().replace(/\s+/g, '')] || name;
+        buildings[canonical] = parseInt(m[2], 10);
       }
     }
   } else {
@@ -133,8 +153,8 @@ const QuickKingdomImport: React.FC<QuickKingdomImportProps> = ({ setArmy, setBui
     const armyStr = armyEntries.length > 0
       ? 'Army: ' + armyEntries.map(([k, v]) => `${k}: ${v}`).join(', ')
       : '';
-    // Buildings
-    const buildingEntries = Object.entries(buildings || {}).filter(([_, v]) => v > 0);
+    // Buildings (always include all canonical keys, even if 0)
+    const buildingEntries = CANONICAL_BUILDING_KEYS.map(k => [k, buildings[k] ?? 0]);
     const buildingsStr = buildingEntries.length > 0
       ? 'Buildings: ' + buildingEntries.map(([k, v]) => `${k}: ${v}`).join(', ')
       : '';
