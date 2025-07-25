@@ -1,6 +1,7 @@
 import React from 'react';
 import { UNIT_DATA } from '../data/unitData';
 import { Army } from '@/types';
+import { BUILDING_DATA } from '../data/buildingData';
 
 interface ProjectedProductionProps {
   population: Record<string, number>;
@@ -21,10 +22,20 @@ const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, b
     else maxPop += n * 10;
   }
   const totalPop = Object.values(population).reduce((sum: number, v) => sum + (typeof v === 'number' ? v : 0), 0);
-  // Mine: 100 optimal (5 iron), 200 max (8.5 iron)
+  // Mine: Use BUILDING_DATA and per_race_bonus
   const mines = get('Mine');
   const minePop = population['Mine'] || 0;
-  const mineOpt = 100, mineMax = 200, mineBase = 5, minePeak = 8.5;
+  const mineOpt = BUILDING_DATA['Mine'].optimal_workers || 100;
+  const mineMax = 200; // If you want to make this dynamic, add to BUILDING_DATA
+  let mineBase = BUILDING_DATA['Mine'].production_per_day || 4;
+  let minePeak = 8.5; // Default fallback
+  if (BUILDING_DATA['Mine'].per_race_bonus && BUILDING_DATA['Mine'].per_race_bonus[race]) {
+    if (BUILDING_DATA['Mine'].per_race_bonus[race].production_per_day)
+      mineBase = BUILDING_DATA['Mine'].per_race_bonus[race].production_per_day;
+    if (BUILDING_DATA['Mine'].per_race_bonus[race].production_peak)
+      minePeak = BUILDING_DATA['Mine'].per_race_bonus[race].production_peak;
+  }
+  // If you want to make minePeak race-specific, add production_peak to per_race_bonus in buildingData
   let ironProd = 0;
   if (mines > 0) {
     const perMine = minePop / mines;
@@ -38,12 +49,20 @@ const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, b
     }
     ironProd = Math.round(ironProd);
   }
-  // Lumber: 85 optimal (5 wood, 6 for elf), 170 max (9.5 wood, 10.5 for elf)
+  // Mill: Use BUILDING_DATA and per_race_bonus
   const mills = get('Mill');
   const lumberPop = population['Lumber'] || 0;
-  const lumberOpt = 85, lumberMax = 170;
-  const lumberBase = race === 'Elf' ? 6 : 5;
-  const lumberPeak = race === 'Elf' ? 10.5 : 9.5;
+  const lumberOpt = BUILDING_DATA['Mill'].optimal_workers || 85;
+  const lumberMax = 170; // If you want to make this dynamic, add to BUILDING_DATA
+  let lumberBase = BUILDING_DATA['Mill'].production_per_day || 5;
+  let lumberPeak = 9.5; // Default fallback
+  if (BUILDING_DATA['Mill'].per_race_bonus && BUILDING_DATA['Mill'].per_race_bonus[race]) {
+    if (BUILDING_DATA['Mill'].per_race_bonus[race].production_per_day)
+      lumberBase = BUILDING_DATA['Mill'].per_race_bonus[race].production_per_day;
+    if (BUILDING_DATA['Mill'].per_race_bonus[race].production_peak)
+      lumberPeak = BUILDING_DATA['Mill'].per_race_bonus[race].production_peak;
+  }
+  // If you want to make lumberPeak race-specific, add production_peak to per_race_bonus in buildingData
   let woodProd = 0;
   if (mills > 0) {
     const perMill = lumberPop / mills;
@@ -57,10 +76,20 @@ const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, b
     }
     woodProd = Math.round(woodProd);
   }
-  // Agriculture: 60 optimal (100 food), 120 max (145 food)
+  // Farm: Use BUILDING_DATA and per_race_bonus
   const farms = get('Farm');
   const agriPop = population['Agriculture'] || 0;
-  const agriOpt = 60, agriMax = 120, agriBase = 100, agriPeak = 145;
+  const agriOpt = BUILDING_DATA['Farm'].optimal_workers || 60;
+  const agriMax = 120; // If you want to make this dynamic, add to BUILDING_DATA
+  let agriBase = BUILDING_DATA['Farm'].production_per_day || 100;
+  let agriPeak = 145; // Default fallback
+  if (BUILDING_DATA['Farm'].per_race_bonus && BUILDING_DATA['Farm'].per_race_bonus[race]) {
+    if (BUILDING_DATA['Farm'].per_race_bonus[race].production_per_day)
+      agriBase = BUILDING_DATA['Farm'].per_race_bonus[race].production_per_day;
+    if (BUILDING_DATA['Farm'].per_race_bonus[race].production_peak)
+      agriPeak = BUILDING_DATA['Farm'].per_race_bonus[race].production_peak;
+  }
+  // If you want to make agriPeak race-specific, add production_peak to per_race_bonus in buildingData
   let foodProd = 0;
   if (farms > 0) {
     const perFarm = agriPop / farms;
