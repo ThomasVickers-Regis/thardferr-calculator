@@ -102,9 +102,11 @@ function parseKingdomText(text: string) {
   return { army, buildings, stats, errors };
 }
 
-const QuickKingdomImport: React.FC<QuickKingdomImportProps> = ({ setArmy, setBuildings, setStats, label, setRace, onAfterImport }) => {
+const QuickKingdomImport: React.FC<QuickKingdomImportProps> = ({ setArmy, setBuildings, setStats, army, buildings, stats, label, setRace, onAfterImport }) => {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [exportText, setExportText] = useState<string>('');
+
   const handleImport = () => {
     const { army, buildings, stats, errors } = parseKingdomText(input);
     if (errors.length > 0) {
@@ -123,22 +125,85 @@ const QuickKingdomImport: React.FC<QuickKingdomImportProps> = ({ setArmy, setBui
     }
     setError(null);
   };
+
+  // Helper to format export text
+  const formatKingdomExport = () => {
+    // Army
+    const armyEntries = Object.entries(army || {}).filter(([_, v]) => v > 0);
+    const armyStr = armyEntries.length > 0
+      ? 'Army: ' + armyEntries.map(([k, v]) => `${k}: ${v}`).join(', ')
+      : '';
+    // Buildings
+    const buildingEntries = Object.entries(buildings || {}).filter(([_, v]) => v > 0);
+    const buildingsStr = buildingEntries.length > 0
+      ? 'Buildings: ' + buildingEntries.map(([k, v]) => `${k}: ${v}`).join(', ')
+      : '';
+    // Resources (stats)
+    const resourceKeys = Object.keys(stats || {}).filter(k => k !== 'KS' && k !== 'Land' && k !== 'Castles');
+    const resourceEntries = [
+      ...(typeof stats?.Land === 'number' ? [['Land', stats.Land]] : []),
+      ...(typeof stats?.Castles === 'number' ? [['Castles', stats.Castles]] : []),
+      ...resourceKeys.map(k => [k, stats[k]])
+    ].filter(([_, v]) => v !== undefined && v !== null && v !== '');
+    const resourcesStr = resourceEntries.length > 0
+      ? 'Resources: ' + resourceEntries.map(([k, v]) => `${k}: ${v}`).join(', ')
+      : '';
+    // Combine
+    return [armyStr, buildingsStr, resourcesStr].filter(Boolean).join('\n');
+  };
+
+  const handleExport = () => {
+    const exportStr = formatKingdomExport();
+    setExportText(exportStr);
+    setInput(exportStr); // Show export in the same textarea
+  };
+
+  const handleCopy = () => {
+    if (exportText) {
+      navigator.clipboard.writeText(exportText);
+    }
+  };
+
+  // Show Copy button only if exportText is present
+  const showCopy = !!exportText;
+
   return (
     <div className="p-4 bg-gray-800 rounded-lg mb-4">
       <h3 className="text-md font-semibold mb-2">{label || 'Quick Import'}</h3>
+      {/* Button row: Import left, Export right */}
+      <div className="flex justify-between mb-2">
+        <button
+          className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-4 rounded-lg transition"
+          onClick={handleImport}
+        >
+          Import
+        </button>
+        <button
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-4 rounded-lg transition"
+          onClick={handleExport}
+        >
+          Export
+        </button>
+      </div>
       <textarea
         className="w-full p-2 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500 mb-2"
         rows={4}
         placeholder="Paste your kingdom data here..."
         value={input}
-        onChange={e => setInput(e.target.value)}
+        onChange={e => {
+          setInput(e.target.value);
+          setExportText(''); // Clear exportText if user edits
+        }}
       />
-      <button
-        className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-4 rounded-lg transition mb-2"
-        onClick={handleImport}
-      >
-        Import
-      </button>
+      {showCopy && (
+        <button
+          className="bg-gray-700 hover:bg-gray-800 text-white font-semibold py-1 px-4 rounded-lg transition mb-2"
+          onClick={handleCopy}
+          type="button"
+        >
+          Copy
+        </button>
+      )}
       {error && <div className="text-red-400 text-xs mt-1">{error}</div>}
     </div>
   );
