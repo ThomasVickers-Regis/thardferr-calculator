@@ -218,16 +218,39 @@ const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population,
       <div className="mt-2 space-y-1">
         <div className="flex justify-between items-center">
           <p className="text-xs text-gray-400">Both Assigned and Efficiency are editable and kept in sync.</p>
-          <button
-            onClick={() => {
-              const optimalPopulation = calculateOptimalPopulation(buildings, totalPop);
-              setPopulation(optimalPopulation);
-            }}
-            className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded transition"
-            title="Reset to optimal population assignments"
-          >
-            Reset to Optimal
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const optimalPopulation = calculateOptimalPopulation(buildings, totalPop);
+                setPopulation(optimalPopulation);
+              }}
+              className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded transition"
+              title="Reset to optimal population assignments"
+            >
+              Reset to Optimal
+            </button>
+            <button
+              onClick={() => {
+                // Assign max to each job in order, without exceeding totalPop
+                let remaining = totalPop;
+                const maxPop: Record<string, number> = {};
+                for (const job of JOBS) {
+                  if (job.key === 'Training' || job.key === 'Exploration') {
+                    maxPop[job.key] = 0;
+                  } else {
+                    const max = Math.min(getJobMax(job.key), remaining);
+                    maxPop[job.key] = max;
+                    remaining -= max;
+                  }
+                }
+                setPopulation(maxPop);
+              }}
+              className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition"
+              title="Reset to max population assignments"
+            >
+              Reset to Max
+            </button>
+          </div>
         </div>
         <div className="text-xs text-gray-300">
           <span className="font-medium">Efficiency Formula:</span>
