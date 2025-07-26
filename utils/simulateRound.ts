@@ -33,7 +33,7 @@ export function simulateRound(
       enemyArmyAtStart,
       yourArmyAtStart,
       phase as PhaseType,
-      techLevelsEnemy,
+      techLevelsYour, // FIXED: use defender's tech levels
       enemyStrategy,
       yourStrategy,
       yourStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
@@ -52,7 +52,7 @@ export function simulateRound(
       yourArmyAtStart,
       enemyArmyAtStart,
       phase as PhaseType,
-      techLevelsYour,
+      techLevelsEnemy, // FIXED: use defender's tech levels
       yourStrategy,
       enemyStrategy,
       enemyStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,

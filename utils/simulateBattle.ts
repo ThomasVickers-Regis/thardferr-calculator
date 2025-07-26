@@ -61,8 +61,8 @@ export function simulateBattle(
   const attackerKS = yourKingdomStats.KS || 1;
   const defenderKS = enemyKingdomStats.KS || 1;
   let ksDifferenceFactor = 1;
-  if (attackerKS > 1.5 * defenderKS) ksDifferenceFactor = 0.8; // Attacker penalty
-  else if (attackerKS < 0.75 * defenderKS) ksDifferenceFactor = 1.2; // Attacker buff
+  // if (attackerKS > 1.5 * defenderKS) ksDifferenceFactor = 0.8; // Attacker penalty
+  // else if (attackerKS < 0.75 * defenderKS) ksDifferenceFactor = 1.2; // Attacker buff
 
   let round = 1;
   let winner: BattleOutcome['winner'] = 'draw';

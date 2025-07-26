@@ -136,10 +136,10 @@ export function getEffectiveUnitStats(
   }
 
   // --- KS Difference Factor (Bottomfeeding) ---
-  stats.melee *= ksDifferenceFactor;
-  stats.short *= ksDifferenceFactor;
-  stats.range *= ksDifferenceFactor;
-  stats.defense *= ksDifferenceFactor;
+  // stats.melee *= ksDifferenceFactor;
+  // stats.short *= ksDifferenceFactor;
+  // stats.range *= ksDifferenceFactor;
+  // stats.defense *= ksDifferenceFactor;
 
   // Clamp to 0 minimum
   stats.melee = Math.max(0, stats.melee);
