@@ -332,6 +332,12 @@ export default function MainApp() {
               stats={yourKingdomStats}
               label="Quick Kingdom Import"
               setRace={setYourRace}
+              techLevels={yourTechLevels}
+              setTechLevels={setYourTechLevels}
+              strategy={yourStrategy}
+              setStrategy={setYourStrategy}
+              population={yourPopulation}
+              setPopulation={setYourPopulation}
               // After import, update castles and building ratios
               onAfterImport={(buildings: Buildings, stats: Partial<KingdomStats>, army: Army) => {
                 const totalBuildings = buildings ? Object.values(buildings).reduce((a, b) => Number(a) + Number(b), 0) : 0;
@@ -446,6 +452,12 @@ export default function MainApp() {
               stats={enemyKingdomStats}
               label="Quick Enemy Import"
               setRace={setEnemyRace}
+              techLevels={enemyTechLevels}
+              setTechLevels={setEnemyTechLevels}
+              strategy={enemyStrategy}
+              setStrategy={setEnemyStrategy}
+              population={enemyPopulation}
+              setPopulation={setEnemyPopulation}
               // After import, update castles and building ratios
               onAfterImport={(buildings: Buildings, stats: Partial<KingdomStats>, army: Army) => {
                 const totalBuildings = buildings ? Object.values(buildings).reduce((a, b) => Number(a) + Number(b), 0) : 0;

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Army, Buildings, KingdomStats } from '@/types';
+import { Army, Buildings, KingdomStats, StrategyName } from '@/types';
 import { BUILDING_DATA } from '../data/buildingData';
+import { TECHNOLOGY_TREES } from '../data/technologyData';
 
 interface QuickKingdomImportProps {
   setArmy: (army: Army) => void;
@@ -12,6 +13,12 @@ interface QuickKingdomImportProps {
   label?: string;
   setRace?: (race: string) => void; // Optional, for auto-detecting race
   onAfterImport?: (buildings: Buildings, stats: Partial<KingdomStats>, army: Army) => void;
+  techLevels?: Record<string, number>;
+  setTechLevels?: (techLevels: Record<string, number>) => void;
+  strategy?: StrategyName;
+  setStrategy?: (strategy: StrategyName) => void;
+  population?: Record<string, number>;
+  setPopulation?: (population: Record<string, number>) => void;
 }
 
 // Known units by race for detection
@@ -59,10 +66,37 @@ BUILDING_NAME_MAP['medical center'] = 'Medical Center';
 BUILDING_NAME_MAP['trainingcenter'] = 'Training Center';
 BUILDING_NAME_MAP['advancedtrainingcenter'] = 'Advanced Training Center';
 
+// Function to validate and correct technology imports based on tree dependencies
+function validateTechnologyImport(techLevels: Record<string, number>): Record<string, number> {
+  const correctedTechLevels: Record<string, number> = { ...techLevels };
+  
+  // Process each technology tree
+  for (const [treeName, techs] of Object.entries(TECHNOLOGY_TREES)) {
+    let previousTechCompleted = true;
+    
+    for (const tech of techs) {
+      const currentLevel = correctedTechLevels[tech.name] || 0;
+      
+      // If this tech has a level > 0 but the previous tech isn't completed, reset it
+      if (currentLevel > 0 && !previousTechCompleted) {
+        correctedTechLevels[tech.name] = 0;
+      }
+      
+      // Update the previous tech completion status for the next iteration
+      previousTechCompleted = (correctedTechLevels[tech.name] || 0) >= 1;
+    }
+  }
+  
+  return correctedTechLevels;
+}
+
 function parseKingdomText(text: string) {
   const army: Army = {};
   const buildings: Buildings = {};
   const stats: Partial<KingdomStats> = {};
+  const techLevels: Record<string, number> = {};
+  const population: Record<string, number> = {};
+  let strategy: StrategyName = null;
   let errors: string[] = [];
 
   // Army
@@ -82,7 +116,7 @@ function parseKingdomText(text: string) {
   }
 
   // Buildings
-  const buildingsMatch = text.match(/Buildings:([\s\S]*?)(?=Resources:|$)/i);
+  const buildingsMatch = text.match(/Buildings:([\s\S]*?)(?=Resources:|Technology:|Strategy:|Population:|$)/i);
   if (buildingsMatch) {
     const bldStr = buildingsMatch[1].replace(/ and /gi, ', ');
     const bldPairs = bldStr.split(',');
@@ -100,7 +134,7 @@ function parseKingdomText(text: string) {
   }
 
   // Resources
-  const resourcesMatch = text.match(/Resources:([\s\S]*)/i);
+  const resourcesMatch = text.match(/Resources:([\s\S]*?)(?=Technology:|Strategy:|Population:|$)/i);
   if (resourcesMatch) {
     const resStr = resourcesMatch[1];
     const resPairs = resStr.split(',');
@@ -113,29 +147,76 @@ function parseKingdomText(text: string) {
     }
   }
 
+  // Technology
+  const technologyMatch = text.match(/Technology:([\s\S]*?)(?=Strategy:|Population:|$)/i);
+  if (technologyMatch) {
+    const techStr = technologyMatch[1];
+    const techPairs = techStr.split(',');
+    for (const pair of techPairs) {
+      const m = pair.match(/([A-Za-z ]+):\s*(\d+)/);
+      if (m) {
+        const name = m[1].trim();
+        techLevels[name] = parseInt(m[2], 10);
+      }
+    }
+  }
+
+  // Strategy
+  const strategyMatch = text.match(/Strategy:([\s\S]*?)(?=Population:|$)/i);
+  if (strategyMatch) {
+    strategy = strategyMatch[1].trim() as StrategyName;
+  }
+
+  // Population
+  const populationMatch = text.match(/Population:([\s\S]*?)(?=\n|$)/i);
+  if (populationMatch) {
+    const popStr = populationMatch[1];
+    const popPairs = popStr.split(',');
+    for (const pair of popPairs) {
+      const m = pair.match(/([A-Za-z ]+):\s*(\d+)/);
+      if (m) {
+        const name = m[1].trim();
+        population[name] = parseInt(m[2], 10);
+      }
+    }
+  }
+
   // Estimate Land if not present
   if (stats['Land'] === undefined && Object.keys(buildings).length > 0) {
     const totalBuildings = Object.values(buildings).reduce((a, b) => a + b, 0);
     stats['Land'] = Math.ceil(totalBuildings / 10);
   }
 
-  return { army, buildings, stats, errors };
+  return { army, buildings, stats, techLevels, strategy, population, errors };
 }
 
-const QuickKingdomImport: React.FC<QuickKingdomImportProps> = ({ setArmy, setBuildings, setStats, army, buildings, stats, label, setRace, onAfterImport }) => {
+const QuickKingdomImport: React.FC<QuickKingdomImportProps> = ({ setArmy, setBuildings, setStats, army, buildings, stats, label, setRace, onAfterImport, techLevels, setTechLevels, strategy, setStrategy, population, setPopulation }) => {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [exportText, setExportText] = useState<string>('');
 
   const handleImport = () => {
-    const { army, buildings, stats, errors } = parseKingdomText(input);
+    const { army, buildings, stats, techLevels, strategy, population, errors } = parseKingdomText(input);
     if (errors.length > 0) {
       setError(errors.join(' '));
       return;
     }
+    
+    // Validate and correct technology imports based on tree dependencies
+    const validatedTechLevels = validateTechnologyImport(techLevels);
+    
     setArmy(army);
     setBuildings(buildings);
     setStats({ ...stats } as KingdomStats);
+    if (setTechLevels) {
+      setTechLevels(validatedTechLevels);
+    }
+    if (setStrategy) {
+      setStrategy(strategy);
+    }
+    if (setPopulation) {
+      setPopulation(population);
+    }
     if (setRace) {
       const detected = detectRace(army);
       if (detected) setRace(detected);
@@ -168,8 +249,21 @@ const QuickKingdomImport: React.FC<QuickKingdomImportProps> = ({ setArmy, setBui
     const resourcesStr = resourceEntries.length > 0
       ? 'Resources: ' + resourceEntries.map(([k, v]) => `${k}: ${v}`).join(', ')
       : '';
+    // Technology and Strategy
+    const techEntries = Object.entries(techLevels || {}).filter(([_, v]) => v > 0);
+    const techStr = techEntries.length > 0
+      ? 'Technology: ' + techEntries.map(([k, v]) => `${k}: ${v}`).join(', ')
+      : '';
+    const strategyStr = strategy
+      ? 'Strategy: ' + strategy
+      : '';
+    // Population
+    const populationEntries = Object.entries(population || {}).filter(([_, v]) => v > 0);
+    const populationStr = populationEntries.length > 0
+      ? 'Population: ' + populationEntries.map(([k, v]) => `${k}: ${v}`).join(', ')
+      : '';
     // Combine
-    return [armyStr, buildingsStr, resourcesStr].filter(Boolean).join('\n');
+    return [armyStr, buildingsStr, resourcesStr, techStr, strategyStr, populationStr].filter(Boolean).join('\n');
   };
 
   const handleExport = () => {
