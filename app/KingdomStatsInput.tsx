@@ -117,7 +117,7 @@ const KingdomStatsInput: React.FC<KingdomStatsInputProps> = ({ kingdomName, stat
                         min={0}
                         max={maxLevel}
                         className="w-12 p-1 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        value={currentLevel}
+                        value={typeof currentLevel === 'number' ? currentLevel : 0}
                         onChange={e => setTechLevels({ ...techLevels, [tech]: Math.max(0, Math.min(Number(e.target.value), maxLevel || 1)) })}
                         title={`Set level for ${tech}`}
                       />
@@ -146,9 +146,12 @@ const KingdomStatsInput: React.FC<KingdomStatsInputProps> = ({ kingdomName, stat
               <tbody>
                 {techs.map((tech, idx) => {
                   const prevTech = techs[idx - 1];
-                  const canResearch = idx === 0 || (prevTech && (techLevels[prevTech.name] || 0) >= 1);
-                  const isMultiLevel = tech.maxLevel && tech.maxLevel > 1;
-                  const currentLevel = techLevels[tech.name] || 0;
+                  const prevTechLevel = prevTech ? techLevels[prevTech.name] : undefined;
+                  const prevTechCompleted = typeof prevTechLevel === 'boolean' ? prevTechLevel : (prevTechLevel || 0) >= 1;
+                  const canResearch = idx === 0 || (prevTech && prevTechCompleted);
+                                  const isMultiLevel = tech.maxLevel && tech.maxLevel > 1;
+                const isBuildingTech = ['Habitation', 'Irrigation', 'Barrack', 'Machinery', 'Wood Recycling'].includes(tech.name);
+                const currentLevel = techLevels[tech.name] || 0;
                   return (
                     <tr key={tech.name} className="even:bg-gray-700">
                       <td className="p-1 font-medium">{tech.name}</td>
@@ -160,7 +163,7 @@ const KingdomStatsInput: React.FC<KingdomStatsInputProps> = ({ kingdomName, stat
                             min={0}
                             max={tech.maxLevel}
                             className="w-12 p-1 rounded bg-gray-900 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                            value={currentLevel}
+                            value={typeof currentLevel === 'number' ? currentLevel : 0}
                             onChange={e => {
                               const val = Math.max(0, Math.min(Number(e.target.value), tech.maxLevel || 1));
                               setTechLevels({ ...techLevels, [tech.name]: val });
@@ -171,8 +174,8 @@ const KingdomStatsInput: React.FC<KingdomStatsInputProps> = ({ kingdomName, stat
                         ) : (
                           <input
                             type="checkbox"
-                            checked={currentLevel >= 1}
-                            onChange={e => setTechLevels({ ...techLevels, [tech.name]: e.target.checked ? 1 : 0 })}
+                            checked={isBuildingTech ? Boolean(currentLevel) : (typeof currentLevel === 'number' ? currentLevel >= 1 : false)}
+                            onChange={e => setTechLevels({ ...techLevels, [tech.name]: isBuildingTech ? e.target.checked : (e.target.checked ? 1 : 0) })}
                             disabled={!canResearch}
                             title={`Research ${tech.name}`}
                           />

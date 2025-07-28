@@ -5,6 +5,7 @@ interface PopulationAssignmentProps {
   setPopulation: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   buildings: Record<string, number>;
   totalPop: number;
+  techLevels?: Record<string, number | boolean>;
 }
 
 const JOBS = [
@@ -25,7 +26,7 @@ const JOB_EFFICIENCY = {
 
 const isEfficiencyJob = (job: string): job is keyof typeof JOB_EFFICIENCY => job in JOB_EFFICIENCY;
 
-const calculateOptimalPopulation = (buildings: Record<string, number>, totalPop: number) => {
+const calculateOptimalPopulation = (buildings: Record<string, number>, totalPop: number, techLevels: Record<string, number | boolean> = {}) => {
   const optimal: Record<string, number> = {};
   for (const job of JOBS) {
     if (job.key === 'Training' || job.key === 'Exploration') {
@@ -38,7 +39,12 @@ const calculateOptimalPopulation = (buildings: Record<string, number>, totalPop:
       optimal[job.key] = (buildings['Farm'] || 0) * 60;
     } else if (isEfficiencyJob(job.key)) {
       const eff = JOB_EFFICIENCY[job.key];
-      optimal[job.key] = (buildings[eff.building] || 0) * eff.optimal;
+      let optimalPerBuilding = eff.optimal;
+      // Machinery technology affects mine optimal workers
+      if (job.key === 'Mine' && techLevels['Machinery']) {
+        optimalPerBuilding = 85;
+      }
+      optimal[job.key] = (buildings[eff.building] || 0) * optimalPerBuilding;
     } else {
       optimal[job.key] = 0;
     }
@@ -53,7 +59,7 @@ const calculateOptimalPopulation = (buildings: Record<string, number>, totalPop:
   return optimal;
 };
 
-const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population, setPopulation, buildings, totalPop }) => {
+const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population, setPopulation, buildings, totalPop, techLevels = {} }) => {
   const [efficiencyValues, setEfficiencyValues] = useState<Record<string, number>>({});
   const [manualOverride, setManualOverride] = useState<Record<string, boolean>>({});
   const prevBuildingsRef = useRef<Record<string, number>>(buildings);
@@ -82,7 +88,7 @@ const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population,
     }
     // On first load, set optimal if nothing assigned
     if (currentTotal === 0 && totalPop > 0) {
-      const optimalPopulation = calculateOptimalPopulation(buildings, totalPop);
+      const optimalPopulation = calculateOptimalPopulation(buildings, totalPop, techLevels);
       setPopulation(optimalPopulation);
     }
   }, [buildings, totalPop, setPopulation]);
@@ -94,7 +100,12 @@ const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population,
     if (job === 'Agriculture') return (buildings['Farm'] || 0) * 120;
     if (isEfficiencyJob(job)) {
       const eff = JOB_EFFICIENCY[job];
-      return (buildings[eff.building] || 0) * eff.max;
+      let max = eff.max;
+      // Machinery technology affects mine max workers
+      if (job === 'Mine' && techLevels['Machinery']) {
+        max = 170; // 2x optimal (85)
+      }
+      return (buildings[eff.building] || 0) * max;
     }
     return 0;
   };
@@ -105,7 +116,12 @@ const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population,
     if (job === 'Agriculture') return (buildings['Farm'] || 0) * 60;
     if (isEfficiencyJob(job)) {
       const eff = JOB_EFFICIENCY[job];
-      return (buildings[eff.building] || 0) * eff.optimal;
+      let optimal = eff.optimal;
+      // Machinery technology affects mine optimal workers
+      if (job === 'Mine' && techLevels['Machinery']) {
+        optimal = 85;
+      }
+      return (buildings[eff.building] || 0) * optimal;
     }
     return 0;
   };
@@ -221,7 +237,7 @@ const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population,
           <div className="flex gap-2">
             <button
               onClick={() => {
-                const optimalPopulation = calculateOptimalPopulation(buildings, totalPop);
+                const optimalPopulation = calculateOptimalPopulation(buildings, totalPop, techLevels);
                 setPopulation(optimalPopulation);
               }}
               className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded transition"
