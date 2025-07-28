@@ -28,12 +28,11 @@ const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, b
   const mineOpt = BUILDING_DATA['Mine'].optimal_workers || 100;
   const mineMax = 200; // If you want to make this dynamic, add to BUILDING_DATA
   let mineBase = BUILDING_DATA['Mine'].production_per_day || 4;
-  let minePeak = 8.5; // Default fallback
+  let minePeak = mineBase + (mineBase / 2); // Peak is base + (base/2)
   if (BUILDING_DATA['Mine'].per_race_bonus && BUILDING_DATA['Mine'].per_race_bonus[race]) {
     if (BUILDING_DATA['Mine'].per_race_bonus[race].production_per_day)
       mineBase = BUILDING_DATA['Mine'].per_race_bonus[race].production_per_day;
-    if (BUILDING_DATA['Mine'].per_race_bonus[race].production_peak)
-      minePeak = BUILDING_DATA['Mine'].per_race_bonus[race].production_peak;
+    minePeak = mineBase + (mineBase / 2); // Recalculate peak after race bonus
   }
   // If you want to make minePeak race-specific, add production_peak to per_race_bonus in buildingData
   let ironProd = 0;
@@ -55,12 +54,11 @@ const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, b
   const lumberOpt = BUILDING_DATA['Mill'].optimal_workers || 85;
   const lumberMax = 170; // If you want to make this dynamic, add to BUILDING_DATA
   let lumberBase = BUILDING_DATA['Mill'].production_per_day || 5;
-  let lumberPeak = 9.5; // Default fallback
+  let lumberPeak = lumberBase + (lumberBase / 2); // Peak is base + (base/2)
   if (BUILDING_DATA['Mill'].per_race_bonus && BUILDING_DATA['Mill'].per_race_bonus[race]) {
     if (BUILDING_DATA['Mill'].per_race_bonus[race].production_per_day)
       lumberBase = BUILDING_DATA['Mill'].per_race_bonus[race].production_per_day;
-    if (BUILDING_DATA['Mill'].per_race_bonus[race].production_peak)
-      lumberPeak = BUILDING_DATA['Mill'].per_race_bonus[race].production_peak;
+    lumberPeak = lumberBase + (lumberBase / 2); // Recalculate peak after race bonus
   }
   // If you want to make lumberPeak race-specific, add production_peak to per_race_bonus in buildingData
   let woodProd = 0;
@@ -82,12 +80,11 @@ const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, b
   const agriOpt = BUILDING_DATA['Farm'].optimal_workers || 60;
   const agriMax = 120; // If you want to make this dynamic, add to BUILDING_DATA
   let agriBase = BUILDING_DATA['Farm'].production_per_day || 100;
-  let agriPeak = 145; // Default fallback
+  let agriPeak = agriBase + (agriBase / 2); // Peak is base + (base/2)
   if (BUILDING_DATA['Farm'].per_race_bonus && BUILDING_DATA['Farm'].per_race_bonus[race]) {
     if (BUILDING_DATA['Farm'].per_race_bonus[race].production_per_day)
       agriBase = BUILDING_DATA['Farm'].per_race_bonus[race].production_per_day;
-    if (BUILDING_DATA['Farm'].per_race_bonus[race].production_peak)
-      agriPeak = BUILDING_DATA['Farm'].per_race_bonus[race].production_peak;
+    agriPeak = agriBase + (agriBase / 2); // Recalculate peak after race bonus
   }
   // If you want to make agriPeak race-specific, add production_peak to per_race_bonus in buildingData
   let foodProd = 0;
