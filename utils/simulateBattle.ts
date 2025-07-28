@@ -78,8 +78,8 @@ export function simulateBattle(
     const enemyRemainingPercent = enemyInitialTotal > 0 ? (enemyTotalUnits / enemyInitialTotal) * 100 : 0;
     
     // Determine retreat thresholds based on strategies
-    const yourRetreatThreshold = yourStrategy === 'Quick Retreat' ? 35 : 20;
-    const enemyRetreatThreshold = enemyStrategy === 'Quick Retreat' ? 35 : 20;
+    const yourRetreatThreshold = yourStrategy === 'Quick Retreat' ? 40 : 20;
+    const enemyRetreatThreshold = enemyStrategy === 'Quick Retreat' ? 40 : 20;
     
     // Check for retreat conditions
     if (yourRemainingPercent < yourRetreatThreshold && enemyRemainingPercent < enemyRetreatThreshold) {
@@ -98,11 +98,11 @@ export function simulateBattle(
       const yourCasualties = yourInitialTotal > 0 ? ((yourInitialTotal - yourTotalUnits) / yourInitialTotal) * 100 : 0;
       const enemyCasualties = enemyInitialTotal > 0 ? ((enemyInitialTotal - enemyTotalUnits) / enemyInitialTotal) * 100 : 0;
       
-      // Attacker wins if they cause ≥35% casualties AND suffer less % casualties than defender
-      if (yourCasualties >= 35 && yourCasualties < enemyCasualties) {
+      // Attacker wins if they cause ≥40% casualties AND suffer less % casualties than defender
+      if (yourCasualties >= 40 && yourCasualties < enemyCasualties) {
         winner = 'yourArmy';
         break;
-      } else if (enemyCasualties >= 35 && enemyCasualties < yourCasualties) {
+      } else if (enemyCasualties >= 40 && enemyCasualties < yourCasualties) {
         winner = 'enemyArmy';
         break;
       }
@@ -173,8 +173,8 @@ export function simulateBattle(
 
     
     // Determine retreat thresholds based on strategies (final check)
-    const yourRetreatThreshold = yourStrategy === 'Quick Retreat' ? 35 : 20;
-    const enemyRetreatThreshold = enemyStrategy === 'Quick Retreat' ? 35 : 20;
+    const yourRetreatThreshold = yourStrategy === 'Quick Retreat' ? 40 : 20;
+    const enemyRetreatThreshold = enemyStrategy === 'Quick Retreat' ? 40 : 20;
     
     // Check for retreat conditions
     if (yourRemainingPercent < yourRetreatThreshold && enemyRemainingPercent < enemyRetreatThreshold) {

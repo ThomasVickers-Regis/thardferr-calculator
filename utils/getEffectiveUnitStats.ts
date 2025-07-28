@@ -102,11 +102,7 @@ export function getEffectiveUnitStats(
                 stats.melee *= strategyEffects.knights_damage_multiplier;
             }
         }
-        if (strategy === 'Quick Retreat' && strategyEffects.all_unit_attack_multiplier) {
-            stats.melee *= strategyEffects.all_unit_attack_multiplier;
-            stats.short *= strategyEffects.all_unit_attack_multiplier;
-            stats.range *= strategyEffects.all_unit_attack_multiplier;
-        }
+
         if (strategy === 'Anti-Cavalry' && strategyEffects.all_units_attack_multiplier) {
             if (!isPikemanUnit(unitName, race)) {
                 stats.melee *= strategyEffects.all_units_attack_multiplier;

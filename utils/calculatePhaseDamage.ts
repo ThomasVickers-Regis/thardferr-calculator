@@ -109,7 +109,7 @@ export function calculatePhaseDamage(
   const rawDamagePerUnit: Record<string, number> = {};
 
   // Pre-calculate raw damage and mitigation pools.
-  const { totalDamage, pikemenDamage, preScaledTotalDamage, preScaledPikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy, doubleRangedDamage);
+  const { totalDamage, pikemenDamage, preScaledTotalDamage, preScaledPikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy, doubleRangedDamage, defenderStrategy);
   
   // Apply Fortification technology effect: reduces attacker damage by 5% when defender has it
   let fortificationReduction = 1.0;
@@ -152,6 +152,15 @@ export function calculatePhaseDamage(
     const gffMsg = 'Gnome Far Fighting: Doubles ranged attacks this phase.';
     if (!buildingEffectsLog.includes(gffMsg)) {
       buildingEffectsLog.push(gffMsg);
+    }
+  }
+
+  // Add Quick Retreat effect if active
+  const quickRetreatActive = (attackerStrategy === 'Quick Retreat' || defenderStrategy === 'Quick Retreat');
+  if (quickRetreatActive) {
+    const qrMsg = 'Quick Retreat: Reduces attack damage by 50% for both armies.';
+    if (!buildingEffectsLog.includes(qrMsg)) {
+      buildingEffectsLog.push(qrMsg);
     }
   }
 
@@ -317,15 +326,19 @@ function handleInfantryAttack(
 
 // Helper functions to break down the main function's logic.
 
-function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number, defendingArmy: Army, doubleRangedDamage: boolean = false): { totalDamage: number; pikemenDamage: number; preScaledTotalDamage: number; preScaledPikemenDamage: number; } {
+function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number, defendingArmy: Army, doubleRangedDamage: boolean = false, defenderStrategy: StrategyName | null = null): { totalDamage: number; pikemenDamage: number; preScaledTotalDamage: number; preScaledPikemenDamage: number; } {
     let totalDamage = 0;
     let pikemenDamage = 0;
     let preScaledTotalDamage = 0;
     let preScaledPikemenDamage = 0;
 
+    // Quick Retreat: If either army uses Quick Retreat, both armies get 50% attack reduction
+    const quickRetreatActive = (attackerStrategy === 'Quick Retreat' || defenderStrategy === 'Quick Retreat');
+    const attackReductionFactor = quickRetreatActive ? 0.5 : 1.0;
+
     for (const [attackerName, attackerCount] of Object.entries(attackingArmy)) {
         if ((attackerCount as number) <= 0) continue;
-        const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, attackerStrategy, true, ksDifferenceFactor, undefined, attackingArmy);
+        const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, attackerStrategy, true, ksDifferenceFactor, defenderStrategy, attackingArmy);
         let attackValue = 0;
         if (phaseType === 'range') attackValue = attackerStats.range;
         else if (phaseType === 'short') {
@@ -343,6 +356,9 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
                 attackValue = attackerStats.melee;
             }
         }
+
+        // Apply Quick Retreat attack reduction
+        attackValue *= attackReductionFactor;
 
         const currentUnitDamage = (attackerCount as number) * attackValue;
         preScaledTotalDamage += currentUnitDamage;
@@ -504,7 +520,7 @@ function getStrategyEffects(unitName: string, race: string, strategy: StrategyNa
         effects.push(`Surrounding: +${strategyEffects.shadow_warriors_defense_increase} Defense, deals full damage in short phase.`);
     }
     if (strategy === 'Quick Retreat') {
-        effects.push(`Quick Retreat: -${((1 - strategyEffects.all_unit_attack_multiplier) * 100).toFixed(0)}% Attack, 50% chance to lose on victory.`);
+        effects.push(`Quick Retreat: -${((1 - strategyEffects.all_unit_attack_multiplier) * 100).toFixed(0)}% Attack, 40% retreat threshold, 50% chance to lose on victory.`);
     }
     if (strategy === 'Anti-Cavalry') {
         if (isPikemanUnit(unitName, race)) {
