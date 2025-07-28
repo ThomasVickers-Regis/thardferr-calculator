@@ -16,6 +16,7 @@ import KingdomStatsInput from './KingdomStatsInput';
 import BuildingTable from './BuildingTable';
 import ProjectedProduction from './ProjectedProduction';
 import ProjectedWeaponsSummary from './ProjectedWeaponsSummary';
+
 import KingdomSummary from './KingdomSummary';
 import PopulationAssignment from './PopulationAssignment';
 import BattleReport from './BattleReport';
@@ -128,7 +129,11 @@ function calculateKS(army: Army, buildings: Buildings, population: Record<string
   // Tech levels: 1000 KS per level
   if (techLevels) {
     for (const lvl of Object.values(techLevels)) {
-      ks += 1000 * (typeof lvl === 'number' ? lvl : parseInt(lvl as string) || 0);
+      if (typeof lvl === 'number') {
+        ks += 1000 * lvl;
+      } else if (typeof lvl === 'boolean' && lvl) {
+        ks += 1000; // Boolean true = 1 level
+      }
     }
   }
   // No population bonus for now
@@ -225,18 +230,29 @@ export default function MainApp() {
   }, [enemyKingdomStats.Castles]);
 
   // Calculate total population for each kingdom
-  const calcTotalPop = (buildings: Buildings) => {
+  const calcTotalPop = (buildings: Buildings, techLevels: TechLevels = {}) => {
     let total = 0;
     for (const [b, count] of Object.entries(buildings)) {
       const n = typeof count === 'number' ? count : parseInt(count as string) || 0;
-      if (b === 'House') total += n * 100;
+      if (b === 'House') {
+        // Habitation technology increases peasants per house from 100 to 115
+        const hasHabitation = (techLevels['Habitation'] || 0) > 0;
+        const peasantsPerHouse = hasHabitation ? 115 : 100;
+        total += n * peasantsPerHouse;
+      }
       else if (b === 'Castle') total += n * 10;
+      else if (b === 'Guard House') {
+        // Barrack technology increases soldiers per guard house from 40 to 65
+        const hasBarrack = (techLevels['Barrack'] || 0) > 0;
+        const soldiersPerGuardHouse = hasBarrack ? 65 : 40;
+        total += n * soldiersPerGuardHouse;
+      }
       else total += n * 10;  // All other buildings provide 10 population each
     }
     return total;
   };
-  const yourTotalPop = calcTotalPop(yourBuildings);
-  const enemyTotalPop = calcTotalPop(enemyBuildings);
+  const yourTotalPop = calcTotalPop(yourBuildings, yourTechLevels);
+  const enemyTotalPop = calcTotalPop(enemyBuildings, enemyTechLevels);
 
   // Initialize enemy buildings and population to start empty like your army side
   useEffect(() => {
@@ -316,6 +332,12 @@ export default function MainApp() {
               stats={yourKingdomStats}
               label="Quick Kingdom Import"
               setRace={setYourRace}
+              techLevels={yourTechLevels}
+              setTechLevels={setYourTechLevels}
+              strategy={yourStrategy}
+              setStrategy={setYourStrategy}
+              population={yourPopulation}
+              setPopulation={setYourPopulation}
               // After import, update castles and building ratios
               onAfterImport={(buildings: Buildings, stats: Partial<KingdomStats>, army: Army) => {
                 const totalBuildings = buildings ? Object.values(buildings).reduce((a, b) => Number(a) + Number(b), 0) : 0;
@@ -341,6 +363,7 @@ export default function MainApp() {
               calculatedPopulation={yourTotalPop}
               race={yourRace}
             />
+
             <ArmyInput
               armyName="Your Army"
               army={yourArmy}
@@ -357,6 +380,7 @@ export default function MainApp() {
               setPopulation={setYourPopulation}
               buildings={yourBuildings}
               totalPop={yourTotalPop}
+              techLevels={yourTechLevels}
             />
             {/* Add BuildingTable below ArmyInput */}
             <BuildingTable
@@ -378,12 +402,14 @@ export default function MainApp() {
               army={yourArmy}
               land={Number(yourKingdomStats.Land) || 0}
               race={yourRace}
+              techLevels={yourTechLevels}
             />
             <ProjectedWeaponsSummary
               race={yourRace}
               blacksmithingEfficiency={Math.floor((yourPopulation['Blacksmithing'] || 0) / 30)}
               population={yourPopulation}
               buildings={yourBuildings}
+              techLevels={yourTechLevels}
             />
                     <EnemyCounterOptimizer 
           yourArmy={yourArmy} 
@@ -426,6 +452,12 @@ export default function MainApp() {
               stats={enemyKingdomStats}
               label="Quick Enemy Import"
               setRace={setEnemyRace}
+              techLevels={enemyTechLevels}
+              setTechLevels={setEnemyTechLevels}
+              strategy={enemyStrategy}
+              setStrategy={setEnemyStrategy}
+              population={enemyPopulation}
+              setPopulation={setEnemyPopulation}
               // After import, update castles and building ratios
               onAfterImport={(buildings: Buildings, stats: Partial<KingdomStats>, army: Army) => {
                 const totalBuildings = buildings ? Object.values(buildings).reduce((a, b) => Number(a) + Number(b), 0) : 0;
@@ -451,6 +483,7 @@ export default function MainApp() {
               calculatedPopulation={enemyTotalPop}
               race={enemyRace}
             />
+
             <ArmyInput
               armyName="Enemy Army"
               army={enemyArmy}
@@ -467,6 +500,7 @@ export default function MainApp() {
               setPopulation={setEnemyPopulation}
               buildings={enemyBuildings}
               totalPop={enemyTotalPop}
+              techLevels={enemyTechLevels}
             />
             {/* Add BuildingTable below ArmyInput */}
             <BuildingTable
@@ -488,12 +522,14 @@ export default function MainApp() {
               army={enemyArmy}
               land={Number(enemyKingdomStats.Land) || 0}
               race={enemyRace}
+              techLevels={enemyTechLevels}
             />
             <ProjectedWeaponsSummary
               race={enemyRace}
               blacksmithingEfficiency={Math.floor((enemyPopulation['Blacksmithing'] || 0) / 30)}
               population={enemyPopulation}
               buildings={enemyBuildings}
+              techLevels={enemyTechLevels}
             />
                     <EnemyCounterOptimizer 
           yourArmy={enemyArmy} 

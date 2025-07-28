@@ -109,7 +109,19 @@ export function calculatePhaseDamage(
   const rawDamagePerUnit: Record<string, number> = {};
 
   // Pre-calculate raw damage and mitigation pools.
-  const { totalDamage, pikemenDamage, preScaledTotalDamage, preScaledPikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy, doubleRangedDamage);
+  const { totalDamage, pikemenDamage, preScaledTotalDamage, preScaledPikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy, doubleRangedDamage, defenderStrategy);
+  
+  // Apply Fortification technology effect: reduces attacker damage by 5% when defender has it
+  let fortificationReduction = 1.0;
+  // Note: techLevels here is the defender's tech levels, not the attacker's
+  const hasFortification = (techLevels['Fortification'] || 0) > 0;
+  if (hasFortification && isBattleDefender) {
+    fortificationReduction = 0.95; // 5% damage reduction
+  }
+  
+  // Apply the fortification reduction to the calculated damage
+  const adjustedTotalDamage = totalDamage * fortificationReduction;
+  const adjustedPikemenDamage = pikemenDamage * fortificationReduction;
   // Calculate the maximum possible mitigation pool (before capping by total damage)
   let maxTotalMitigation = 0;
   const totalDefenders = Object.values(defendingArmy).reduce((sum, count) => sum + count, 0);
@@ -130,6 +142,11 @@ export function calculatePhaseDamage(
   }
   const { totalMitigation, buildingEffectsLog } = calculateTotalMitigation(defendingArmy, defenderBuildings, phaseType, isBattleDefender);
 
+  // Add Fortification effect to building effects log if defender has it and damage was reduced
+  if (hasFortification && isBattleDefender && totalDamage > 0) {
+    buildingEffectsLog.push('Fortification: Reduces incoming damage by 5%');
+  }
+
   // Add Gnome Far Fighting effect to both sides if active in range phase
   if (doubleRangedDamage && phaseType === 'range') {
     const gffMsg = 'Gnome Far Fighting: Doubles ranged attacks this phase.';
@@ -138,8 +155,17 @@ export function calculatePhaseDamage(
     }
   }
 
+  // Add Quick Retreat effect if active
+  const quickRetreatActive = (attackerStrategy === 'Quick Retreat' || defenderStrategy === 'Quick Retreat');
+  if (quickRetreatActive) {
+    const qrMsg = 'Quick Retreat: Reduces attack damage by 50% for both armies.';
+    if (!buildingEffectsLog.includes(qrMsg)) {
+      buildingEffectsLog.push(qrMsg);
+    }
+  }
+
   const defenderUnitNames = Object.keys(defendingArmy).filter(u => defendingArmy[u] > 0);
-  if (defenderUnitNames.length === 0) return { losses: {}, damageLog: [], rawTotalDamage: totalDamage, totalMitigation, mitigationPerUnit: {}, rawDamagePerUnit: {}, maxTotalMitigation, preScaledTotalDamage, preScaledPikemenDamage };
+  if (defenderUnitNames.length === 0) return { losses: {}, damageLog: [], rawTotalDamage: adjustedTotalDamage, totalMitigation, mitigationPerUnit: {}, rawDamagePerUnit: {}, maxTotalMitigation, preScaledTotalDamage, preScaledPikemenDamage };
   
   // Now, calculate losses and create the final log entries.
   for (const defenderName of defenderUnitNames) {
@@ -154,8 +180,8 @@ export function calculatePhaseDamage(
           techLevels,
           defenderStrategy,
           ksDifferenceFactor,
-          totalDamage,
-          pikemenDamage,
+          adjustedTotalDamage,
+          adjustedPikemenDamage,
           attackerStrategy,
           totalMitigation,
           buildingEffectsLog,
@@ -187,7 +213,7 @@ export function calculatePhaseDamage(
               rawDamageAllocatedToStack,
               mitigationAllocatedToStack,
               totalMitigation,
-              totalRawDamage: totalDamage,
+              totalRawDamage: adjustedTotalDamage,
               maxTotalMitigation,
               preScaledTotalDamage,
               preScaledPikemenDamage
@@ -195,7 +221,7 @@ export function calculatePhaseDamage(
       });
   }
 
-  return { losses, damageLog, rawTotalDamage: totalDamage, totalMitigation, mitigationPerUnit, rawDamagePerUnit, maxTotalMitigation, preScaledTotalDamage, preScaledPikemenDamage };
+  return { losses, damageLog, rawTotalDamage: adjustedTotalDamage, totalMitigation, mitigationPerUnit, rawDamagePerUnit, maxTotalMitigation, preScaledTotalDamage, preScaledPikemenDamage };
 }
 
 function handleInfantryAttack(
@@ -300,15 +326,19 @@ function handleInfantryAttack(
 
 // Helper functions to break down the main function's logic.
 
-function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number, defendingArmy: Army, doubleRangedDamage: boolean = false): { totalDamage: number; pikemenDamage: number; preScaledTotalDamage: number; preScaledPikemenDamage: number; } {
+function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, techLevels: TechLevels, attackerStrategy: StrategyName | null, phaseType: PhaseType, ksDifferenceFactor: number, defendingArmy: Army, doubleRangedDamage: boolean = false, defenderStrategy: StrategyName | null = null): { totalDamage: number; pikemenDamage: number; preScaledTotalDamage: number; preScaledPikemenDamage: number; } {
     let totalDamage = 0;
     let pikemenDamage = 0;
     let preScaledTotalDamage = 0;
     let preScaledPikemenDamage = 0;
 
+    // Quick Retreat: If either army uses Quick Retreat, both armies get 50% attack reduction
+    const quickRetreatActive = (attackerStrategy === 'Quick Retreat' || defenderStrategy === 'Quick Retreat');
+    const attackReductionFactor = quickRetreatActive ? 0.5 : 1.0;
+
     for (const [attackerName, attackerCount] of Object.entries(attackingArmy)) {
         if ((attackerCount as number) <= 0) continue;
-        const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, attackerStrategy, true, ksDifferenceFactor, undefined, attackingArmy);
+        const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, attackerStrategy, true, ksDifferenceFactor, defenderStrategy, attackingArmy);
         let attackValue = 0;
         if (phaseType === 'range') attackValue = attackerStats.range;
         else if (phaseType === 'short') {
@@ -326,6 +356,9 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
                 attackValue = attackerStats.melee;
             }
         }
+
+        // Apply Quick Retreat attack reduction
+        attackValue *= attackReductionFactor;
 
         const currentUnitDamage = (attackerCount as number) * attackValue;
         preScaledTotalDamage += currentUnitDamage;
@@ -346,6 +379,11 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
         preScaledPikemenDamage *= 2;
     }
 
+    // Fortification: Reduces attacker damage by 5% when defender has this technology
+    // Note: We need to check if the defender has Fortification technology
+    // Since we don't have direct access to defender tech levels here, we'll need to pass it through
+    // For now, we'll implement this in the calling function where we have access to defender tech levels
+    
     // Save pre-scaled values before scaling
     const preScaleTotal = preScaledTotalDamage;
     const preScalePikemen = preScaledPikemenDamage;
@@ -482,7 +520,7 @@ function getStrategyEffects(unitName: string, race: string, strategy: StrategyNa
         effects.push(`Surrounding: +${strategyEffects.shadow_warriors_defense_increase} Defense, deals full damage in short phase.`);
     }
     if (strategy === 'Quick Retreat') {
-        effects.push(`Quick Retreat: -${((1 - strategyEffects.all_unit_attack_multiplier) * 100).toFixed(0)}% Attack, 50% chance to lose on victory.`);
+        effects.push(`Quick Retreat: -${((1 - strategyEffects.all_unit_attack_multiplier) * 100).toFixed(0)}% Attack, 40% retreat threshold, 50% chance to lose on victory.`);
     }
     if (strategy === 'Anti-Cavalry') {
         if (isPikemanUnit(unitName, race)) {
@@ -556,7 +594,7 @@ export function simulateBattlePhase(
     state.enemyArmy,
     state.yourArmy,
     phase,
-    state.enemyTechLevels,
+    state.yourTechLevels, // FIXED: use defender's tech levels (your army is defending)
     state.enemyStrategy as StrategyName,
     state.yourStrategy as StrategyName,
     state.yourStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
@@ -571,7 +609,7 @@ export function simulateBattlePhase(
     state.yourArmy,
     state.enemyArmy,
     phase,
-    state.yourTechLevels,
+    state.enemyTechLevels, // FIXED: use defender's tech levels (enemy army is defending)
     state.yourStrategy as StrategyName,
     state.enemyStrategy as StrategyName,
     state.enemyStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
