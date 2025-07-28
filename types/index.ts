@@ -2,7 +2,7 @@ export type Army = Record<string, number>;
 
 export type PhaseType = 'range' | 'short' | 'melee';
 
-export type TechLevels = Record<string, number | boolean>;
+export type TechLevels = Record<string, number>;
 
 export type StrategyName =
   | 'Human Charging!'

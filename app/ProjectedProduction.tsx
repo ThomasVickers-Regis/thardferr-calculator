@@ -9,7 +9,7 @@ interface ProjectedProductionProps {
   army: Army;
   land: number;
   race: string;
-  techLevels?: Record<string, number | boolean>;
+  techLevels?: Record<string, number>;
 }
 
 const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, buildings, army, land, race, techLevels = {} }) => {
@@ -29,7 +29,7 @@ const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, b
   let mineOpt = BUILDING_DATA['Mine'].optimal_workers || 100;
   let mineMax = 200; // If you want to make this dynamic, add to BUILDING_DATA
   // Machinery technology decreases optimal workers for mines from 100 to 85
-  const hasMachinery = techLevels['Machinery'] || false;
+  const hasMachinery = (techLevels['Machinery'] || 0) > 0;
   if (hasMachinery) {
     mineOpt = 85;
     mineMax = 170; // Max is 2x optimal
@@ -62,7 +62,7 @@ const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, b
   const lumberMax = 170; // If you want to make this dynamic, add to BUILDING_DATA
   let lumberBase = BUILDING_DATA['Mill'].production_per_day || 5;
   // Wood Recycling technology increases wood production by 1.5 per mill
-  const hasWoodRecycling = techLevels['Wood Recycling'] || false;
+  const hasWoodRecycling = (techLevels['Wood Recycling'] || 0) > 0;
   if (hasWoodRecycling) {
     lumberBase += 1.5;
   }
@@ -97,7 +97,7 @@ const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, b
   const agriMax = 120; // If you want to make this dynamic, add to BUILDING_DATA
   let agriBase = BUILDING_DATA['Farm'].production_per_day || 100;
   // Irrigation technology increases food production per farm by 15
-  const hasIrrigation = techLevels['Irrigation'] || false;
+  const hasIrrigation = (techLevels['Irrigation'] || 0) > 0;
   if (hasIrrigation) {
     agriBase += 15; // Adds 15 food
   }
@@ -127,7 +127,13 @@ const ProjectedProduction: React.FC<ProjectedProductionProps> = ({ population, b
   }
   // Gold: min(markets, land) × (maxPop / land) × 1.25
   const markets = get('Market');
-  const goldProd = Math.round(Math.min(markets, land || 1) * (maxPop / (land || 1)) * 1.25);
+  let goldMultiplier = 1.25;
+  // Commerce technology increases gold production by 10%
+  const hasCommerce = (techLevels['Commerce'] || 0) > 0;
+  if (hasCommerce) {
+    goldMultiplier = 1.375; // 1.25 + 10% = 1.375
+  }
+  const goldProd = Math.round(Math.min(markets, land || 1) * (maxPop / (land || 1)) * goldMultiplier);
   // Food upkeep: 1 per 6 people + units' food upkeep (use maxPop, not assigned)
   const foodUpkeepPop = Math.ceil(maxPop / 6);
   let foodUpkeepUnits = 0;

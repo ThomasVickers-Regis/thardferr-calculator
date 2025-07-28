@@ -43,7 +43,7 @@ export function simulateRound(
       enemyRace,
       yourRace,
       undefined,
-      isYourArmyTheDefender,
+      isYourArmyTheDefender, // Your army is defending when isYourArmyTheDefender is true
       doubleRangedDamage
     );
 
@@ -62,7 +62,7 @@ export function simulateRound(
       yourRace,
       enemyRace,
       undefined,
-      !isYourArmyTheDefender,
+      !isYourArmyTheDefender, // Enemy army is defending when isYourArmyTheDefender is false
       doubleRangedDamage
     );
 

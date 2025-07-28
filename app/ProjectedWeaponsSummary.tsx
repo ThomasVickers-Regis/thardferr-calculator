@@ -5,6 +5,7 @@ interface ProjectedWeaponsSummaryProps {
   blacksmithingEfficiency: number;
   population: Record<string, number>;
   buildings: Record<string, number>;
+  techLevels?: Record<string, number>;
 }
 
 const WEAPON_DATA_BY_RACE: Record<string, Array<{ name: string; iron: number; wood: number; gold: number }>> = {
@@ -50,7 +51,7 @@ const WEAPON_DATA_BY_RACE: Record<string, Array<{ name: string; iron: number; wo
   ],
 };
 
-const ProjectedWeaponsSummary: React.FC<ProjectedWeaponsSummaryProps> = ({ race, blacksmithingEfficiency, population, buildings }) => {
+const ProjectedWeaponsSummary: React.FC<ProjectedWeaponsSummaryProps> = ({ race, blacksmithingEfficiency, population, buildings, techLevels = {} }) => {
   const weapons = WEAPON_DATA_BY_RACE[race] || [];
   const forges = typeof buildings['Forge'] === 'number' ? buildings['Forge'] : parseInt(buildings['Forge'] || '0', 10) || 0;
   const assigned = population['Blacksmithing'] || 0;
@@ -64,8 +65,29 @@ const ProjectedWeaponsSummary: React.FC<ProjectedWeaponsSummaryProps> = ({ race,
     const t = (perForge - 80) / (160 - 80);
     outputPerForge = (1 - t) * 1.5 + t * 3;
   }
-  const totalProduced = forges > 0 ? Math.floor(forges * outputPerForge) : 0;
-  const summary = weapons.map(w => `${totalProduced} ${w.name}`).join(', ');
+  let totalProduced = forges > 0 ? Math.floor(forges * outputPerForge) : 0;
+  
+  // Apply technology bonuses
+      const hasAnimalTraining = (techLevels['Animal training'] || 0) > 0;
+    const hasBlacksmithing = (techLevels['Blacksmithing'] || 0) > 0;
+  
+  // Animal Training boosts horse/animal weapons by 20%
+  const animalWeapons = ['Horse', 'Poney', 'Wolf'];
+  const animalWeaponBonus = hasAnimalTraining ? 1.2 : 1;
+  
+  // Blacksmithing boosts blade weapons by 20%
+  const bladeWeapons = ['Sword', 'Axe', 'Hammer', 'Lance', 'Spear'];
+  const bladeWeaponBonus = hasBlacksmithing ? 1.2 : 1;
+  
+  const summary = weapons.map(w => {
+    let weaponCount = totalProduced;
+    if (animalWeapons.includes(w.name)) {
+      weaponCount = Math.floor(totalProduced * animalWeaponBonus);
+    } else if (bladeWeapons.includes(w.name)) {
+      weaponCount = Math.floor(totalProduced * bladeWeaponBonus);
+    }
+    return `${weaponCount} ${w.name}`;
+  }).join(', ');
   return (
     <div className="p-4 bg-gray-800 rounded-lg mb-4">
       <h3 className="text-lg font-semibold mb-2">Armory Production</h3>

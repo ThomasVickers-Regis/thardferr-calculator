@@ -236,14 +236,14 @@ export default function MainApp() {
       const n = typeof count === 'number' ? count : parseInt(count as string) || 0;
       if (b === 'House') {
         // Habitation technology increases peasants per house from 100 to 115
-        const hasHabitation = techLevels['Habitation'] || false;
+        const hasHabitation = (techLevels['Habitation'] || 0) > 0;
         const peasantsPerHouse = hasHabitation ? 115 : 100;
         total += n * peasantsPerHouse;
       }
       else if (b === 'Castle') total += n * 10;
       else if (b === 'Guard House') {
         // Barrack technology increases soldiers per guard house from 40 to 65
-        const hasBarrack = techLevels['Barrack'] || false;
+        const hasBarrack = (techLevels['Barrack'] || 0) > 0;
         const soldiersPerGuardHouse = hasBarrack ? 65 : 40;
         total += n * soldiersPerGuardHouse;
       }
@@ -403,6 +403,7 @@ export default function MainApp() {
               blacksmithingEfficiency={Math.floor((yourPopulation['Blacksmithing'] || 0) / 30)}
               population={yourPopulation}
               buildings={yourBuildings}
+              techLevels={yourTechLevels}
             />
                     <EnemyCounterOptimizer 
           yourArmy={yourArmy} 
@@ -516,6 +517,7 @@ export default function MainApp() {
               blacksmithingEfficiency={Math.floor((enemyPopulation['Blacksmithing'] || 0) / 30)}
               population={enemyPopulation}
               buildings={enemyBuildings}
+              techLevels={enemyTechLevels}
             />
                     <EnemyCounterOptimizer 
           yourArmy={enemyArmy} 

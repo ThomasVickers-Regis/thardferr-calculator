@@ -5,7 +5,7 @@ interface PopulationAssignmentProps {
   setPopulation: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   buildings: Record<string, number>;
   totalPop: number;
-  techLevels?: Record<string, number | boolean>;
+  techLevels?: Record<string, number>;
 }
 
 const JOBS = [
@@ -26,13 +26,18 @@ const JOB_EFFICIENCY = {
 
 const isEfficiencyJob = (job: string): job is keyof typeof JOB_EFFICIENCY => job in JOB_EFFICIENCY;
 
-const calculateOptimalPopulation = (buildings: Record<string, number>, totalPop: number, techLevels: Record<string, number | boolean> = {}) => {
+const calculateOptimalPopulation = (buildings: Record<string, number>, totalPop: number, techLevels: Record<string, number> = {}) => {
   const optimal: Record<string, number> = {};
   for (const job of JOBS) {
     if (job.key === 'Training' || job.key === 'Exploration') {
       optimal[job.key] = 0;
     } else if (job.key === 'Building') {
-      optimal[job.key] = (buildings['Building'] || 0) * 150;
+      let buildingEfficiency = 150;
+      // Carpentry technology increases building construction speed by 50%
+      if ((techLevels['Carpentry'] || 0) > 0) {
+        buildingEfficiency = 225; // 150 + 50% = 225
+      }
+      optimal[job.key] = (buildings['Building'] || 0) * buildingEfficiency;
     } else if (job.key === 'Blacksmithing') {
       optimal[job.key] = (buildings['Forge'] || 0) * 80;
     } else if (job.key === 'Agriculture') {
@@ -41,7 +46,7 @@ const calculateOptimalPopulation = (buildings: Record<string, number>, totalPop:
       const eff = JOB_EFFICIENCY[job.key];
       let optimalPerBuilding = eff.optimal;
       // Machinery technology affects mine optimal workers
-      if (job.key === 'Mine' && techLevels['Machinery']) {
+      if (job.key === 'Mine' && (techLevels['Machinery'] || 0) > 0) {
         optimalPerBuilding = 85;
       }
       optimal[job.key] = (buildings[eff.building] || 0) * optimalPerBuilding;
@@ -95,7 +100,14 @@ const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population,
 
   const getJobMax = (job: string) => {
     if (job === 'Training' || job === 'Exploration') return totalPop;
-    if (job === 'Building') return (buildings['Building'] || 0) * 150;
+    if (job === 'Building') {
+      let buildingEfficiency = 150;
+      // Carpentry technology increases building construction speed by 50%
+      if (techLevels['Carpentry']) {
+        buildingEfficiency = 225; // 150 + 50% = 225
+      }
+      return (buildings['Building'] || 0) * buildingEfficiency;
+    }
     if (job === 'Blacksmithing') return (buildings['Forge'] || 0) * 160;
     if (job === 'Agriculture') return (buildings['Farm'] || 0) * 120;
     if (isEfficiencyJob(job)) {
@@ -111,7 +123,14 @@ const PopulationAssignment: React.FC<PopulationAssignmentProps> = ({ population,
   };
   const getJobOptimal = (job: string) => {
     if (job === 'Training' || job === 'Exploration') return 0;
-    if (job === 'Building') return (buildings['Building'] || 0) * 150;
+    if (job === 'Building') {
+      let buildingEfficiency = 150;
+      // Carpentry technology increases building construction speed by 50%
+      if (techLevels['Carpentry']) {
+        buildingEfficiency = 225; // 150 + 50% = 225
+      }
+      return (buildings['Building'] || 0) * buildingEfficiency;
+    }
     if (job === 'Blacksmithing') return (buildings['Forge'] || 0) * 80;
     if (job === 'Agriculture') return (buildings['Farm'] || 0) * 60;
     if (isEfficiencyJob(job)) {

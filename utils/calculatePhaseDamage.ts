@@ -110,6 +110,18 @@ export function calculatePhaseDamage(
 
   // Pre-calculate raw damage and mitigation pools.
   const { totalDamage, pikemenDamage, preScaledTotalDamage, preScaledPikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy, doubleRangedDamage);
+  
+  // Apply Fortification technology effect: reduces attacker damage by 5% when defender has it
+  let fortificationReduction = 1.0;
+  // Note: techLevels here is the defender's tech levels, not the attacker's
+  const hasFortification = (techLevels['Fortification'] || 0) > 0;
+  if (hasFortification && isBattleDefender) {
+    fortificationReduction = 0.95; // 5% damage reduction
+  }
+  
+  // Apply the fortification reduction to the calculated damage
+  const adjustedTotalDamage = totalDamage * fortificationReduction;
+  const adjustedPikemenDamage = pikemenDamage * fortificationReduction;
   // Calculate the maximum possible mitigation pool (before capping by total damage)
   let maxTotalMitigation = 0;
   const totalDefenders = Object.values(defendingArmy).reduce((sum, count) => sum + count, 0);
@@ -130,6 +142,11 @@ export function calculatePhaseDamage(
   }
   const { totalMitigation, buildingEffectsLog } = calculateTotalMitigation(defendingArmy, defenderBuildings, phaseType, isBattleDefender);
 
+  // Add Fortification effect to building effects log if defender has it and damage was reduced
+  if (hasFortification && isBattleDefender && totalDamage > 0) {
+    buildingEffectsLog.push('Fortification: Reduces incoming damage by 5%');
+  }
+
   // Add Gnome Far Fighting effect to both sides if active in range phase
   if (doubleRangedDamage && phaseType === 'range') {
     const gffMsg = 'Gnome Far Fighting: Doubles ranged attacks this phase.';
@@ -139,7 +156,7 @@ export function calculatePhaseDamage(
   }
 
   const defenderUnitNames = Object.keys(defendingArmy).filter(u => defendingArmy[u] > 0);
-  if (defenderUnitNames.length === 0) return { losses: {}, damageLog: [], rawTotalDamage: totalDamage, totalMitigation, mitigationPerUnit: {}, rawDamagePerUnit: {}, maxTotalMitigation, preScaledTotalDamage, preScaledPikemenDamage };
+  if (defenderUnitNames.length === 0) return { losses: {}, damageLog: [], rawTotalDamage: adjustedTotalDamage, totalMitigation, mitigationPerUnit: {}, rawDamagePerUnit: {}, maxTotalMitigation, preScaledTotalDamage, preScaledPikemenDamage };
   
   // Now, calculate losses and create the final log entries.
   for (const defenderName of defenderUnitNames) {
@@ -154,8 +171,8 @@ export function calculatePhaseDamage(
           techLevels,
           defenderStrategy,
           ksDifferenceFactor,
-          totalDamage,
-          pikemenDamage,
+          adjustedTotalDamage,
+          adjustedPikemenDamage,
           attackerStrategy,
           totalMitigation,
           buildingEffectsLog,
@@ -187,7 +204,7 @@ export function calculatePhaseDamage(
               rawDamageAllocatedToStack,
               mitigationAllocatedToStack,
               totalMitigation,
-              totalRawDamage: totalDamage,
+              totalRawDamage: adjustedTotalDamage,
               maxTotalMitigation,
               preScaledTotalDamage,
               preScaledPikemenDamage
@@ -195,7 +212,7 @@ export function calculatePhaseDamage(
       });
   }
 
-  return { losses, damageLog, rawTotalDamage: totalDamage, totalMitigation, mitigationPerUnit, rawDamagePerUnit, maxTotalMitigation, preScaledTotalDamage, preScaledPikemenDamage };
+  return { losses, damageLog, rawTotalDamage: adjustedTotalDamage, totalMitigation, mitigationPerUnit, rawDamagePerUnit, maxTotalMitigation, preScaledTotalDamage, preScaledPikemenDamage };
 }
 
 function handleInfantryAttack(
@@ -346,6 +363,11 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
         preScaledPikemenDamage *= 2;
     }
 
+    // Fortification: Reduces attacker damage by 5% when defender has this technology
+    // Note: We need to check if the defender has Fortification technology
+    // Since we don't have direct access to defender tech levels here, we'll need to pass it through
+    // For now, we'll implement this in the calling function where we have access to defender tech levels
+    
     // Save pre-scaled values before scaling
     const preScaleTotal = preScaledTotalDamage;
     const preScalePikemen = preScaledPikemenDamage;
@@ -556,7 +578,7 @@ export function simulateBattlePhase(
     state.enemyArmy,
     state.yourArmy,
     phase,
-    state.enemyTechLevels,
+    state.yourTechLevels, // FIXED: use defender's tech levels (your army is defending)
     state.enemyStrategy as StrategyName,
     state.yourStrategy as StrategyName,
     state.yourStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
@@ -571,7 +593,7 @@ export function simulateBattlePhase(
     state.yourArmy,
     state.enemyArmy,
     phase,
-    state.yourTechLevels,
+    state.enemyTechLevels, // FIXED: use defender's tech levels (enemy army is defending)
     state.yourStrategy as StrategyName,
     state.enemyStrategy as StrategyName,
     state.enemyStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,

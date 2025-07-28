@@ -175,7 +175,7 @@ const KingdomStatsInput: React.FC<KingdomStatsInputProps> = ({ kingdomName, stat
                           <input
                             type="checkbox"
                             checked={isBuildingTech ? Boolean(currentLevel) : (typeof currentLevel === 'number' ? currentLevel >= 1 : false)}
-                            onChange={e => setTechLevels({ ...techLevels, [tech.name]: isBuildingTech ? e.target.checked : (e.target.checked ? 1 : 0) })}
+                            onChange={e => setTechLevels({ ...techLevels, [tech.name]: e.target.checked ? 1 : 0 })}
                             disabled={!canResearch}
                             title={`Research ${tech.name}`}
                           />
