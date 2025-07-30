@@ -17,6 +17,7 @@ export type StrategyName =
   | 'Infantry Attack'
   | 'Undead Sacrifice'
   | 'Orc'
+  | 'Skeleton Swarm'
   | null;
 
 export type Buildings = Record<string, number>;

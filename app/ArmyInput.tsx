@@ -15,9 +15,10 @@ interface ArmyInputProps {
   techLevels?: TechLevels;
   strategy?: StrategyName | null;
   enemyStrategy?: StrategyName | null;
+  enemyArmy?: Army; // Add enemy army for Caragous scaling
 }
 
-const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, buildings, race, techLevels, strategy, enemyStrategy = null }) => {
+const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, buildings, race, techLevels, strategy, enemyStrategy = null, enemyArmy = {} }) => {
   const raceKey = race?.toLowerCase() || 'dwarf';
   // Guard House cap display
   const guardHouses = buildings?.['Guard House'] || 0;
@@ -237,7 +238,8 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
 
               // Use getEffectiveUnitStats for display values, with special case for Orc Surrounding + ShadowWarrior
               // For enemy army, pass yourStrategy as enemyStrategy; for your army, pass enemyStrategy as enemyStrategy
-              const stats = getEffectiveUnitStats(unit, raceKey, techLevels, strategy, true, 1, enemyStrategy, army);
+              // Pass enemyArmy for Caragous scaling effect
+              const stats = getEffectiveUnitStats(unit, raceKey, techLevels, strategy, true, 1, enemyStrategy, army, enemyArmy);
               const statModifiers = getStatModifiers(unit, raceKey, techLevels || {}, strategy);
               // Add WolfMaster bonus to short positiveFlat for Rusher/Slother (Orc only)
               let shortWolfBonus = 0;
@@ -245,11 +247,25 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                 const wolfMasterCount = army['WolfMaster'] || 0;
                 const unitCount = army[unit] || 0;
                 if (unitCount > 0 && wolfMasterCount > 0) {
-                  shortWolfBonus = Math.floor(wolfMasterCount / unitCount);
+                  shortWolfBonus = wolfMasterCount / unitCount;
                 }
               }
               const displayShortPositiveFlat = statModifiers.short.positiveFlat + shortWolfBonus;
               const isOrcSurroundingShadowWarrior = strategy === 'Orc Surrounding' && unit === 'ShadowWarrior';
+              
+              // Calculate Caragous scaling bonus for display
+              let caragousMeleeBonus = 0;
+              let caragousDefenseBonus = 0;
+              if (unit === 'Caragous' && raceKey === 'elf' && enemyArmy && Object.keys(enemyArmy).length > 0) {
+                const enemyTotalUnits = Object.values(enemyArmy).reduce((sum, count) => sum + count, 0);
+                const caragousCount = army[unit] || 0;
+                if (enemyTotalUnits > 0 && caragousCount > 0) {
+                  const enemyPercentage = (caragousCount / enemyTotalUnits);
+                  const scalingFactor = Math.min(1.0, enemyPercentage) * 100;
+                  caragousMeleeBonus = Math.floor(scalingFactor) / 10;
+                  caragousDefenseBonus = Math.floor(scalingFactor) / 10;
+                }
+              }
 
               return (
                 <tr key={unit} className="even:bg-gray-700">
@@ -272,6 +288,10 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                       }
                       if (statModifiers.melee.negative > 0) {
                         modifiers.push(<span key="negative" className="text-red-400 ml-1">(-{Math.round(statModifiers.melee.negative)}%)</span>);
+                      }
+                      // Add Caragous scaling bonus
+                      if (caragousMeleeBonus > 0) {
+                        modifiers.push(<span key="caragous" className="text-green-400 ml-1">(+{caragousMeleeBonus})</span>);
                       }
                       return modifiers;
                     })()}
@@ -319,7 +339,7 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                       return modifiers;
                     })()}
                   </td>
-                  <td className="p-2 text-center">{stats.defense}
+                  <td className="p-2 text-center">{baseStats.defense}
                     {(() => {
                       const modifiers = [];
                       if (statModifiers.defense.positiveFlat > 0) {
@@ -333,6 +353,10 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                       }
                       if (statModifiers.defense.negative > 0) {
                         modifiers.push(<span key="negative" className="text-red-400 ml-1">(-{Math.round(statModifiers.defense.negative)}%)</span>);
+                      }
+                      // Add Caragous scaling bonus
+                      if (caragousDefenseBonus > 0) {
+                        modifiers.push(<span key="caragous" className="text-green-400 ml-1">(+{caragousDefenseBonus})</span>);
                       }
                       return modifiers;
                     })()}

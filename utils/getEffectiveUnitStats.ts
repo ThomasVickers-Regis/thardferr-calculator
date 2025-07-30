@@ -39,7 +39,8 @@ export function getEffectiveUnitStats(
   isAttacker: boolean = true,
   ksDifferenceFactor: number = 1,
   enemyStrategy: StrategyName | null = null,
-  army?: Record<string, number> // Optional army composition for special logic
+  army?: Record<string, number>, // Optional army composition for special logic
+  enemyArmy?: Record<string, number> // Optional enemy army for Caragous scaling
 ): UnitStats & { rangeModifier?: number } {
   const raceKey = race?.toLowerCase() || 'dwarf';
   const base = UNIT_DATA[raceKey]?.[unitName];
@@ -131,6 +132,29 @@ export function getEffectiveUnitStats(
     }
   }
 
+  // --- Caragous Scaling Effect ---
+  // Caragous: Melee/defense depends on % vs enemy army size
+  // Base stats: 0 melee, 1 defense
+  // Scaling: At 100% enemy army size, Caragous gets +10 melee and +10 defense
+  if (unitName === 'Caragous' && raceKey === 'elf' && enemyArmy) {
+    const enemyTotalUnits = Object.values(enemyArmy).reduce((sum, count) => sum + count, 0);
+    const caragousCount = army?.[unitName] || 0; // Default to 0 if not specified
+    
+    if (enemyTotalUnits > 0 && caragousCount > 0) {
+      // Calculate the percentage of enemy army size relative to Caragous unit count
+      const enemyPercentage = (caragousCount / enemyTotalUnits);
+      
+      // Scale from 0-100% enemy army size to 0-10 melee and 0-10 defense bonus
+      // At 100% enemy army size, Caragous gets +10 melee and +10 defense
+      const scalingFactor = Math.min(1.0, enemyPercentage) * 100;
+      const meleeBonus = Math.floor(scalingFactor) / 10;
+      const defenseBonus = Math.floor(scalingFactor) / 10;
+      
+      stats.melee += meleeBonus;
+      stats.defense += defenseBonus;
+    }
+  }
+
   // --- KS Difference Factor (Bottomfeeding) ---
   // stats.melee *= ksDifferenceFactor;
   // stats.short *= ksDifferenceFactor;
@@ -149,12 +173,12 @@ export function getEffectiveUnitStats(
     rangeModifier = 100;
   }
 
-  // --- Orc Rusher/Slother/WolfMaster special logic (additive short, integer ratio) ---
+  // --- Orc Rusher/Slother/WolfMaster special logic (additive short, decimal ratio) ---
   if (raceKey === 'orc' && army && (unitName === 'Rusher' || unitName === 'Slother')) {
     const wolfMasterCount = army['WolfMaster'] || 0;
     const unitCount = army[unitName] || 0;
     if (unitCount > 0 && wolfMasterCount > 0) {
-      stats.short += Math.floor(wolfMasterCount / unitCount);
+      stats.short += wolfMasterCount / unitCount;
     }
   }
 
@@ -332,4 +356,9 @@ export function isArcherUnit(unitName: string, race: string): boolean {
 
 export function isShieldbearerUnit(unitName: string, race: string): boolean {
     return unitName === 'Shieldbearer';
+}
+
+export function isSkeletonUnit(unitName: string, race: string): boolean {
+    const skeletonNames = ['SkeletalLegion'];
+    return skeletonNames.includes(unitName);
 } 

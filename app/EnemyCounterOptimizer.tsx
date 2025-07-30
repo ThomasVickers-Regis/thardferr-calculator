@@ -36,7 +36,7 @@ const EnemyCounterOptimizer: React.FC<EnemyCounterOptimizerProps> = ({
     const baseStats = UNIT_DATA[enemyRaceKey]?.[unit];
     if (!baseStats) return null;
     const countNum = typeof count === 'number' ? count : Number(count);
-    const effectiveStats = getEffectiveUnitStats(unit, enemyRaceKey, enemyTechLevels || {}, enemyStrategy || null, false, countNum);
+    const effectiveStats = getEffectiveUnitStats(unit, enemyRaceKey, enemyTechLevels || {}, enemyStrategy || null, false, countNum, undefined, enemyArmy, yourArmy);
     return {
       unit,
       count: countNum,
@@ -60,7 +60,7 @@ const EnemyCounterOptimizer: React.FC<EnemyCounterOptimizerProps> = ({
   const enemyRangePercentage = totalEnemyDamage > 0 ? (enemyPhaseDamage.range / totalEnemyDamage) * 100 : 0;
   const enemyMeleePercentage = totalEnemyDamage > 0 ? (enemyPhaseDamage.melee / totalEnemyDamage) * 100 : 0;
   const yourUnits = Object.entries(UNIT_DATA[yourRaceKey] || {}).map(([unit, baseStats]) => {
-    const effectiveStats = getEffectiveUnitStats(unit, yourRaceKey, yourTechLevels || {}, yourStrategy || null, true, 1);
+    const effectiveStats = getEffectiveUnitStats(unit, yourRaceKey, yourTechLevels || {}, yourStrategy || null, true, 1, undefined, yourArmy, enemyArmy);
     const baseCost = baseStats.base_gold_cost || 0;
     const equipmentCost = baseStats.equipment_gold_cost || 0;
     const totalCost = baseCost + equipmentCost;
