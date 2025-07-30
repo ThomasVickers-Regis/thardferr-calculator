@@ -105,28 +105,36 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
   const yourPhaseAttack = Object.entries((phaseLog as PhaseLog).yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy || {})
     .filter(([, v]) => (v as number) > 0)
     .map(([unit, count]) => {
-      const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1);
-      return (count as number) * stats.range;
+      const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1, undefined, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy);
+      let attackValue = 0;
+      if (phaseLog.phase === 'range') attackValue = stats.range;
+      else if (phaseLog.phase === 'short') attackValue = stats.short;
+      else if (phaseLog.phase === 'melee') attackValue = stats.melee;
+      return (count as number) * attackValue;
     })
     .reduce((sum, val) => sum + val, 0);
   const enemyPhaseAttack = Object.entries((phaseLog as PhaseLog).enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy || {})
     .filter(([, v]) => (v as number) > 0)
     .map(([unit, count]) => {
-      const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1);
-      return (count as number) * stats.range;
+      const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1, undefined, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy);
+      let attackValue = 0;
+      if (phaseLog.phase === 'range') attackValue = stats.range;
+      else if (phaseLog.phase === 'short') attackValue = stats.short;
+      else if (phaseLog.phase === 'melee') attackValue = stats.melee;
+      return (count as number) * attackValue;
     })
     .reduce((sum, val) => sum + val, 0);
   const yourPhaseDefense = Object.entries((phaseLog as PhaseLog).yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy || {})
     .filter(([, v]) => (v as number) > 0)
     .map(([unit, count]) => {
-      const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1);
+      const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1, undefined, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy);
       return (count as number) * stats.defense;
     })
     .reduce((sum, val) => sum + val, 0);
   const enemyPhaseDefense = Object.entries((phaseLog as PhaseLog).enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy || {})
     .filter(([, v]) => (v as number) > 0)
     .map(([unit, count]) => {
-      const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1);
+      const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1, undefined, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy);
       return (count as number) * stats.defense;
     })
     .reduce((sum, val) => sum + val, 0);
@@ -172,7 +180,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                   <div className="text-gray-300 font-medium mb-2">Unit Summary:</div>
                   <div className="space-y-1 text-xs">
                     {(Object.entries(phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy || {}) || []).filter(([, v]) => (v as number) > 0).map(([unit, count]) => {
-                        const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1);
+                        const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1, undefined, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy);
                         let attackValue = 0;
                         if (phaseLog.phase === 'range') attackValue = stats.range;
                         else if (phaseLog.phase === 'short') attackValue = stats.short;
@@ -180,6 +188,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                         const totalDamage = (count as number) * attackValue;
                         const lost = phaseLog.yourLosses[unit] || 0;
                         const survived = (count as number) - lost;
+                        
                         return (
                           <div key={unit} className="flex justify-between items-center bg-gray-750 p-1 rounded">
                             <div className="flex-1">
@@ -200,7 +209,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                   <div className="text-gray-300 font-medium mb-2">{phaseLog.phase} Attackers:</div>
                   <div className="space-y-1 text-xs">
                     {(Object.entries(phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy || {}) || []).filter(([unit, count]) => {
-                        const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1, undefined, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy);
+                        const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1, undefined, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy);
                         if (phaseLog.phase === 'range') return stats.range > 0 && (count as number) > 0;
                         if (phaseLog.phase === 'short') {
                           if (
@@ -216,7 +225,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                         return false;
                       })
                       .map(([unit, count]) => {
-                        const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1, undefined, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy);
+                        const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1, undefined, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy);
                         let attackValue = 0;
                         if (phaseLog.phase === 'range') attackValue = stats.range;
                         else if (phaseLog.phase === 'short') attackValue = stats.short;
@@ -273,7 +282,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                   <div className="text-gray-300 font-medium mb-2">Unit Summary:</div>
                   <div className="space-y-1 text-xs">
                     {(Object.entries(phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy || {}) || []).filter(([, v]) => (v as number) > 0).map(([unit, count]) => {
-                        const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1);
+                        const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1, undefined, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy);
                         let attackValue = 0;
                         if (phaseLog.phase === 'range') attackValue = stats.range;
                         else if (phaseLog.phase === 'short') attackValue = stats.short;
@@ -281,6 +290,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                         const totalDamage = (count as number) * attackValue;
                         const lost = phaseLog.enemyLosses[unit] || 0;
                         const survived = (count as number) - lost;
+                        
                         return (
                           <div key={unit} className="flex justify-between items-center bg-gray-750 p-1 rounded">
                             <div className="flex-1">
@@ -301,7 +311,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                   <div className="text-gray-300 font-medium mb-2">{phaseLog.phase} Attackers:</div>
                   <div className="space-y-1 text-xs">
                     {(Object.entries(phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy || {}) || []).filter(([unit, count]) => {
-                        const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1, undefined, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy);
+                        const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1, undefined, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy);
                         if (phaseLog.phase === 'range') return stats.range > 0 && (count as number) > 0;
                         if (phaseLog.phase === 'short') {
                           if (
@@ -317,7 +327,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                         return false;
                       })
                       .map(([unit, count]) => {
-                        const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1, undefined, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy);
+                        const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1, undefined, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy);
                         let attackValue = 0;
                         if (phaseLog.phase === 'range') attackValue = stats.range;
                         else if (phaseLog.phase === 'short') attackValue = stats.short;
@@ -343,7 +353,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                 <div className="font-medium text-blue-300 mb-3 border-b border-gray-600 pb-2 text-lg">Your Army Details</div>
                 <div className="space-y-3 text-sm">
                   {(Object.entries(phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy || {}) || []).filter(([, v]) => (v as number) > 0).map(([unit, count]) => {
-                      const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1);
+                      const stats = getEffectiveUnitStats(unit, yourProps.race, yourProps.techLevels, yourProps.strategy, true, 1, undefined, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy);
                       const baseStats = UNIT_DATA[yourProps.race.toLowerCase()]?.[unit];
                       const lost = phaseLog.yourLosses[unit] || 0;
                       const survived = (count as number) - lost;
@@ -383,7 +393,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                 </div>
                 <div className="space-y-3 text-sm">
                   {(Object.entries(phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy || {}) || []).filter(([, v]) => (v as number) > 0).map(([unit, count]) => {
-                      const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1);
+                      const stats = getEffectiveUnitStats(unit, enemyProps.race, enemyProps.techLevels, enemyProps.strategy, true, 1, undefined, phaseLog.enemyArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).enemyArmy, phaseLog.yourArmyAtStart || (entry as BattleLogEntry & { roundResult: RoundResult }).yourArmy);
                       const baseStats = UNIT_DATA[enemyProps.race.toLowerCase()]?.[unit];
                       const lost = phaseLog.enemyLosses[unit] || 0;
                       // Use the count at the start of the phase for all calculations
@@ -557,7 +567,7 @@ const BattleReport: React.FC<BattleReportProps> = ({
         for (const [unit, countRaw] of Object.entries(entry.yourArmy)) {
           const count = countRaw as number;
           if (count > 0) {
-            const stats = getEffectiveUnitStats(unit, yourRace, yourTechLevels, yourStrategy, true, 1);
+            const stats = getEffectiveUnitStats(unit, yourRace, yourTechLevels, yourStrategy, true, 1, undefined, entry.yourArmy, entry.enemyArmy);
             let attackValue = 0;
             if (phaseLog.phase === "range") attackValue = stats.range;
             else if (phaseLog.phase === "short") attackValue = stats.short;
@@ -572,7 +582,7 @@ const BattleReport: React.FC<BattleReportProps> = ({
         for (const [unit, countRaw] of Object.entries(entry.enemyArmy)) {
           const count = countRaw as number;
           if (count > 0) {
-            const stats = getEffectiveUnitStats(unit, enemyRace, enemyTechLevels, enemyStrategy, true, 1);
+            const stats = getEffectiveUnitStats(unit, enemyRace, enemyTechLevels, enemyStrategy, true, 1, undefined, entry.enemyArmy, entry.yourArmy);
             let attackValue = 0;
             if (phaseLog.phase === "range") attackValue = stats.range;
             else if (phaseLog.phase === "short") attackValue = stats.short;

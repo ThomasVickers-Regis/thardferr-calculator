@@ -50,10 +50,10 @@ export const UNIT_WEIGHTS: Record<string, Record<string, number>> = {
   },
   undead: {
     DarkKnight: 1,
-    SkeletonWarrior: 3,
-    WraithPikeman: 3,
+    SkeletonWarrior: 1.5,
+    WraithPikeman: 2,
     Abomination: 2,
-    PhantomArcher: 3,
+    PhantomArcher: 2,
     WraithRider: 1
   }
 };
@@ -243,7 +243,7 @@ function handleInfantryAttack(
     const { weightedTotals, sumOfAllWeightedTotals } = calculateWeightedTotals(defendingArmy, defenderRace);
     const totalDefenders = defenderUnitNames.reduce((sum, name) => sum + defendingArmy[name], 0);
 
-    let unitEffectiveDefense = getEffectiveUnitStats(defenderName, defenderRace, techLevels, defenderStrategy, false, ksDifferenceFactor).defense;
+    let unitEffectiveDefense = getEffectiveUnitStats(defenderName, defenderRace, techLevels, defenderStrategy, false, ksDifferenceFactor, undefined, defendingArmy, attackingArmy).defense;
     let buildingEffects: string[] = [...buildingEffectsLog];
 
     // Add defender strategy effects to the log
@@ -280,7 +280,7 @@ function handleInfantryAttack(
 
         for (const unitName of infantryUnits) {
             const unitCount = defendingArmy[unitName];
-            const baseStats = getEffectiveUnitStats(unitName, defenderRace, techLevels, null, false, ksDifferenceFactor);
+            const baseStats = getEffectiveUnitStats(unitName, defenderRace, techLevels, null, false, ksDifferenceFactor, undefined, defendingArmy, attackingArmy);
             totalInfantryDefenseLoss += (baseStats.defense * 0.75) * unitCount;
         }
 
@@ -302,7 +302,7 @@ function handleInfantryAttack(
     let finalDamageToStack = Math.max(0, rawDamageAllocatedToStack - mitigationAllocatedToStack);
     
     // Apply special reductions to the now-mitigated damage
-    const { reduction, effects } = applySpecialReductions(defenderName, defenderRace, defenderStrategy, phaseType, defendingArmy);
+    const { reduction, effects } = applySpecialReductions(defenderName, defenderRace, defenderStrategy, phaseType, defendingArmy, techLevels);
     finalDamageToStack *= (1 - reduction);
     buildingEffects.push(...effects);
 
@@ -338,7 +338,7 @@ function calculateRawTotalDamage(attackingArmy: Army, attackerRace: string, tech
 
     for (const [attackerName, attackerCount] of Object.entries(attackingArmy)) {
         if ((attackerCount as number) <= 0) continue;
-        const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, attackerStrategy, true, ksDifferenceFactor, defenderStrategy, attackingArmy);
+        const attackerStats = getEffectiveUnitStats(attackerName, attackerRace, techLevels, attackerStrategy, true, ksDifferenceFactor, defenderStrategy, attackingArmy, defendingArmy);
         let attackValue = 0;
         if (phaseType === 'range') attackValue = attackerStats.range;
         else if (phaseType === 'short') {
@@ -443,7 +443,7 @@ function calculateWeightedTotals(defendingArmy: Army, defenderRace: string): { w
     return { weightedTotals, sumOfAllWeightedTotals };
 }
 
-function applySpecialReductions(defenderName: string, defenderRace: string, defenderStrategy: StrategyName | null, phaseType: PhaseType, defendingArmy: Army): { reduction: number, effects: string[] } {
+function applySpecialReductions(defenderName: string, defenderRace: string, defenderStrategy: StrategyName | null, phaseType: PhaseType, defendingArmy: Army, techLevels: TechLevels): { reduction: number, effects: string[] } {
     let reduction = 0;
     const effects: string[] = [];
 
@@ -474,14 +474,28 @@ function applySpecialReductions(defenderName: string, defenderRace: string, defe
     if (phaseType === 'range' && defenderName.includes('Skeleton')) {
         reduction = 1.0; // 100%
     }
-    if (phaseType === 'melee' && isShadowWarriorUnit(defenderName, defenderRace)) {
+    if ((phaseType === 'melee' || phaseType === 'short') && isShadowWarriorUnit(defenderName, defenderRace)) {
+        // Base hiding: 25% (75% damage reduction)
+        let hidingPercentage = 0.25;
+        
         if (defenderStrategy === 'Orc Surrounding') {
-            reduction = 0.55;
-            effects.push('Detection chance: +25% (reduction lowered to 55%)');
-        } else if (defenderStrategy === 'Orc') {
-            reduction = 0.75;
-        } else {
-            reduction = 0.80;
+            // Orc strategy: -25% hiding (0% hiding, 100% damage reduction)
+            hidingPercentage = 1;
+            effects.push('Orc Surrounding: -25% hiding (0% total)');
+        }
+        
+        // Apply Cloacking technology if available (decreases detection by 15%)
+        // This increases hiding by 15% if the defender has the technology
+        if (techLevels['Cloacking'] && techLevels['Cloacking'] > 0) {
+            hidingPercentage += 0.15;
+            effects.push('Cloacking technology: +15% hiding');
+        }
+        
+        const damageReduction = 1.0 - hidingPercentage;
+        reduction = damageReduction;
+        
+        if (hidingPercentage > 0) {
+            effects.push(`${(hidingPercentage * 100).toFixed(0)}% hiding (${(damageReduction * 100).toFixed(0)}% damage reduction)`);
         }
     }
     if (phaseType === 'range' && defenderStrategy === 'Dwarf Shield Line') {
@@ -494,7 +508,10 @@ function applySpecialReductions(defenderName: string, defenderRace: string, defe
     }
 
     if (reduction > 0) {
-        effects.push(`${(reduction * 100).toFixed(0)}% damage reduction`);
+        // Don't add general damage reduction message for Shadow Warriors since they have their own specific message
+        if (!((phaseType === 'melee' || phaseType === 'short') && isShadowWarriorUnit(defenderName, defenderRace))) {
+            effects.push(`${(reduction * 100).toFixed(0)}% damage reduction`);
+        }
     }
 
     return { reduction, effects };
