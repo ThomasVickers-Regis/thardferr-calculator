@@ -356,4 +356,9 @@ export function isArcherUnit(unitName: string, race: string): boolean {
 
 export function isShieldbearerUnit(unitName: string, race: string): boolean {
     return unitName === 'Shieldbearer';
+}
+
+export function isSkeletonUnit(unitName: string, race: string): boolean {
+    const skeletonNames = ['SkeletalLegion'];
+    return skeletonNames.includes(unitName);
 } 

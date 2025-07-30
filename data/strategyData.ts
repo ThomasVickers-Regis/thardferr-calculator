@@ -86,5 +86,12 @@ export const STRATEGY_DATA: Record<string, StrategyData> = {
       all_shadow_warriors_damages_in_short_ranged_phase: true,
       chances_of_being_detected_increased_percent: 0.25
     }
+  },
+  "Skeleton Swarm": {
+    type: "Undead Unique",
+    description: "Skeleton units become immune to long range damage.",
+    effects: {
+      skeleton_units_immune_to_long_range_damage: true
+    }
   }
 };

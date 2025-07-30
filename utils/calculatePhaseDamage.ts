@@ -1,6 +1,6 @@
 import { UNIT_DATA } from '@/data/unitData';
 import { Army, TechLevels, StrategyName, PhaseType, Buildings } from '@/types';
-import { getEffectiveUnitStats, isMageUnit, isShadowWarriorUnit, isInfantryUnit, isKnightUnit, isPikemanUnit, isMountedUnit, isArcherUnit, isShieldbearerUnit } from './getEffectiveUnitStats';
+import { getEffectiveUnitStats, isMageUnit, isShadowWarriorUnit, isInfantryUnit, isKnightUnit, isPikemanUnit, isMountedUnit, isArcherUnit, isShieldbearerUnit, isSkeletonUnit } from './getEffectiveUnitStats';
 import { STRATEGY_DATA } from '@/data/strategyData';
 
 // New Global Tuning Knob
@@ -471,8 +471,9 @@ function applySpecialReductions(defenderName: string, defenderRace: string, defe
     if (phaseType === 'melee' && isMageUnit(defenderName, defenderRace) && defenderStrategy !== 'Elf Energy Gathering') {
         reduction = 1.0; // 100%
     }
-    if (phaseType === 'range' && defenderName.includes('Skeleton')) {
-        reduction = 1.0; // 100%
+    if (phaseType === 'range' && isSkeletonUnit(defenderName, defenderRace) && defenderStrategy === 'Skeleton Swarm') {
+        reduction = 1.0; // 100% - Skeleton units immune to long range damage
+        effects.push('Skeleton Swarm: Immune to long range damage');
     }
     if ((phaseType === 'melee' || phaseType === 'short') && isShadowWarriorUnit(defenderName, defenderRace)) {
         // Base hiding: 25% (75% damage reduction)
@@ -565,6 +566,9 @@ function getStrategyEffects(unitName: string, race: string, strategy: StrategyNa
         effects.push(`Infantry Attack Penalty: -${(strategyEffects.infantry_defense_reduction_percent * 100).toFixed(0)}% Defense`);
     } else if (strategy === 'Infantry Attack' && !isInfantryUnit(unitName, race)) {
         effects.push('Infantry Attack Bonus: Receives redistributed defense.');
+    }
+    if (strategy === 'Skeleton Swarm' && isSkeletonUnit(unitName, race)) {
+        effects.push('Skeleton Swarm: Immune to long range damage');
     }
     
     return effects;
