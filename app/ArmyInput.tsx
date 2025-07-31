@@ -271,7 +271,7 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                 <tr key={unit} className="even:bg-gray-700">
                   <td className="p-2 font-medium" title={unit}>{unit}</td>
                   <td className="p-2 text-center">
-                    <span className="text-white font-bold">{baseStats.melee}</span>
+                    <span className="text-white font-bold">{stats.melee}</span>
                     {isOrcSurroundingShadowWarrior && (
                       <span className="text-red-400 ml-1">(-{baseStats.melee})</span>
                     )}
@@ -297,7 +297,7 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                     })()}
                   </td>
                   <td className="p-2 text-center">
-                    <span className="text-white font-bold">{baseStats.short}</span>
+                    <span className="text-white font-bold">{stats.short}</span>
                     {isOrcSurroundingShadowWarrior && (
                       <span className="text-green-400 ml-1">(+{baseStats.melee})</span>
                     )}
@@ -339,7 +339,7 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                       return modifiers;
                     })()}
                   </td>
-                  <td className="p-2 text-center">{baseStats.defense}
+                  <td className="p-2 text-center">{stats.defense}
                     {(() => {
                       const modifiers = [];
                       if (statModifiers.defense.positiveFlat > 0) {

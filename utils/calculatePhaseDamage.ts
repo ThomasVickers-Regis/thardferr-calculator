@@ -244,6 +244,15 @@ function handleInfantryAttack(
     const totalDefenders = defenderUnitNames.reduce((sum, name) => sum + defendingArmy[name], 0);
 
     let unitEffectiveDefense = getEffectiveUnitStats(defenderName, defenderRace, techLevels, defenderStrategy, false, ksDifferenceFactor, undefined, defendingArmy, attackingArmy).defense;
+    
+    // Apply phase-specific defense boost for Elf Energy Gathering strategy
+    if (defenderStrategy === 'Elf Energy Gathering' && isMageUnit(defenderName, defenderRace) && (phaseType === 'melee' || phaseType === 'short')) {
+        const strategyEffects = STRATEGY_DATA[defenderStrategy]?.effects;
+        if (strategyEffects?.wizards_defense_increase) {
+            unitEffectiveDefense += strategyEffects.wizards_defense_increase;
+        }
+    }
+    
     let buildingEffects: string[] = [...buildingEffectsLog];
 
     // Add defender strategy effects to the log
@@ -468,8 +477,9 @@ function applySpecialReductions(defenderName: string, defenderRace: string, defe
         }
     }
 
-    if (phaseType === 'melee' && isMageUnit(defenderName, defenderRace) && defenderStrategy !== 'Elf Energy Gathering') {
-        reduction = 1.0; // 100%
+    if ((phaseType === 'melee' || phaseType === 'short') && isMageUnit(defenderName, defenderRace) && defenderStrategy !== 'Elf Energy Gathering') {
+        reduction = 1.0; // 100% - Mages are immune to melee and short range damage
+        effects.push('Mage: Immune to melee and short range damage');
     }
     if (phaseType === 'range' && isSkeletonUnit(defenderName, defenderRace) && defenderStrategy === 'Skeleton Swarm') {
         reduction = 1.0; // 100% - Skeleton units immune to long range damage
@@ -529,7 +539,14 @@ function getStrategyEffects(unitName: string, race: string, strategy: StrategyNa
         effects.push(`Charge: +${((strategyEffects.knights_attack_multiplier - 1) * 100).toFixed(0)}% Attack, -${(strategyEffects.knights_defense_reduction_percent * 100).toFixed(0)}% Defense`);
     }
     if (strategy === 'Elf Energy Gathering' && isMageUnit(unitName, race)) {
-        effects.push(`Energy Gathering: +${strategyEffects.wizards_defense_increase} Defense, +${((strategyEffects.wizards_close_combat_damage_multiplier - 1) * 100).toFixed(0)}% Melee Damage, +${strategyEffects.wizards_ranged_attack_increase} Ranged Attack`);
+        let effectText = `Energy Gathering: +${((strategyEffects.wizards_close_combat_damage_multiplier - 1) * 100).toFixed(0)}% Melee Damage, +${strategyEffects.wizards_ranged_attack_increase} Ranged Attack`;
+        
+        // Only show defense boost during melee and short phases
+        if (phaseType === 'melee' || phaseType === 'short') {
+            effectText += `, +${strategyEffects.wizards_defense_increase} Defense`;
+        }
+        
+        effects.push(effectText);
     }
     if (strategy === 'Orc Berserker') {
         effects.push(`Berserker: +${strategyEffects.all_units_damage_increase} Damage, Defense /${strategyEffects.all_units_defense_divide_by}`);

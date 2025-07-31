@@ -129,6 +129,38 @@ export function getEffectiveUnitStats(
             stats.short = (stats.short || 0) + (stats.melee || 0) + (stats.range || 0);
             stats.melee = 0;
         }
+        
+        // Elf Energy Gathering: Mages get enhanced stats (defense boost applied phase-specifically in calculatePhaseDamage)
+        if (strategy === 'Elf Energy Gathering' && isMageUnit(unitName, race)) {
+            stats.melee *= strategyEffects.wizards_close_combat_damage_multiplier || 1; // +100%
+            stats.range += strategyEffects.wizards_ranged_attack_increase || 0; // Flat +4
+        }
+        
+        // Quick Retreat: Reduces attack for all units
+        if (strategy === 'Quick Retreat') {
+            stats.melee *= strategyEffects.all_unit_attack_multiplier || 1;
+            stats.short *= strategyEffects.all_unit_attack_multiplier || 1;
+            stats.range *= strategyEffects.all_unit_attack_multiplier || 1;
+        }
+        
+        // Orc Berserker: Increases damage but reduces defense
+        if (strategy === 'Orc Berserker') {
+            stats.melee += strategyEffects.all_units_damage_increase || 0; // Flat +3
+            stats.short += strategyEffects.all_units_damage_increase || 0; // Flat +3
+            stats.range += strategyEffects.all_units_damage_increase || 0; // Flat +3
+            stats.defense /= strategyEffects.all_units_defense_divide_by || 1; // Divide by 2
+        }
+        
+        // Skeleton Swarm: Skeleton units get enhanced stats (immune to long range is handled in battle logic)
+        if (strategy === 'Skeleton Swarm' && isSkeletonUnit(unitName, race)) {
+            // The immunity to long range damage is handled in calculatePhaseDamage.ts
+            // This is just for any other stat modifications if needed
+        }
+        
+        // Infantry Attack: Infantry gets defense penalty (bonus to other units is handled in battle logic)
+        if (strategy === 'Infantry Attack' && isInfantryUnit(unitName, race)) {
+            stats.defense *= (1 - (strategyEffects.infantry_defense_reduction_percent || 0)); // -75%
+        }
     }
   }
 
@@ -278,7 +310,7 @@ export function getStatModifiers(
       
       if (strategy === 'Elf Energy Gathering') {
         if (isMageUnit(unitName, race)) {
-          modifiers.defense.positiveFlat += effects.wizards_defense_increase; // Flat +2
+          // Defense boost is phase-specific (melee/short only) - not shown in UI
           modifiers.melee.positive += (effects.wizards_close_combat_damage_multiplier - 1) * 100; // +100%
           modifiers.range.positiveFlat += effects.wizards_ranged_attack_increase; // Flat +4
         }
