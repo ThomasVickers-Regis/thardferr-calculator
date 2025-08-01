@@ -90,7 +90,8 @@ export function calculatePhaseDamage(
   attackingArmy: Army,
   defendingArmy: Army,
   phaseType: PhaseType,
-  techLevels: TechLevels,
+  attackerTechLevels: TechLevels,
+  defenderTechLevels: TechLevels,
   attackerStrategy: StrategyName | null,
   defenderStrategy: StrategyName | null,
   processedArmyStrategy: StrategyName | null,
@@ -109,12 +110,12 @@ export function calculatePhaseDamage(
   const rawDamagePerUnit: Record<string, number> = {};
 
   // Pre-calculate raw damage and mitigation pools.
-  const { totalDamage, pikemenDamage, preScaledTotalDamage, preScaledPikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, techLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy, doubleRangedDamage, defenderStrategy);
+  const { totalDamage, pikemenDamage, preScaledTotalDamage, preScaledPikemenDamage } = calculateRawTotalDamage(attackingArmy, attackerRace, attackerTechLevels, attackerStrategy, phaseType, ksDifferenceFactor, defendingArmy, doubleRangedDamage, defenderStrategy);
   
   // Apply Fortification technology effect: reduces attacker damage by 5% when defender has it
   let fortificationReduction = 1.0;
-  // Note: techLevels here is the defender's tech levels, not the attacker's
-  const hasFortification = (techLevels['Fortification'] || 0) > 0;
+  // Note: defenderTechLevels here is the defender's tech levels
+  const hasFortification = (defenderTechLevels['Fortification'] || 0) > 0;
   if (hasFortification && isBattleDefender) {
     fortificationReduction = 0.95; // 5% damage reduction
   }
@@ -177,7 +178,7 @@ export function calculatePhaseDamage(
           defenderUnitNames,
           defendingArmy,
           defenderRace,
-          techLevels,
+          defenderTechLevels,
           defenderStrategy,
           ksDifferenceFactor,
           adjustedTotalDamage,
@@ -632,10 +633,11 @@ export function simulateBattlePhase(
     state.enemyArmy,
     state.yourArmy,
     phase,
-    state.yourTechLevels, // FIXED: use defender's tech levels (your army is defending)
+    state.enemyTechLevels, // Attacker's tech levels (enemy is attacking)
+    state.yourTechLevels, // Defender's tech levels (your army is defending)
     state.enemyStrategy as StrategyName,
     state.yourStrategy as StrategyName,
-    state.yourStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
+    state.enemyStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
     1,
     state.enemyBuildings,
     state.yourBuildings,
@@ -647,10 +649,11 @@ export function simulateBattlePhase(
     state.yourArmy,
     state.enemyArmy,
     phase,
-    state.enemyTechLevels, // FIXED: use defender's tech levels (enemy army is defending)
+    state.yourTechLevels, // Attacker's tech levels (your army is attacking)
+    state.enemyTechLevels, // Defender's tech levels (enemy army is defending)
     state.yourStrategy as StrategyName,
     state.enemyStrategy as StrategyName,
-    state.enemyStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
+    state.yourStrategy === 'Infantry Attack' ? 'Infantry Attack' : null,
     1,
     state.yourBuildings,
     state.enemyBuildings,
