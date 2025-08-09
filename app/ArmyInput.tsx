@@ -260,10 +260,10 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
                 const enemyTotalUnits = Object.values(enemyArmy).reduce((sum, count) => sum + count, 0);
                 const caragousCount = army[unit] || 0;
                 if (enemyTotalUnits > 0 && caragousCount > 0) {
-                  const enemyPercentage = (caragousCount / enemyTotalUnits);
-                  const scalingFactor = Math.min(1.0, enemyPercentage) * 100;
-                  caragousMeleeBonus = Math.floor(scalingFactor) / 10;
-                  caragousDefenseBonus = Math.floor(scalingFactor) / 10;
+                  const ratio = Math.min(1.0, enemyTotalUnits / caragousCount);
+                  const scalingFactor = Math.floor(ratio * 100);
+                  caragousMeleeBonus = scalingFactor / 10;
+                  caragousDefenseBonus = scalingFactor / 10;
                 }
               }
 
