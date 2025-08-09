@@ -20,7 +20,6 @@ import ProjectedWeaponsSummary from './ProjectedWeaponsSummary';
 import KingdomSummary from './KingdomSummary';
 import PopulationAssignment from './PopulationAssignment';
 import BattleReport from './BattleReport';
-import EnemyCounterOptimizer from './EnemyCounterOptimizer';
 import QuickKingdomImport from './QuickKingdomImport';
 
 // List of available races
@@ -412,20 +411,7 @@ export default function MainApp() {
               buildings={yourBuildings}
               techLevels={yourTechLevels}
             />
-                    <EnemyCounterOptimizer 
-          yourArmy={yourArmy} 
-          yourKingdomStats={yourKingdomStats} 
-          yourRace={yourRace} 
-          yourTechLevels={yourTechLevels} 
-          yourStrategy={yourStrategy}
-          yourBuildings={yourBuildings}
-          enemyArmy={enemyArmy} 
-          enemyKingdomStats={enemyKingdomStats} 
-          enemyRace={enemyRace} 
-          enemyTechLevels={enemyTechLevels} 
-          enemyStrategy={enemyStrategy}
-          enemyBuildings={enemyBuildings}
-        />
+            
           </div>
           <div>
             <h2 className="text-xl font-semibold mb-2">Enemy Army</h2>
@@ -533,20 +519,7 @@ export default function MainApp() {
               buildings={enemyBuildings}
               techLevels={enemyTechLevels}
             />
-                    <EnemyCounterOptimizer 
-          yourArmy={enemyArmy} 
-          yourKingdomStats={enemyKingdomStats} 
-          yourRace={enemyRace} 
-          yourTechLevels={enemyTechLevels} 
-          yourStrategy={enemyStrategy}
-          yourBuildings={enemyBuildings}
-          enemyArmy={yourArmy} 
-          enemyKingdomStats={yourKingdomStats} 
-          enemyRace={yourRace} 
-          enemyTechLevels={yourTechLevels} 
-          enemyStrategy={yourStrategy}
-          enemyBuildings={yourBuildings}
-        />
+            
           </div>
         </div>
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
