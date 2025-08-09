@@ -166,8 +166,8 @@ export function getEffectiveUnitStats(
     const caragousCount = army?.[unitName] || 0; // Default to 0 if not specified
     
     if (enemyTotalUnits > 0 && caragousCount > 0) {
-      // Percentage of enemy army size relative to Caragous unit count
-      const ratio = Math.min(1.0, enemyTotalUnits / caragousCount);
+      // Percentage of Caragous unit count relative to enemy army size
+      const ratio = Math.min(1.0, caragousCount / enemyTotalUnits);
       // Scale 0..1 to 0..10 (floored to 0.1 increments)
       const scalingFactor = Math.floor(ratio * 100);
       const meleeBonus = scalingFactor / 10;
