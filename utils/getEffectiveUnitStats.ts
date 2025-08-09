@@ -1,7 +1,6 @@
 import { UNIT_DATA, UnitStats } from '../data/unitData';
 import { TECHNOLOGY_DATA } from '../data/technologyData';
 import { STRATEGY_DATA } from '../data/strategyData';
-import { UNIT_DATA as unitData } from "@/data/unitData";
 
 // Types for input
 export type TechLevels = Record<string, number>; // e.g., { 'Ranged Accuracy': 2, 'Hardening': 3 }
@@ -136,12 +135,6 @@ export function getEffectiveUnitStats(
             stats.range += strategyEffects.wizards_ranged_attack_increase || 0; // Flat +4
         }
         
-        // Quick Retreat: Reduces attack for all units
-        if (strategy === 'Quick Retreat') {
-            stats.melee *= strategyEffects.all_unit_attack_multiplier || 1;
-            stats.short *= strategyEffects.all_unit_attack_multiplier || 1;
-            stats.range *= strategyEffects.all_unit_attack_multiplier || 1;
-        }
         
         // Orc Berserker: Increases damage but reduces defense
         if (strategy === 'Orc Berserker') {
@@ -173,14 +166,12 @@ export function getEffectiveUnitStats(
     const caragousCount = army?.[unitName] || 0; // Default to 0 if not specified
     
     if (enemyTotalUnits > 0 && caragousCount > 0) {
-      // Calculate the percentage of enemy army size relative to Caragous unit count
-      const enemyPercentage = (caragousCount / enemyTotalUnits);
-      
-      // Scale from 0-100% enemy army size to 0-10 melee and 0-10 defense bonus
-      // At 100% enemy army size, Caragous gets +10 melee and +10 defense
-      const scalingFactor = Math.min(1.0, enemyPercentage) * 100;
-      const meleeBonus = Math.floor(scalingFactor) / 10;
-      const defenseBonus = Math.floor(scalingFactor) / 10;
+      // Percentage of enemy army size relative to Caragous unit count
+      const ratio = Math.min(1.0, enemyTotalUnits / caragousCount);
+      // Scale 0..1 to 0..10 (floored to 0.1 increments)
+      const scalingFactor = Math.floor(ratio * 100);
+      const meleeBonus = scalingFactor / 10;
+      const defenseBonus = scalingFactor / 10;
       
       stats.melee += meleeBonus;
       stats.defense += defenseBonus;

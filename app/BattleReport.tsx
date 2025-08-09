@@ -695,7 +695,7 @@ const BattleReport: React.FC<BattleReportProps> = ({
           <div className="text-sm mt-1">
             {[
               'Advanced Training Center', 'Training Center', 'Farm', 'House', 'Forge', 
-              'Guard House', 'Guard Tower', 'Market', 'Medical Center', 'Mill', 'Mine', 'School'
+              'Guard House', 'Guard Towers', 'Market', 'Medical Center', 'Mill', 'Mine', 'School'
             ].map(building => {
               const count = buildingsLost[building] || 0;
               return `${count} ${building}`;
