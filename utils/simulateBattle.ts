@@ -113,8 +113,8 @@ export function simulateBattle(
 
     // Determine winner based on casualty percentages and remaining units
     if (yourCasualtyPercentage >= 100 && enemyCasualtyPercentage >= 100) {
-        // Both armies completely destroyed
-        winner = 'draw';
+        // Both armies completely destroyed - defender wins in draw
+        winner = 'enemyArmy';
     } else if (yourCasualtyPercentage >= 100) {
         // Your army completely destroyed
         winner = 'enemyArmy';
@@ -122,8 +122,8 @@ export function simulateBattle(
         // Enemy army completely destroyed
         winner = 'yourArmy';
     } else if (yourTotalUnits === 0 && enemyTotalUnits === 0) {
-        // Both armies have no units remaining
-        winner = 'draw';
+        // Both armies have no units remaining - defender wins in draw
+        winner = 'enemyArmy';
     } else if (yourTotalUnits === 0) {
         // Your army has no units remaining
         winner = 'enemyArmy';
@@ -143,7 +143,8 @@ export function simulateBattle(
             } else if (enemyTotalUnits > yourTotalUnits) {
                 winner = 'enemyArmy';
             } else {
-                winner = 'draw';
+                // Equal casualty percentages and equal remaining units - defender wins in draw
+                winner = 'enemyArmy';
             }
         }
     }
