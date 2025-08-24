@@ -116,12 +116,14 @@ export function getEffectiveUnitStats(
             stats.range *= strategyEffects.infantry_attack_multiplier || 1;
         }
         if (strategy === 'Dwarf Shield Line') {
-            if (isShieldbearerUnit(unitName, race)) {
-                stats.melee *= 1 + (strategyEffects.shieldbearers_close_combat_damage_increase_percent || 0);
-                stats.short *= 1 + (strategyEffects.shieldbearers_close_combat_damage_increase_percent || 0);
-            }
+            // All units get -10% melee and short attack
             stats.melee *= 1 - (strategyEffects.all_units_close_combat_attack_reduction_percent || 0);
             stats.short *= 1 - (strategyEffects.all_units_close_combat_attack_reduction_percent || 0);
+            
+            // Shieldbearers get -50% defense (redistribution handled in battle logic)
+            if (isShieldbearerUnit(unitName, race)) {
+                stats.defense *= (1 - (strategyEffects.shieldbearers_defense_reduction_percent || 0)); // -50%
+            }
         }
         // Orc Surrounding: ShadowWarrior does all damage in short phase, none in melee
         if (strategy === 'Orc Surrounding' && isShadowWarriorUnit(unitName, race)) {

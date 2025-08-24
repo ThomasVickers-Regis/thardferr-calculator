@@ -172,7 +172,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                     <div className="capitalize">{phaseLog.phase}: <span className="font-bold text-blue-400">{isNaN(yourPhaseAttack) ? '0.00' : formatNumber(yourPhaseAttack)}</span></div>
                     <div>Defense: <span className="font-bold text-blue-400">{isNaN(yourPhaseDefense) ? '0.00' : formatNumber(yourPhaseDefense)}</span></div>
                   </div>
-                  <div className="text-xs text-blue-300 font-bold mt-2">• Global: All battle damage is reduced by 0.65× for game balance.</div>
+                  <div className="text-xs text-blue-300 font-bold mt-2">• Global: Full damage is applied for single-round battles.</div>
                 </div>
                 
                 {/* Condensed Unit Summary */}
@@ -273,7 +273,7 @@ const BattlePhase: React.FC<BattlePhaseProps> = ({
                   })()}
                   {/* Global damage reduction note */}
                   <div className="mt-2 pt-2 border-t border-gray-600">
-                    <div className="text-xs text-blue-300 font-bold">• Global: All battle damage is reduced by 0.65× for game balance.</div>
+                    <div className="text-xs text-blue-300 font-bold">• Global: Full damage is applied for single-round battles.</div>
                   </div>
                 </div>
                 
@@ -510,6 +510,58 @@ const BattleReport: React.FC<BattleReportProps> = ({
   }
   const { winner, rounds, finalYourArmy, finalEnemyArmy, battleLog } = battleOutcome;
 
+  // Calculate casualties for both sides (comparing initial to final army)
+  const calculateCasualties = (initialArmy: Army, finalArmy: Army) => {
+    const casualties: Record<string, number> = {};
+    for (const [unit, initialCount] of Object.entries(initialArmy || {})) {
+      const finalCount = finalArmy[unit] || 0;
+      const lost = (initialCount as number) - finalCount;
+      if (lost > 0) {
+        casualties[unit] = lost;
+      }
+    }
+    return casualties;
+  };
+
+  // Calculate phase-by-phase casualties
+  const calculatePhaseCasualties = () => {
+    const yourPhaseCasualties = { range: 0, short: 0, melee: 0 };
+    const enemyPhaseCasualties = { range: 0, short: 0, melee: 0 };
+    
+    if (battleLog.length > 0) {
+      const round = battleLog[0];
+      round.roundResult.phaseLogs.forEach((phaseLog: any) => {
+        if (phaseLog.phase === 'range' || phaseLog.phase === 'short' || phaseLog.phase === 'melee') {
+          // Sum up casualties for each phase
+          Object.values(phaseLog.yourLosses || {}).forEach((lost: any) => {
+            yourPhaseCasualties[phaseLog.phase as keyof typeof yourPhaseCasualties] += lost;
+          });
+          Object.values(phaseLog.enemyLosses || {}).forEach((lost: any) => {
+            enemyPhaseCasualties[phaseLog.phase as keyof typeof enemyPhaseCasualties] += lost;
+          });
+        }
+      });
+    }
+    
+    return { yourPhaseCasualties, enemyPhaseCasualties };
+  };
+
+  const { yourPhaseCasualties, enemyPhaseCasualties } = calculatePhaseCasualties();
+  
+  // Calculate total casualties
+  const yourTotalCasualties = Object.values(yourPhaseCasualties).reduce((sum, val) => sum + val, 0);
+  const enemyTotalCasualties = Object.values(enemyPhaseCasualties).reduce((sum, val) => sum + val, 0);
+  
+  // Calculate casualty percentages
+  const yourInitialTotal = Object.values(originalYourArmy).reduce((sum, count) => sum + count, 0);
+  const enemyInitialTotal = Object.values(originalEnemyArmy).reduce((sum, count) => sum + count, 0);
+  const yourCasualtyPercentage = yourInitialTotal > 0 ? (yourTotalCasualties / yourInitialTotal) * 100 : 0;
+  const enemyCasualtyPercentage = enemyInitialTotal > 0 ? (enemyTotalCasualties / enemyInitialTotal) * 100 : 0;
+
+  // Use the final, post-healing army state for the summary.
+  const yourFinalCasualties = calculateCasualties(originalYourArmy, finalYourArmy);
+  const enemyFinalCasualties = calculateCasualties(originalEnemyArmy, finalEnemyArmy);
+
   // Calculate land and building losses dynamically
   const calculateLandAndBuildingLosses = () => {
     if (winner !== 'yourArmy') {
@@ -555,118 +607,24 @@ const BattleReport: React.FC<BattleReportProps> = ({
   };
 
   const { landLost, castlesLost, peasantsLost, buildingsLost } = calculateLandAndBuildingLosses();
-  // Calculate total and phase-by-phase damage for both sides
-  const totalDamage = { your: 0, enemy: 0 };
-  const phaseDamage = { your: { range: 0, short: 0, melee: 0 }, enemy: { range: 0, short: 0, melee: 0 } };
-  Object.entries(battleLog).forEach(([, entry]) => {
-    Object.entries((entry as BattleLogEntry & { roundResult: RoundResult }).roundResult?.phaseLogs || []).forEach((pair) => {
-      const phaseLog = pair[1] as PhaseLog;
-      if (["range", "short", "melee"].includes(String(phaseLog.phase))) {
-        // Calculate your side
-        let yourPhaseAttack = 0;
-        for (const [unit, countRaw] of Object.entries(entry.yourArmy)) {
-          const count = countRaw as number;
-          if (count > 0) {
-            const stats = getEffectiveUnitStats(unit, yourRace, yourTechLevels, yourStrategy, true, 1, undefined, entry.yourArmy, entry.enemyArmy);
-            let attackValue = 0;
-            if (phaseLog.phase === "range") attackValue = stats.range;
-            else if (phaseLog.phase === "short") attackValue = stats.short;
-            else if (phaseLog.phase === "melee") attackValue = stats.melee;
-            yourPhaseAttack += attackValue * count;
-          }
-        }
-        phaseDamage.your[phaseLog.phase as "range" | "short" | "melee"] += yourPhaseAttack;
-        totalDamage.your += yourPhaseAttack;
-        // Calculate enemy side
-        let enemyPhaseAttack = 0;
-        for (const [unit, countRaw] of Object.entries(entry.enemyArmy)) {
-          const count = countRaw as number;
-          if (count > 0) {
-            const stats = getEffectiveUnitStats(unit, enemyRace, enemyTechLevels, enemyStrategy, true, 1, undefined, entry.enemyArmy, entry.yourArmy);
-            let attackValue = 0;
-            if (phaseLog.phase === "range") attackValue = stats.range;
-            else if (phaseLog.phase === "short") attackValue = stats.short;
-            else if (phaseLog.phase === "melee") attackValue = stats.melee;
-            enemyPhaseAttack += attackValue * count;
-          }
-        }
-        phaseDamage.enemy[phaseLog.phase as "range" | "short" | "melee"] += enemyPhaseAttack;
-        totalDamage.enemy += enemyPhaseAttack;
-      }
-    });
-  });
-  const damageAdvantage = totalDamage.your - totalDamage.enemy;
-  // Calculate casualties for both sides (comparing initial to final army)
-  const calculateCasualties = (initialArmy: Army, finalArmy: Army) => {
-    const casualties: Record<string, number> = {};
-    for (const [unit, initialCount] of Object.entries(initialArmy || {})) {
-      const finalCount = finalArmy[unit] || 0;
-      const lost = (initialCount as number) - finalCount;
-      if (lost > 0) {
-        casualties[unit] = lost;
-      }
-    }
-    return casualties;
-  };
-  // Use the final, post-healing army state for the summary.
-  const yourFinalCasualties = calculateCasualties(originalYourArmy, finalYourArmy);
-  const enemyFinalCasualties = calculateCasualties(originalEnemyArmy, finalEnemyArmy);
-  // Simulate land gain/loss based on battle outcome (attacker perspective)
-  const calculateLandGainLoss = () => {
-    if (winner === 'yourArmy') {
-      const defenderLand = 20; // Should come from enemy kingdom stats
-      const landGained = Math.floor(defenderLand * (0.05 + Math.random() * 0.1));
-      const castlesGained = Math.random() < 0.2 ? 1 : 0;
-      return { land: landGained, castles: castlesGained, peasants: Math.floor(Math.random() * 2000) + 1000 };
-    } else {
-      return { land: 0, castles: 0, peasants: Math.floor(Math.random() * 1000) + 500 };
-    }
-  };
-  const landResults = calculateLandGainLoss();
-  // Simulate building gains from conquered territory (only happens to attacker)
-  const simulateBuildingGains = () => {
-    if (winner !== 'yourArmy') return {};
-    const landGained = landResults.land;
-    if (landGained <= 0) return {};
-    const buildingRatios = {
-      'House': 2.0, 'Farm': 0.5, 'Forge': 0.5, 'Guard House': 0.5, 'Guard Tower': 0.5, 'Market': 0.5,
-      'Medical Center': 0.0, 'Mill': 0.5, 'Mine': 0.5, 'School': 0.5, 'Training Center': 0.25, 'Advanced Training Center': 0.25
-    };
-    const gained: Record<string, number> = {};
-    Object.entries(buildingRatios).forEach(([building, ratio]) => {
-      const baseCount = Math.floor(landGained * ratio);
-      const variation = Math.random() * 0.4 - 0.2;
-      const finalCount = Math.max(0, Math.floor(baseCount * (1 + variation)));
-      if (finalCount > 0) gained[building] = finalCount;
-    });
-    return gained;
-  };
-  const buildingGains = simulateBuildingGains();
+
   // Format casualties for display
   const formatCasualties = (casualties: Record<string, number>) => {
     return Object.entries(casualties)
       .map(([unit, count]) => `${count} ${unit}`)
       .join(', ');
   };
-  // Aggregate total losses for both sides across all rounds/phases
-  const aggregateLosses = (key: 'yourLosses' | 'enemyLosses') => {
-    const total: Record<string, number> = {};
-    Object.entries(battleLog).forEach(([, entry]) => {
-      Object.entries((entry as BattleLogEntry & { roundResult: RoundResult }).roundResult?.phaseLogs || []).forEach((pair) => {
-        const phaseLog = pair[1] as PhaseLog;
-        Object.entries(phaseLog[key] || {}).forEach(([unit, lost]) => {
-          total[unit] = (total[unit] || 0) + (lost as number);
-        });
-      });
-    });
-    return total;
+
+  // Helper function to get phase casualty percentage
+  const getPhaseCasualtyPercentage = (phaseCasualties: number, totalCasualties: number) => {
+    if (totalCasualties === 0) return 0;
+    return (phaseCasualties / totalCasualties) * 100;
   };
-  const yourTotalLosses = aggregateLosses('yourLosses');
-  const enemyTotalLosses = aggregateLosses('enemyLosses');
 
   return (
     <div className="p-6 bg-gray-800 rounded-lg mb-6">
       <h3 className="text-2xl font-semibold mb-6 text-center">Battle Report</h3>
+      
       {/* Battle Outcome Header */}
       <div className="mb-4 p-3 bg-gray-700 rounded">
         {winner === 'yourArmy' ? (
@@ -679,6 +637,7 @@ const BattleReport: React.FC<BattleReportProps> = ({
           </div>
         )}
       </div>
+
       {/* Land Results */}
       {landLost > 0 && (
         <div className="mb-4 p-3 bg-gray-700 rounded">
@@ -688,6 +647,7 @@ const BattleReport: React.FC<BattleReportProps> = ({
           </div>
         </div>
       )}
+
       {/* Building Gains */}
       {Object.keys(buildingsLost).length > 0 && (
         <div className="mb-4 p-3 bg-gray-700 rounded">
@@ -703,6 +663,7 @@ const BattleReport: React.FC<BattleReportProps> = ({
           </div>
         </div>
       )}
+
       {/* Casualties */}
       <div className="mb-4 p-3 bg-gray-700 rounded">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -728,9 +689,35 @@ const BattleReport: React.FC<BattleReportProps> = ({
           </div>
         </div>
       </div>
-      {/* Battle Statistics */}
+
+      {/* Phase-by-Phase Casualty Breakdown */}
       <div className="mb-4 p-3 bg-gray-700 rounded">
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="text-purple-300 font-bold text-center mb-3">⚔️ GENERAL'S REPORT ⚔️</div>
+        
+        {/* Your Casualties by Phase */}
+        <div className="mb-3">
+          <div className="text-blue-400 font-bold mb-2">Our Casualties by Phase:</div>
+          <div className="text-sm space-y-1">
+            <div>Long Range: {yourPhaseCasualties.range} ({getPhaseCasualtyPercentage(yourPhaseCasualties.range, yourTotalCasualties).toFixed(1)}%)</div>
+            <div>Short Range: {yourPhaseCasualties.short} ({getPhaseCasualtyPercentage(yourPhaseCasualties.short, yourTotalCasualties).toFixed(1)}%)</div>
+            <div>Melee: {yourPhaseCasualties.melee} ({getPhaseCasualtyPercentage(yourPhaseCasualties.melee, yourTotalCasualties).toFixed(1)}%)</div>
+            <div className="font-bold text-blue-300">Total: {yourTotalCasualties} ({yourCasualtyPercentage.toFixed(1)}% of army)</div>
+          </div>
+        </div>
+
+        {/* Enemy Casualties by Phase */}
+        <div className="mb-3">
+          <div className="text-red-400 font-bold mb-2">Enemy Casualties by Phase:</div>
+          <div className="text-sm space-y-1">
+            <div>Long Range: {enemyPhaseCasualties.range} ({getPhaseCasualtyPercentage(enemyPhaseCasualties.range, enemyTotalCasualties).toFixed(1)}%)</div>
+            <div>Short Range: {enemyPhaseCasualties.short} ({getPhaseCasualtyPercentage(enemyPhaseCasualties.short, enemyTotalCasualties).toFixed(1)}%)</div>
+            <div>Melee: {enemyPhaseCasualties.melee} ({getPhaseCasualtyPercentage(enemyPhaseCasualties.melee, enemyTotalCasualties).toFixed(1)}%)</div>
+            <div className="font-bold text-red-300">Total: {enemyTotalCasualties} ({enemyCasualtyPercentage.toFixed(1)}% of army)</div>
+          </div>
+        </div>
+
+        {/* Battle Statistics */}
+        <div className="grid grid-cols-2 gap-4 text-sm mt-3 pt-3 border-t border-gray-600">
           <div>
             <span className="font-bold">Winner:</span>{' '}
             <span className={winner === 'yourArmy' ? 'text-green-400' : 'text-red-400'}>
@@ -742,6 +729,7 @@ const BattleReport: React.FC<BattleReportProps> = ({
           </div>
         </div>
       </div>
+
       {/* Round-by-Round Details */}
       <div>
         <h4 className="font-semibold mb-2">Detailed Battle Log</h4>

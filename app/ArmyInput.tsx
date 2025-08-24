@@ -174,8 +174,8 @@ const ArmyInput: React.FC<ArmyInputProps> = ({ armyName, army, setArmy, units, b
         abilities.push({ text: 'All units: -10% attack', isPositive: false });
         break;
       case 'Dwarf Shield Line':
-        abilities.push({ text: 'All units: -10% close combat attack', isPositive: false });
-        abilities.push({ text: 'Shieldbearers: +100% melee damage', isPositive: true });
+        abilities.push({ text: 'All units: -10% melee/short attack', isPositive: false });
+        abilities.push({ text: 'Shieldbearers: -50% defense (redistributed to others)', isPositive: false });
         abilities.push({ text: 'Long range immunity: 2× Shieldbearer ratio', isPositive: true });
         break;
       case 'Elf Energy Gathering':
