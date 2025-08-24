@@ -79,10 +79,10 @@ export function getEffectiveUnitStats(
     stats.defense += tougherHeavyArmorLevel;
   }
   
-  // Improve Bow Range: +50% range per level for bow units
+  // Improve Bow Range: +1 range per level for bow units
   const improveBowRangeLevel = techLevels['Improve Bow Range'] || 0;
   if (improveBowRangeLevel > 0 && base.weaponType === 'bow') {
-    stats.range += stats.range * (improveBowRangeLevel * 0.5); // +50% per level
+    stats.range += improveBowRangeLevel; // +1 per level
   }
 
   // --- Ranged Base Effectiveness ---
@@ -260,7 +260,7 @@ export function getStatModifiers(
 
   const improveBowRangeLevel = techLevels['Improve Bow Range'] || 0;
   if (improveBowRangeLevel > 0 && base.weaponType === 'bow') {
-    modifiers.range.positive += improveBowRangeLevel * 50; // +50% per level
+    modifiers.range.positiveFlat += improveBowRangeLevel; // +1 per level
   }
 
   // Strategy modifiers
