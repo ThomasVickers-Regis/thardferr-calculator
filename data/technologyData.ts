@@ -44,7 +44,7 @@ export const TECHNOLOGY_DATA: Record<string, TechnologyData> = {
     description: "Increases number of attacks from Bow.",
     stat: 'range',
     weaponType: 'bow',
-    percent_bonus: 0.5,
+    flat_bonus: 1,
     maxLevel: 1,
     cost: 200000,
     researchTime: 100,

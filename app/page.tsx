@@ -187,7 +187,6 @@ export default function MainApp() {
       yourStrategy,
       enemyTechLevels,
       enemyStrategy,
-      20, // maxRounds
       yourBuildings,
       enemyBuildings,
       yourRace,

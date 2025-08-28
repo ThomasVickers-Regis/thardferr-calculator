@@ -7,7 +7,7 @@ Thardferr is a turn-based strategy game with 6 races (Dwarf, Elf, Gnome, Human, 
 
 ### Dwarf
 - **Units**: Shieldbearer (3w), HammerWheilder (2w), AxeMan (2w), Runner (1w), LightCrossbowman (2w), HeavyCrossbowman (1w)
-- **Unique Strategy**: Dwarf Shield Line - Shieldbearers reduce ranged damage, +100% melee damage, -10% melee attack for others
+- **Unique Strategy**: Dwarf Shield Line - All units -10% melee/short attack, Shieldbearers -50% defense (redistributed to others), ranged mitigation
 - **Special**: Shieldbearers provide ranged damage mitigation
 
 ### Elf  
@@ -43,7 +43,7 @@ Thardferr is a turn-based strategy game with 6 races (Dwarf, Elf, Gnome, Human, 
 3. **Melee Phase**: Close combat, Medical Centers provide mitigation
 
 ### Damage Calculation
-- **Global Scaling**: 0.65x damage multiplier applied to all attacks
+- **Global Scaling**: Full damage applied (no scaling for single-round battles)
 - **Unit Weights**: Different units have different damage allocation weights (1-3)
 - **Mitigation**: Buildings reduce incoming damage before unit losses calculated
 - **Defense**: Each unit has defense stat, damage/defense = units lost
@@ -73,7 +73,7 @@ Thardferr is a turn-based strategy game with 6 races (Dwarf, Elf, Gnome, Human, 
 - **Anti-Cavalry**: Pikemen +250% vs mounted, others -10% attack
 
 ### Race-Specific Strategies
-- **Dwarf Shield Line**: Shieldbearers +100% melee, others -10% melee, ranged mitigation
+- **Dwarf Shield Line**: All units -10% melee/short attack, Shieldbearers -50% defense (redistributed to others), ranged mitigation
 - **Elf Energy Gathering**: Mages +100% melee, +4 range, +2 defense in melee/short
 - **Gnome Far Fighting**: Doubles ranged damage for both sides
 - **Human Charging!**: Knights +50% attack/short, -25% defense
@@ -214,7 +214,7 @@ Defined in `data/strategyData.ts`. The following are actually applied in code:
 
 - Dwarf Shield Line (Dwarf Unique)
   - All units: -10% melee and short attack
-  - Shieldbearers: +100% melee/short attack (applied additively with the reduction)
+  - Shieldbearers: -50% defense (redistributed to other units)
   - Defending in range phase: incoming ranged damage reduced by min(1.0, 2 × ShieldbearerRatio)
 
 - Elf Energy Gathering (Elf Unique)
@@ -279,20 +279,20 @@ Note on Orc Surrounding + ShadowWarrior short damage:
 High-level flow (see `utils/simulateBattle.ts` and `utils/simulateRound.ts`):
 1) Pre-battle scaling on defender: Castle-based unit count penalty applied to the defending army only:
    - 1 castle: ×1.0; 2–9: ×0.8; 10–19: ×0.75; 20+: ×0.7
-2) Rounds: up to 20 by default. Each round runs phases in order: range → short → melee.
+2) Single round with three phases: range → short → melee.
 3) In each phase, both sides attack and both sides defend using snapshots of the armies at phase start.
 4) Losses are applied after each side’s phase damage, then proceed to next phase.
-5) Retreat checks happen each round before simulating phases:
-   - Standard retreat threshold: 20% of original size
-   - Quick Retreat threshold: 40%
-   - If both under threshold: draw; if only one under: the other wins.
-6) Quick Retreat special win: if either side uses Quick Retreat, instant win if it causes ≥40% casualties and suffered less % casualties than the opponent.
-7) End of battle: apply post-battle healing from Medical Centers (see Healing).
+5) Winner determination after all phases complete:
+   - If one army is completely destroyed (100% casualties), the other wins
+   - If both armies have units remaining, winner is determined by casualty percentage (lower percentage wins)
+   - If casualty percentages are equal, winner is determined by remaining unit count (more units wins)
+   - If both armies have equal casualty percentages and equal remaining units, it's a draw
+6) End of battle: apply post-battle healing from Medical Centers (see Healing).
 
 ## 6) Phase Damage Calculation (calculatePhaseDamage)
 
 Global constants and pools:
-- GLOBAL_DAMAGE_SCALING_FACTOR = 0.65 (applied to total phase damage and the pikemen-damage sub-pool)
+- GLOBAL_DAMAGE_SCALING_FACTOR = 1.0 (full damage for single-round battles)
 - Damage is computed for the attacker and then allocated to defender stacks by weighted shares and mitigations.
 
 Step-by-step for a single attacker→defender calculation:
@@ -306,7 +306,7 @@ Step-by-step for a single attacker→defender calculation:
 2) Gnome Far Fighting (if active and phase=range):
    - Double: totalDamage, pikemenDamage, preScaledTotalDamage, preScaledPikemenDamage.
 3) Save pre-scaled totals (for UI) and scale final totals:
-   - totalDamage ×= 0.65; pikemenDamage ×= 0.65
+   - totalDamage ×= 1.0; pikemenDamage ×= 1.0 (full damage for single-round battles)
 4) Fortification (defender tech, only for the true battle defender):
    - Multiply damage by 0.95 (−5%) when defending.
 
@@ -335,6 +335,7 @@ Damage allocation across defender stacks (handleInfantryAttack):
    - Base effective defense comes from effective stats and then:
      - Elf Energy Gathering: if target is Mage and phase is melee/short, +2 defense.
      - Infantry Attack redistribution: infantry targets keep ×0.25 defense; non-infantry get a flat defense bonus equal to total lost infantry defense divided by total non-infantry count (recomputed for each defender stack).
+     - Dwarf Shield Line redistribution: shieldbearer targets keep ×0.50 defense; non-shieldbearers get a flat defense bonus equal to total lost shieldbearer defense divided by total non-shieldbearer count (recomputed for each defender stack).
 7) Final per-stack damage: `max(0, rawShareAdjusted − stackMitigation) × (1 − reduction)`.
 8) Losses: `floor(finalDamageToStack / unitEffectiveDefense)`, clamped to the current stack size.
 
@@ -395,7 +396,7 @@ KS is displayed/propagated in the UI; it does not directly change battle damage 
 - Effects list includes buildings, strategies, Quick Retreat notes, Fortification, and Gnome Far Fighting.
 - Battle report additionally shows:
   - Castle defender scaling summary
-  - Global damage reduction note: all damage ×0.65
+     - Global damage reduction note: all damage ×1.0 (full damage)
   - Unit-by-unit summaries with effective stats and losses
 
 ## 13) Edge Cases and Implementation Details (Important)

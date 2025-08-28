@@ -47,8 +47,8 @@ export const STRATEGY_DATA: Record<string, StrategyData> = {
     effects: {
       all_units_close_combat_attack_reduction_percent: 0.10,
       enemy_long_ranged_attack_reduction_multiplier: "2 * percentage_of_shieldbearers_in_army",
-      shieldbearers_close_combat_damage_increase_percent: 1.00,
-      other_units_damage_reduced_by_shieldbearer_damage: true
+      shieldbearers_defense_reduction_percent: 0.50,
+      other_units_defense_increase_from_shieldbearer_defense: true
     }
   },
   "Elf Energy Gathering": {

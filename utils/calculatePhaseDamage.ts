@@ -3,8 +3,8 @@ import { Army, TechLevels, StrategyName, PhaseType, Buildings } from '@/types';
 import { getEffectiveUnitStats, isMageUnit, isShadowWarriorUnit, isInfantryUnit, isKnightUnit, isPikemanUnit, isMountedUnit, isArcherUnit, isShieldbearerUnit, isSkeletonUnit } from './getEffectiveUnitStats';
 import { STRATEGY_DATA } from '@/data/strategyData';
 
-// New Global Tuning Knob
-export const GLOBAL_DAMAGE_SCALING_FACTOR = 0.65; // This value perfectly matched your target losses
+// Global damage scaling - removed for single-round battles to match actual game casualty rates
+export const GLOBAL_DAMAGE_SCALING_FACTOR = 1.0; // Full damage for single-round battles
 
 // UWDA: Unit Weights by race and unit name
 export const UNIT_WEIGHTS: Record<string, Record<string, number>> = {
@@ -306,6 +306,31 @@ function handleInfantryAttack(
         }
     }
 
+    if (defenderStrategy === 'Dwarf Shield Line') {
+        let totalShieldbearerDefenseLoss = 0;
+        const shieldbearerUnits = defenderUnitNames.filter(name => isShieldbearerUnit(name, defenderRace));
+        const nonShieldbearerUnitCount = defenderUnitNames
+            .filter(name => !isShieldbearerUnit(name, defenderRace))
+            .reduce((sum, name) => sum + defendingArmy[name], 0);
+
+        for (const unitName of shieldbearerUnits) {
+            const unitCount = defendingArmy[unitName];
+            const baseStats = getEffectiveUnitStats(unitName, defenderRace, techLevels, null, false, ksDifferenceFactor, undefined, defendingArmy, attackingArmy);
+            totalShieldbearerDefenseLoss += (baseStats.defense * 0.50) * unitCount; // -50% defense
+        }
+
+        if (isShieldbearerUnit(defenderName, defenderRace)) {
+            unitEffectiveDefense *= 0.50; // -50% defense
+            // This is now handled by getStrategyEffects, so we can remove the manual push
+            // buildingEffects.push(`Dwarf Shield Line Penalty: -50% defense`);
+        } else if (nonShieldbearerUnitCount > 0) {
+            const bonusPerUnit = totalShieldbearerDefenseLoss / nonShieldbearerUnitCount;
+            unitEffectiveDefense += bonusPerUnit;
+            // This is now handled by getStrategyEffects
+            // buildingEffects.push(`Dwarf Shield Line Bonus: +${bonusPerUnit.toFixed(2)} defense`);
+        }
+    }
+
     // Apply mitigation to the raw damage share
     const unitCountRatio = totalDefenders > 0 ? defendingArmy[defenderName] / totalDefenders : 0;
     const mitigationAllocatedToStack = totalMitigation * unitCountRatio;
@@ -563,9 +588,9 @@ function getStrategyEffects(unitName: string, race: string, strategy: StrategyNa
     }
     if (strategy === 'Dwarf Shield Line') {
         if (isShieldbearerUnit(unitName, race)) {
-            effects.push(`Shield Line: +${(strategyEffects.shieldbearers_close_combat_damage_increase_percent * 100).toFixed(0)}% Melee Damage`);
-        } else if (isInfantryUnit(unitName, race)) {
-            effects.push(`Shield Line: -${(strategyEffects.all_units_close_combat_attack_reduction_percent * 100).toFixed(0)}% Melee Attack`);
+            effects.push(`Shield Line: -${(strategyEffects.shieldbearers_defense_reduction_percent * 100).toFixed(0)}% Defense`);
+        } else {
+            effects.push(`Shield Line: -${(strategyEffects.all_units_close_combat_attack_reduction_percent * 100).toFixed(0)}% Melee/Short Attack`);
         }
     }
     if (strategy === 'Gnome Far Fighting' && phaseType === 'range') {

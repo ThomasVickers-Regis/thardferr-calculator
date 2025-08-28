@@ -79,10 +79,10 @@ export function getEffectiveUnitStats(
     stats.defense += tougherHeavyArmorLevel;
   }
   
-  // Improve Bow Range: +50% range per level for bow units
+  // Improve Bow Range: +1 range per level for bow units
   const improveBowRangeLevel = techLevels['Improve Bow Range'] || 0;
   if (improveBowRangeLevel > 0 && base.weaponType === 'bow') {
-    stats.range += stats.range * (improveBowRangeLevel * 0.5); // +50% per level
+    stats.range += improveBowRangeLevel; // +1 per level
   }
 
   // --- Ranged Base Effectiveness ---
@@ -116,12 +116,14 @@ export function getEffectiveUnitStats(
             stats.range *= strategyEffects.infantry_attack_multiplier || 1;
         }
         if (strategy === 'Dwarf Shield Line') {
-            if (isShieldbearerUnit(unitName, race)) {
-                stats.melee *= 1 + (strategyEffects.shieldbearers_close_combat_damage_increase_percent || 0);
-                stats.short *= 1 + (strategyEffects.shieldbearers_close_combat_damage_increase_percent || 0);
-            }
+            // All units get -10% melee and short attack
             stats.melee *= 1 - (strategyEffects.all_units_close_combat_attack_reduction_percent || 0);
             stats.short *= 1 - (strategyEffects.all_units_close_combat_attack_reduction_percent || 0);
+            
+            // Shieldbearers get -50% defense (redistribution handled in battle logic)
+            if (isShieldbearerUnit(unitName, race)) {
+                stats.defense *= (1 - (strategyEffects.shieldbearers_defense_reduction_percent || 0)); // -50%
+            }
         }
         // Orc Surrounding: ShadowWarrior does all damage in short phase, none in melee
         if (strategy === 'Orc Surrounding' && isShadowWarriorUnit(unitName, race)) {
@@ -258,7 +260,7 @@ export function getStatModifiers(
 
   const improveBowRangeLevel = techLevels['Improve Bow Range'] || 0;
   if (improveBowRangeLevel > 0 && base.weaponType === 'bow') {
-    modifiers.range.positive += improveBowRangeLevel * 50; // +50% per level
+    modifiers.range.positiveFlat += improveBowRangeLevel; // +1 per level
   }
 
   // Strategy modifiers
