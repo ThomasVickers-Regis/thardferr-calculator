@@ -30,7 +30,7 @@
    - [3.2 Phase 2: Range Phase Balance](#phase-2-range-phase-balance)
    - [3.3 Phase 3: Multi-Phase Damage System](#phase-3-multi-phase-damage-system)
    - [3.4 Phase 4: Armor Type Additions](#phase-4-armor-type-additions)
-   - [3.5 Phase 5: Equipment Cost Rebalancing](#phase-5-equipment-cost-rebalancing)
+   - [3.5 Phase 5: Dynamic Market System Implementation](#phase-5-dynamic-market-system-implementation)
    - [3.6 Phase 6: Strategy Balance Fixes](#phase-6-strategy-balance-fixes)
    - [3.7 Phase 7: Technology Improvements](#phase-7-technology-improvements)
    - [3.8 Phase 8: Unit Weight System Fix](#phase-8-unit-weight-system-fix)
@@ -211,12 +211,12 @@
 ```typescript
 // In unitData.ts - Undead section
 SkeletalLegion: { 
-  base_gold_cost: 150, // Increase from 79
-  upkeep: { gold: 3, food: 1 } // Add food cost
+  base_gold_cost: 200, // Increase from 79 (compensate for no food cost)
+  upkeep: { gold: 4, food: 0 } // Keep no food cost, increase gold upkeep
 }
 WraithPikeman: { 
-  base_gold_cost: 400, // Increase from 285
-  upkeep: { gold: 8, food: 2 } // Add food cost
+  base_gold_cost: 500, // Increase from 285 (compensate for no food cost)
+  upkeep: { gold: 10, food: 0 } // Keep no food cost, increase gold upkeep
 }
 ```
 
@@ -299,22 +299,130 @@ RockThrower: { armorType: 'light' }, // Basic ranged unit should scale
 Slinger: { armorType: 'light' }, // Basic ranged unit should scale
 ```
 
-### Phase 5: Equipment Cost Rebalancing
+### Phase 5: Dynamic Market System Implementation
 
-#### Fix Equipment Cost Scaling
+#### Dynamic Market Buying Algorithm
 ```typescript
-// In unitData.ts - Increase equipment costs to be meaningful
-// Note: Mage keeps 0 equipment costs (no gear needed) - balance through base_gold_cost
-Catapult: { 
-  equipment_iron_cost: 50, // Increase from 14
-  equipment_wood_cost: 300, // Increase from 210
-  equipment_gold_cost: 50 // Add metal components
+// In utils/marketCalculations.ts - Dynamic market system
+// The total cost of a transaction is the sum of the prices of each individual unit,
+// where each unit's price increases incrementally.
+
+interface MarketTransaction {
+  currentPrice: number;
+  quantity: number;
+  perUnitAdjustment: number;
 }
-Knight: { 
-  equipment_iron_cost: 25, // Increase from 14
-  equipment_wood_cost: 10, // Add lance/spear cost
-  equipment_gold_cost: 20 // Add decorative elements
+
+function calculateBuyingCost(transaction: MarketTransaction): {
+  totalCost: number;
+  finalMarketPrice: number;
+} {
+  const { currentPrice, quantity, perUnitAdjustment } = transaction;
+  
+  // Price of a single unit (Pn): Current Price + (Per-Unit Adjustment * n)
+  // Total Cost = SUM[n=1 to Q] (Current Price + (Per-Unit Adjustment * n))
+  // Simplified: Total Cost = (Current Price * Q) + (Per-Unit Adjustment * (Q * (Q+1) / 2))
+  
+  const totalCost = (currentPrice * quantity) + 
+    (perUnitAdjustment * (quantity * (quantity + 1) / 2));
+  
+  // Final Market Price = Current Price + (Per-Unit Adjustment * Q)
+  const finalMarketPrice = currentPrice + (perUnitAdjustment * quantity);
+  
+  return { totalCost, finalMarketPrice };
 }
+
+// Example: Buying 500,000 Wood
+// Current Price: 150 gold, Quantity: 500,000, Per-Unit Adjustment: 0.0000005
+// Total Cost = 75,062,500 gold, Final Market Price = 150.25 gold
+```
+
+#### Dynamic Market Selling Algorithm
+```typescript
+// In utils/marketCalculations.ts - Selling algorithm
+function calculateSellingRevenue(transaction: MarketTransaction): {
+  totalRevenue: number;
+  finalMarketPrice: number;
+} {
+  const { currentPrice, quantity, perUnitAdjustment } = transaction;
+  
+  // Price of a single unit (Pn): Current Price - (Per-Unit Adjustment * n)
+  // Total Revenue = SUM[n=1 to Q] (Current Price - (Per-Unit Adjustment * n))
+  // Simplified: Total Revenue = (Current Price * Q) - (Per-Unit Adjustment * (Q * (Q+1) / 2))
+  
+  const totalRevenue = (currentPrice * quantity) - 
+    (perUnitAdjustment * (quantity * (quantity + 1) / 2));
+  
+  // Final Market Price = Current Price - (Per-Unit Adjustment * Q)
+  const finalMarketPrice = currentPrice - (perUnitAdjustment * quantity);
+  
+  return { totalRevenue, finalMarketPrice };
+}
+```
+
+#### Market Configuration System
+```typescript
+// In data/marketData.ts - Market configuration
+const marketConfig = {
+  // Resource-specific per-unit adjustments (how quickly prices change)
+  perUnitAdjustments: {
+    'wood': 0.0000005,    // Wood prices change slowly (stable resource)
+    'iron': 0.000001,     // Iron prices change moderately
+    'food': 0.0000003,    // Food prices change very slowly (essential)
+    'gold': 0.000002      // Gold prices change faster (premium resource)
+  },
+  
+  // Market volatility settings
+  volatility: {
+    'low': 0.0000002,     // Stable markets (basic resources)
+    'medium': 0.0000005,  // Normal markets (most resources)
+    'high': 0.000001      // Volatile markets (premium resources)
+  },
+  
+  // Price floors and ceilings
+  priceLimits: {
+    'wood': { min: 50, max: 500 },
+    'iron': { min: 100, max: 1000 },
+    'food': { min: 25, max: 300 },
+    'gold': { min: 200, max: 2000 }
+  }
+};
+```
+
+#### Market Impact on Equipment Costs
+```typescript
+// In utils/calculateEquipmentCosts.ts - Dynamic equipment pricing
+function calculateEquipmentCosts(unitData: any, currentMarketPrices: any): number {
+  // Equipment costs now scale with current market prices
+  // This creates realistic supply/demand dynamics
+  
+  const baseCosts = unitData.equipment_costs;
+  const marketMultiplier = {
+    iron: currentMarketPrices.iron / 150, // Base iron price
+    wood: currentMarketPrices.wood / 100, // Base wood price
+    gold: currentMarketPrices.gold / 500  // Base gold price
+  };
+  
+  let totalCost = 0;
+  
+  // Calculate dynamic costs based on current market
+  if (baseCosts.iron) {
+    totalCost += baseCosts.iron * marketMultiplier.iron;
+  }
+  if (baseCosts.wood) {
+    totalCost += baseCosts.wood * marketMultiplier.wood;
+  }
+  if (baseCosts.gold) {
+    totalCost += baseCosts.gold * marketMultiplier.gold;
+  }
+  
+  return Math.round(totalCost);
+}
+
+// Example: Knight equipment costs
+// Base costs: 25 iron, 10 wood, 20 gold
+// If iron price doubles from 150 to 300, equipment costs increase significantly
+// This creates strategic timing for unit production based on market conditions
 ```
 
 ### Phase 6: Strategy Balance Fixes
@@ -1492,8 +1600,8 @@ function applyActivityPenalty(protectionTime: number, isActivePlayer: boolean): 
 | Unit | Old Stats (M/S/R/D) | New Stats (M/S/R/D) | Old Cost | New Cost | Old Upkeep | New Upkeep | Old Armor | New Armor | Changes |
 |------|-------------------|-------------------|----------|----------|------------|------------|-----------|-----------|---------|
 | DarkKnight | 8/0/1/11 | 8/2/1/11 | 1186g | 1186g | 21g,0f | 21g,2f | heavy | heavy | +2 short, +2f upkeep |
-| SkeletalLegion | 1/0/0/1 | 1/2/0/1 | 79g | 150g | 1.5g,0f | 3g,1f | none | light | +71g cost, +2 short, +1.5g+1f upkeep, +light armor |
-| WraithPikeman | 4/0/0/4 | 4/2/0/4 | 285g | 400g | 6g,0f | 8g,2f | light | light | +115g cost, +2 short, +2g+2f upkeep |
+| SkeletalLegion | 1/0/0/1 | 1/2/0/1 | 79g | 200g | 1.5g,0f | 4g,0f | none | light | +121g cost, +2 short, +2.5g upkeep, +light armor |
+| WraithPikeman | 4/0/0/4 | 4/2/0/4 | 285g | 500g | 6g,0f | 10g,0f | light | light | +215g cost, +2 short, +4g upkeep |
 | AbominationCaragous | 4/0/0/3 | 4/0/0/3 | 1486g | 1486g | 14g,0f | 14g,2f | heavy | heavy | +2f upkeep |
 | PhantomArcher | 0/0/2/3 | 0/2/2/3 | 485g | 485g | 5g,0f | 5g,1f | none | light | +2 short, +1f upkeep, +light armor |
 | WraithRider | 3/0/2/7 | 3/2/2/7 | 745g | 745g | 13g,0f | 13g,2f | light | light | +2 short, +2f upkeep |
@@ -1639,10 +1747,10 @@ function applyActivityPenalty(protectionTime: number, isActivePlayer: boolean): 
 - **Impact**: Massive buff to Dwarf and heavy armor units
 - **Benefit**: Heavy armor units become the premium late-game option
 
-#### 2. Undead Food Costs
-- **Effect**: All undead units now need food upkeep
-- **Impact**: Huge economic nerf to Undead race
-- **Benefit**: Undead no longer have unfair economic advantage
+#### 2. Undead Economic Balance
+- **Effect**: Undead units keep no food costs but increased gold costs/upkeep
+- **Impact**: Economic nerf to Undead race while maintaining thematic identity
+- **Benefit**: Undead no longer have unfair economic advantage, but keep their unique food-free theme
 
 #### 3. Mage Cost Reduction
 - **Effect**: 1900g → 1200g (37% reduction)
@@ -1722,7 +1830,7 @@ function applyActivityPenalty(protectionTime: number, isActivePlayer: boolean): 
 | Race | Overall Change | Key Buffs | Key Nerfs |
 |------|---------------|-----------|-----------|
 | **Dwarf** | 🟢 Buffed | Heavy armor tech +5 defense, multi-phase damage, armor type additions | None |
-| **Undead** | 🔴 Nerfed | Multi-phase damage, armor type additions | Food costs, higher unit costs, +2 short range to all units |
+| **Undead** | 🔴 Nerfed | Multi-phase damage, armor type additions | Higher gold costs/upkeep, +2 short range to all units |
 | **Elf** | 🟢 Buffed | Cheaper Mage, enhanced Caragous scaling, multi-phase damage, armor type additions | Range damage reduced |
 | **Human** | 🟡 Slight Buff | Multi-phase damage, armor type additions | None |
 | **Orc** | 🟡 Slight Buff | Multi-phase damage, armor type additions | None |
