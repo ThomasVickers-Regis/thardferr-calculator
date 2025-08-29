@@ -694,10 +694,7 @@ if (phaseType === 'short' && defenderBuildings['Barricades'] && isBattleDefender
 
 #### Adjust Building Cap System
 ```typescript
-// In BuildingTable.tsx - Change building cap calculation
-// Old: const maxBuildings = land ? land * 10 : 0;
-// New: const maxBuildings = land ? (land * 12) - (castles || 0) : 0;
-// This allows 12 buildings per land minus castles, creating more strategic choices
+// What ever the total numbers of builds are minus the castle should be the max building around, not 10. Current game should have 12. 
 ```
 
 ### Phase 10: Thievery System Implementation
