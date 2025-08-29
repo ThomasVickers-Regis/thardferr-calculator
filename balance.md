@@ -301,17 +301,21 @@ Slinger: { armorType: 'light' }, // Basic ranged unit should scale
 
 ### Phase 5: Dynamic Market System Implementation
 
-#### Dynamic Market Buying Algorithm
+#### Dynamic Market Trading Platform
 ```typescript
-// In utils/marketCalculations.ts - Dynamic market system
-// The total cost of a transaction is the sum of the prices of each individual unit,
-// where each unit's price increases incrementally.
+// In utils/marketCalculations.ts - Kingdom-to-kingdom trading platform
+// The market is a trading platform where kingdoms buy/sell resources from each other
+// Prices change dynamically based on supply and demand from actual trades
 
 interface MarketTransaction {
   currentPrice: number;
   quantity: number;
   perUnitAdjustment: number;
 }
+
+// BUYING ALGORITHM (Kingdom buying resources from market)
+// The total cost of a transaction is the sum of the prices of each individual unit,
+// where each unit's price increases incrementally.
 
 function calculateBuyingCost(transaction: MarketTransaction): {
   totalCost: number;
@@ -332,14 +336,10 @@ function calculateBuyingCost(transaction: MarketTransaction): {
   return { totalCost, finalMarketPrice };
 }
 
-// Example: Buying 500,000 Wood
-// Current Price: 150 gold, Quantity: 500,000, Per-Unit Adjustment: 0.0000005
-// Total Cost = 75,062,500 gold, Final Market Price = 150.25 gold
-```
+// SELLING ALGORITHM (Kingdom selling resources to market)
+// The total revenue from a transaction is the sum of the prices of each individual unit,
+// where each unit's price decreases incrementally.
 
-#### Dynamic Market Selling Algorithm
-```typescript
-// In utils/marketCalculations.ts - Selling algorithm
 function calculateSellingRevenue(transaction: MarketTransaction): {
   totalRevenue: number;
   finalMarketPrice: number;
@@ -358,11 +358,16 @@ function calculateSellingRevenue(transaction: MarketTransaction): {
   
   return { totalRevenue, finalMarketPrice };
 }
+
+// Example: Buying 500,000 Wood
+// Current Price: 150 gold, Quantity: 500,000, Per-Unit Adjustment: 0.0000005
+// Total Cost = 75,062,500 gold, Final Market Price = 150.25 gold
+// After this transaction, the market price updates from 150 to 150.25
 ```
 
 #### Market Configuration System
 ```typescript
-// In data/marketData.ts - Market configuration
+// In data/marketData.ts - Market configuration for kingdom trading
 const marketConfig = {
   // Resource-specific per-unit adjustments (how quickly prices change)
   perUnitAdjustments: {
@@ -379,7 +384,7 @@ const marketConfig = {
     'high': 0.000001      // Volatile markets (premium resources)
   },
   
-  // Price floors and ceilings
+  // Price floors and ceilings to prevent extreme prices
   priceLimits: {
     'wood': { min: 50, max: 500 },
     'iron': { min: 100, max: 1000 },
@@ -387,42 +392,119 @@ const marketConfig = {
     'gold': { min: 200, max: 2000 }
   }
 };
-```
 
-#### Market Impact on Equipment Costs
-```typescript
-// In utils/calculateEquipmentCosts.ts - Dynamic equipment pricing
-function calculateEquipmentCosts(unitData: any, currentMarketPrices: any): number {
-  // Equipment costs now scale with current market prices
-  // This creates realistic supply/demand dynamics
-  
-  const baseCosts = unitData.equipment_costs;
-  const marketMultiplier = {
-    iron: currentMarketPrices.iron / 150, // Base iron price
-    wood: currentMarketPrices.wood / 100, // Base wood price
-    gold: currentMarketPrices.gold / 500  // Base gold price
+// Market state tracking
+interface MarketState {
+  currentPrices: {
+    wood: number;
+    iron: number;
+    food: number;
+    gold: number;
   };
-  
-  let totalCost = 0;
-  
-  // Calculate dynamic costs based on current market
-  if (baseCosts.iron) {
-    totalCost += baseCosts.iron * marketMultiplier.iron;
-  }
-  if (baseCosts.wood) {
-    totalCost += baseCosts.wood * marketMultiplier.wood;
-  }
-  if (baseCosts.gold) {
-    totalCost += baseCosts.gold * marketMultiplier.gold;
-  }
-  
-  return Math.round(totalCost);
+  lastTransaction: {
+    resource: string;
+    quantity: number;
+    price: number;
+    timestamp: number;
+  };
+  tradingVolume: {
+    wood: number;
+    iron: number;
+    food: number;
+    gold: number;
+  };
 }
 
-// Example: Knight equipment costs
-// Base costs: 25 iron, 10 wood, 20 gold
-// If iron price doubles from 150 to 300, equipment costs increase significantly
-// This creates strategic timing for unit production based on market conditions
+// Initialize market with starting prices
+const initialMarketState: MarketState = {
+  currentPrices: {
+    wood: 150,
+    iron: 200,
+    food: 100,
+    gold: 500
+  },
+  lastTransaction: {
+    resource: 'wood',
+    quantity: 0,
+    price: 150,
+    timestamp: Date.now()
+  },
+  tradingVolume: {
+    wood: 0,
+    iron: 0,
+    food: 0,
+    gold: 0
+  }
+};
+```
+
+#### Market Transaction Processing
+```typescript
+// In utils/processMarketTransaction.ts - Process kingdom trading
+function processMarketTransaction(
+  kingdomId: string,
+  resource: string,
+  quantity: number,
+  transactionType: 'buy' | 'sell',
+  marketState: MarketState
+): {
+  success: boolean;
+  totalCost?: number;
+  totalRevenue?: number;
+  newMarketPrice: number;
+  message: string;
+} {
+  const currentPrice = marketState.currentPrices[resource];
+  const perUnitAdjustment = marketConfig.perUnitAdjustments[resource];
+  
+  if (transactionType === 'buy') {
+    const { totalCost, finalMarketPrice } = calculateBuyingCost({
+      currentPrice,
+      quantity,
+      perUnitAdjustment
+    });
+    
+    // Update market state
+    marketState.currentPrices[resource] = finalMarketPrice;
+    marketState.lastTransaction = {
+      resource,
+      quantity,
+      price: finalMarketPrice,
+      timestamp: Date.now()
+    };
+    marketState.tradingVolume[resource] += quantity;
+    
+    return {
+      success: true,
+      totalCost,
+      newMarketPrice: finalMarketPrice,
+      message: `Successfully bought ${quantity} ${resource} for ${totalCost} gold. New market price: ${finalMarketPrice}`
+    };
+  } else {
+    const { totalRevenue, finalMarketPrice } = calculateSellingRevenue({
+      currentPrice,
+      quantity,
+      perUnitAdjustment
+    });
+    
+    // Update market state
+    marketState.currentPrices[resource] = finalMarketPrice;
+    marketState.lastTransaction = {
+      resource,
+      quantity,
+      price: finalMarketPrice,
+      timestamp: Date.now()
+    };
+    marketState.tradingVolume[resource] += quantity;
+    
+    return {
+      success: true,
+      totalRevenue,
+      newMarketPrice: finalMarketPrice,
+      message: `Successfully sold ${quantity} ${resource} for ${totalRevenue} gold. New market price: ${finalMarketPrice}`
+    };
+  }
+}
 ```
 
 ### Phase 6: Strategy Balance Fixes
