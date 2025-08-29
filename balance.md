@@ -75,11 +75,13 @@
 - **Shieldbearer**: Weight 1 (takes less damage despite being a tank)
 - **Impact**: Tank units don't actually tank damage effectively
 
-### 10. Building Mitigation Imbalance
-**Problem**: Building effects are too weak compared to unit damage
-- **Guard Tower**: 2-4 damage reduction per building (vs 15 damage Catapults)
-- **Medical Center**: 1-2 damage reduction per building (vs 8 damage Knights)
-- **Impact**: Buildings are nearly irrelevant in high-damage battles
+### 10. Building Mitigation System Analysis
+**Current System**: Buildings provide damage mitigation pools with per-unit caps
+- **Guard Towers**: 40 damage per tower, max 2 per unit (range phase only)
+- **Medical Centers**: 75 damage per center when defending, 50 when attacking, max 2/1 per unit (melee phase only)
+- **Post-Battle Healing**: Medical Centers heal 20% of losses if centers/land ≥ 1, 10% if ≥ 0.5
+- **Building Cap**: Currently 10 buildings per land (too restrictive)
+- **Impact**: Buildings are effective but limited by per-unit caps and restrictive building limits
 
 ---
 
@@ -241,6 +243,17 @@ Knight: {
 
 ### Phase 6: Strategy Balance Fixes
 
+#### Unit Slot Mapping System
+```typescript
+// Universal unit slot mapping (same across all races)
+// Unit 1: Best Elite Unit (DarkKnight, Rider, Balista, Knight, WolfMaster, Rider)
+// Unit 2: Infantry Unit (SkeletalLegion, Militia, Infantry, Infantry, Rusher, Infantry)
+// Unit 3: Pikeman Unit (WraithPikeman, RockThrower, Militia, Pikeman, Slother, Militia)
+// Unit 4: Secondary Elite Unit (AbominationCaragous, Catapult, Catapult, HeavyInfantry, ShadowWarrior, Catapult)
+// Unit 5: Ranged Unit (PhantomArcher, Balista, RockThrower, Archer, Slinger, RockThrower)
+// Unit 6: Elite Ranged Unit (WraithRider, None, None, MountedArcher, AxeThrower, None)
+```
+
 #### Fix Strategy Effects
 ```typescript
 // In strategyData.ts
@@ -267,6 +280,145 @@ Knight: {
   effects: {
     pikemen_attack_vs_mounted_multiplier: 2.0, // Reduce from 3.5
     all_units_attack_multiplier: 0.95 // Increase from 0.9
+  }
+}
+```
+
+#### Add Dual-Strategy System
+```typescript
+// In strategyData.ts - New dual-strategy system
+// Players can choose ONE positioning strategy AND ONE combat strategy
+
+// POSITIONING STRATEGIES (affect unit weights for damage allocation)
+"Frontline Formation": {
+  type: "positioning",
+  description: "Elite units tank damage, protecting ranged units",
+  effects: {
+    unit_weight_modifiers: {
+      unit_1: +2, // Best Elite Unit takes more damage
+      unit_2: +1, // Infantry Unit takes more damage
+      unit_3: +1, // Pikeman Unit takes more damage
+      unit_4: +1, // Secondary Elite Unit takes more damage
+      unit_5: -1, // Ranged Unit takes less damage
+      unit_6: -1  // Elite Ranged Unit takes less damage
+    }
+  }
+},
+"Skirmish Formation": {
+  type: "positioning", 
+  description: "Ranged units draw fire, elite units deal damage",
+  effects: {
+    unit_weight_modifiers: {
+      unit_1: -1, // Best Elite Unit takes less damage
+      unit_2: -1, // Infantry Unit takes less damage
+      unit_3: -1, // Pikeman Unit takes less damage
+      unit_4: -1, // Secondary Elite Unit takes less damage
+      unit_5: +2, // Ranged Unit takes more damage
+      unit_6: +1  // Elite Ranged Unit takes more damage
+    }
+  }
+},
+"Elite Focus": {
+  type: "positioning",
+  description: "Elite units are priority targets, protecting basic units",
+  effects: {
+    unit_weight_modifiers: {
+      unit_1: +2, // Best Elite Unit takes much more damage
+      unit_2: -1, // Infantry Unit takes less damage
+      unit_3: -1, // Pikeman Unit takes less damage
+      unit_4: +1, // Secondary Elite Unit takes more damage
+      unit_5: -1, // Ranged Unit takes less damage
+      unit_6: +1  // Elite Ranged Unit takes more damage
+    }
+  }
+},
+"Ranged Protection": {
+  type: "positioning",
+  description: "Ranged units are heavily protected by other units",
+  effects: {
+    unit_weight_modifiers: {
+      unit_1: +1, // Best Elite Unit takes more damage
+      unit_2: +1, // Infantry Unit takes more damage
+      unit_3: +1, // Pikeman Unit takes more damage
+      unit_4: +1, // Secondary Elite Unit takes more damage
+      unit_5: -2, // Ranged Unit takes much less damage
+      unit_6: -2  // Elite Ranged Unit takes much less damage
+    }
+  }
+},
+"Balanced Formation": {
+  type: "positioning",
+  description: "All units share damage equally",
+  effects: {
+    unit_weight_modifiers: {
+      unit_1: 0,  // All units unchanged
+      unit_2: 0,
+      unit_3: 0,
+      unit_4: 0,
+      unit_5: 0,
+      unit_6: 0
+    }
+  }
+},
+
+// COMBAT STRATEGIES (affect damage and phases)
+"Aggressive Assault": {
+  type: "combat",
+  description: "Focus on overwhelming damage output",
+  effects: {
+    all_units_melee_damage_multiplier: 1.3,
+    all_units_short_range_damage_multiplier: 1.2,
+    all_units_range_damage_multiplier: 1.1,
+    all_units_defense_multiplier: 0.9
+  }
+},
+"Defensive Stance": {
+  type: "combat",
+  description: "Prioritize survival over damage",
+  effects: {
+    all_units_defense_multiplier: 1.4,
+    all_units_melee_damage_multiplier: 0.8,
+    all_units_short_range_damage_multiplier: 0.8,
+    all_units_range_damage_multiplier: 0.9
+  }
+},
+"Range Superiority": {
+  type: "combat",
+  description: "Maximize ranged combat effectiveness",
+  effects: {
+    all_units_range_damage_multiplier: 1.4,
+    all_units_short_range_damage_multiplier: 1.2,
+    all_units_melee_damage_multiplier: 0.7,
+    all_units_defense_multiplier: 0.9
+  }
+},
+"Close Combat Specialists": {
+  type: "combat",
+  description: "Excel in melee and short range combat",
+  effects: {
+    all_units_melee_damage_multiplier: 1.4,
+    all_units_short_range_damage_multiplier: 1.3,
+    all_units_range_damage_multiplier: 0.6,
+    all_units_defense_multiplier: 1.1
+  }
+},
+"Tactical Flexibility": {
+  type: "combat",
+  description: "Balanced approach with slight bonuses",
+  effects: {
+    all_units_melee_damage_multiplier: 1.1,
+    all_units_short_range_damage_multiplier: 1.1,
+    all_units_range_damage_multiplier: 1.1,
+    all_units_defense_multiplier: 1.1
+  }
+},
+"Phase Mastery": {
+  type: "combat",
+  description: "Focus on one combat phase for maximum effect",
+  effects: {
+    // Randomly boosts one phase significantly
+    phase_boost: "random", // +50% to one random phase
+    all_units_defense_multiplier: 0.9
   }
 }
 ```
@@ -328,19 +480,148 @@ Knight: { weight: 2 }, // Elite units should be priority targets
 EliteArcher: { weight: 2 }, // Elite units should be priority targets
 ```
 
-### Phase 9: Building Mitigation Buff
+### Phase 9: Building System Expansion
 
-#### Increase Building Effectiveness
+#### Adjust Building Effectiveness
 ```typescript
-// In buildingData.ts or battle logic
-Guard Tower: {
-  damage_reduction_per_building: 5, // Increase from 2-4
-  max_reduction_per_unit: 3 // Increase from 1-2
-},
-Medical Center: {
-  damage_reduction_per_building: 3, // Increase from 1-2
-  max_reduction_per_unit: 2 // Increase from 1
+// In calculatePhaseDamage.ts - Adjust mitigation caps
+// Guard Towers: Increase per-unit cap for better scaling
+const perUnitCap = 3; // Increase from 2 (better for large armies)
+
+// Medical Centers: Increase per-unit cap when defending
+const perUnitCap = isBattleDefender ? 3 : 1; // Increase from 2/1 (better for large armies)
+
+// Alternative: Increase base mitigation per building
+const potentialMitigationPool = towerCount * 50; // Increase from 40
+const perCenterPool = isBattleDefender ? 100 : 75; // Increase from 75/50
+```
+
+#### Add Short Range Mitigation Building
+```typescript
+// In buildingData.ts - New building
+"Barricades": {
+  cost: { gold: 800, iron: 20, wood: 100 },
+  defense_bonus: 30,
+  effect: 'Reduces short range attack by 30 damage per barricade (max 2 per unit).'
 }
+
+// In calculatePhaseDamage.ts - Add short range mitigation
+if (phaseType === 'short' && defenderBuildings['Barricades'] && isBattleDefender) {
+  const barricadeCount = defenderBuildings['Barricades'];
+  const potentialMitigationPool = barricadeCount * 30;
+  const perUnitCap = 2;
+  const maxMitigationByUnitCap = totalDefenders * perUnitCap;
+  const totalBarricadeMitigation = Math.min(potentialMitigationPool, maxMitigationByUnitCap);
+  if (totalBarricadeMitigation > 0) {
+    totalMitigation += totalBarricadeMitigation;
+    buildingEffectsLog.push(`Barricades reduced total damage by ${totalBarricadeMitigation.toFixed(0)}`);
+  }
+}
+```
+
+#### Add Race-Specific Strategic Buildings
+```typescript
+// In buildingData.ts - Race-specific buildings
+
+// ELF BUILDINGS
+"Alchemy Lab": {
+  cost: { gold: 2500, iron: 20, wood: 60 },
+  effect: 'Mages get +2 range damage and +1 defense.',
+  race: 'elf',
+  combat_bonus: { mage_range: 2, mage_defense: 1 }
+},
+"Enchanted Grove": {
+  cost: { gold: 1800, iron: 10, wood: 200 },
+  effect: 'All archer units get +1 range and +1 short range damage.',
+  race: 'elf',
+  combat_bonus: { archer_range: 1, archer_short: 1 }
+},
+
+// DWARF BUILDINGS  
+"Forge": {
+  cost: { gold: 2200, iron: 150, wood: 50 },
+  effect: 'Heavy armor units get +2 defense and equipment costs reduced by 25%.',
+  race: 'dwarf',
+  combat_bonus: { heavy_armor_defense: 2 },
+  cost_reduction: { equipment: 0.75 }
+},
+"Stone Fortress": {
+  cost: { gold: 3000, iron: 200, wood: 100 },
+  effect: 'All units get +1 defense when defending. Guard towers provide 50% more mitigation.',
+  race: 'dwarf',
+  combat_bonus: { defense_bonus: 1 },
+  building_bonus: { guard_tower_mitigation: 1.5 }
+},
+
+// UNDEAD BUILDINGS
+"Necromancer Tower": {
+  cost: { gold: 2800, iron: 30, wood: 80 },
+  effect: 'All undead units get +1 melee and +1 defense. Post-battle healing increased by 50%.',
+  race: 'undead',
+  combat_bonus: { undead_melee: 1, undead_defense: 1 },
+  healing_bonus: { post_battle: 1.5 }
+},
+"Graveyard": {
+  cost: { gold: 1200, iron: 20, wood: 40 },
+  effect: 'SkeletalLegion and WraithPikeman production speed increased by 30%.',
+  race: 'undead',
+  production_bonus: { skeleton_speed: 1.3, wraith_speed: 1.3 }
+},
+
+// HUMAN BUILDINGS
+"Barracks": {
+  cost: { gold: 1600, iron: 80, wood: 120 },
+  effect: 'All infantry units get +1 melee and +1 defense. Training speed increased by 25%.',
+  race: 'human',
+  combat_bonus: { infantry_melee: 1, infantry_defense: 1 },
+  production_bonus: { training_speed: 1.25 }
+},
+"Royal Stables": {
+  cost: { gold: 2000, iron: 60, wood: 150 },
+  effect: 'Mounted units get +2 melee and +1 defense. Knight production speed increased by 40%.',
+  race: 'human',
+  combat_bonus: { mounted_melee: 2, mounted_defense: 1 },
+  production_bonus: { knight_speed: 1.4 }
+},
+
+// ORC BUILDINGS
+"War Camp": {
+  cost: { gold: 1400, iron: 40, wood: 100 },
+  effect: 'All orc units get +1 melee damage. Production speed increased by 20%.',
+  race: 'orc',
+  combat_bonus: { orc_melee: 1 },
+  production_bonus: { orc_speed: 1.2 }
+},
+"Beast Pen": {
+  cost: { gold: 1800, iron: 30, wood: 120 },
+  effect: 'WolfMaster and mounted units get +2 melee and +1 defense.',
+  race: 'orc',
+  combat_bonus: { beast_melee: 2, beast_defense: 1 }
+},
+
+// GNOME BUILDINGS
+"Engineering Workshop": {
+  cost: { gold: 2400, iron: 100, wood: 80 },
+  effect: 'Siege units get +2 range damage and +1 defense. Production speed increased by 35%.',
+  race: 'gnome',
+  combat_bonus: { siege_range: 2, siege_defense: 1 },
+  production_bonus: { siege_speed: 1.35 }
+},
+"Mechanical Forge": {
+  cost: { gold: 1900, iron: 120, wood: 60 },
+  effect: 'All gnome units get +1 defense. Equipment costs reduced by 20%.',
+  race: 'gnome',
+  combat_bonus: { gnome_defense: 1 },
+  cost_reduction: { equipment: 0.8 }
+}
+```
+
+#### Adjust Building Cap System
+```typescript
+// In BuildingTable.tsx - Change building cap calculation
+// Old: const maxBuildings = land ? land * 10 : 0;
+// New: const maxBuildings = land ? (land * 12) - (castles || 0) : 0;
+// This allows 12 buildings per land minus castles, creating more strategic choices
 ```
 
 ---
@@ -365,13 +646,16 @@ Medical Center: {
 
 ### Priority 4 (Medium) - Strategy & Technology
 1. ✅ Fix strategy balance issues (Quick Retreat, Elf Energy Gathering, etc.)
-2. ✅ Improve technology scaling (Sharper Blades, Improve Bow Range)
-3. ✅ Rebalance equipment costs to be meaningful
+2. ✅ Implement new dual-strategy system (positioning + combat)
+3. ✅ Improve technology scaling (Sharper Blades, Improve Bow Range)
+4. ✅ Rebalance equipment costs to be meaningful
 
 ### Priority 5 (Medium) - Systems Balance
 1. ✅ Fix unit weight system (tank units should tank)
 2. ✅ Increase building mitigation effectiveness
 3. ✅ Balance production rates
+4. ✅ Implement new building system (Barricades, Training Grounds, etc.)
+5. ✅ Adjust building cap to 12 per land minus castles
 
 ### Priority 6 (Low) - Polish
 1. ✅ Fine-tune unit costs
@@ -462,6 +746,39 @@ Medical Center: {
 | Catapult | 1 slot | 5 slots | 5x more expensive in army capacity |
 | Balista | 1 slot | 4 slots | 4x more expensive in army capacity |
 | All others | 1 slot | 1 slot | No change |
+
+### New Building System
+| Building | Cost | Effect | Race |
+|----------|------|--------|------|
+| **Barricades** | 800g, 20i, 100w | 30 damage reduction per building (max 2/unit) | All |
+| **Alchemy Lab** | 2500g, 20i, 60w | +2 range, +1 defense to mages | Elf |
+| **Enchanted Grove** | 1800g, 10i, 200w | +1 range, +1 short to all archers | Elf |
+| **Forge** | 2200g, 150i, 50w | +2 defense to heavy armor, -25% equipment costs | Dwarf |
+| **Stone Fortress** | 3000g, 200i, 100w | +1 defense when defending, +50% guard tower mitigation | Dwarf |
+| **Necromancer Tower** | 2800g, 30i, 80w | +1 melee, +1 defense to undead, +50% healing | Undead |
+| **Graveyard** | 1200g, 20i, 40w | +30% production speed for SkeletalLegion/WraithPikeman | Undead |
+| **Barracks** | 1600g, 80i, 120w | +1 melee, +1 defense to infantry, +25% training speed | Human |
+| **Royal Stables** | 2000g, 60i, 150w | +2 melee, +1 defense to mounted, +40% Knight production | Human |
+| **War Camp** | 1400g, 40i, 100w | +1 melee to all orcs, +20% production speed | Orc |
+| **Beast Pen** | 1800g, 30i, 120w | +2 melee, +1 defense to WolfMaster/mounted | Orc |
+| **Engineering Workshop** | 2400g, 100i, 80w | +2 range, +1 defense to siege, +35% production | Gnome |
+| **Mechanical Forge** | 1900g, 120i, 60w | +1 defense to all gnomes, -20% equipment costs | Gnome |
+| **Building Cap** | N/A | 12 buildings per land (was 10) | System |
+
+### New Dual-Strategy System
+| Strategy Type | Strategy Name | Effect | Description |
+|---------------|---------------|--------|-------------|
+| **Positioning** | Frontline Formation | Elite +2 weight, Ranged -1 weight | Elite units tank damage, protect ranged |
+| **Positioning** | Skirmish Formation | Elite -1 weight, Ranged +2 weight | Ranged units draw fire, elite deal damage |
+| **Positioning** | Elite Focus | Best Elite +2 weight, Basic units -1 weight | Elite units are priority targets |
+| **Positioning** | Ranged Protection | All units +1 weight, Ranged -2 weight | Ranged units heavily protected |
+| **Positioning** | Balanced Formation | All units unchanged | Equal damage distribution |
+| **Combat** | Aggressive Assault | +30% melee, +20% short, +10% range, -10% defense | Overwhelming damage output |
+| **Combat** | Defensive Stance | +40% defense, -20% melee/short, -10% range | Prioritize survival |
+| **Combat** | Range Superiority | +40% range, +20% short, -30% melee, -10% defense | Maximize ranged combat |
+| **Combat** | Close Combat Specialists | +40% melee, +30% short, -40% range, +10% defense | Excel in close combat |
+| **Combat** | Tactical Flexibility | +10% all stats | Balanced approach |
+| **Combat** | Phase Mastery | +50% random phase, -10% defense | Focus on one phase |
 
 ---
 
@@ -558,7 +875,8 @@ Medical Center: {
 - **Technology Balance**: Heavy armor scales better than light armor (premium vs basic)
 - **Unit Diversity**: All unit types have clear roles and viability
 - **Strategy Balance**: All strategies are viable and not overpowered
-- **Building Relevance**: Buildings provide meaningful combat benefits
+- **Building Relevance**: Buildings provide effective damage mitigation with appropriate scaling
+- **Building Diversity**: Multiple strategic building options for different playstyles
 - **Equipment Impact**: Equipment costs are a significant part of unit costs
 - **Tank Mechanics**: Tank units actually absorb damage effectively
 
