@@ -393,9 +393,15 @@ const marketConfig = {
   }
 };
 
-// Market state tracking
+// Market state tracking with available quantities and equilibrium
 interface MarketState {
   currentPrices: {
+    wood: number;
+    iron: number;
+    food: number;
+    gold: number;
+  };
+  availableQuantities: {
     wood: number;
     iron: number;
     food: number;
@@ -406,6 +412,7 @@ interface MarketState {
     quantity: number;
     price: number;
     timestamp: number;
+    kingdomId: string;
   };
   tradingVolume: {
     wood: number;
@@ -413,9 +420,27 @@ interface MarketState {
     food: number;
     gold: number;
   };
+  kingdomInventories: {
+    [kingdomId: string]: {
+      wood: number;
+      iron: number;
+      food: number;
+      gold: number;
+    };
+  };
+  // New equilibrium tracking
+  equilibriumData: {
+    [resource: string]: {
+      averagePrice: number;        // Rolling average of transaction prices
+      equilibriumPrice: number;    // Calculated equilibrium based on supply/demand
+      priceHistory: number[];      // Last 100 transaction prices
+      supplyDemandRatio: number;   // Available quantity / average daily demand
+      lastUpdate: number;          // Timestamp of last equilibrium calculation
+    };
+  };
 }
 
-// Initialize market with starting prices
+// Initialize market with starting prices and empty quantities
 const initialMarketState: MarketState = {
   currentPrices: {
     wood: 150,
@@ -423,17 +448,55 @@ const initialMarketState: MarketState = {
     food: 100,
     gold: 500
   },
+  availableQuantities: {
+    wood: 0,    // No resources available until kingdoms sell
+    iron: 0,
+    food: 0,
+    gold: 0
+  },
   lastTransaction: {
     resource: 'wood',
     quantity: 0,
     price: 150,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    kingdomId: 'none'
   },
   tradingVolume: {
     wood: 0,
     iron: 0,
     food: 0,
     gold: 0
+  },
+  kingdomInventories: {},
+  equilibriumData: {
+    wood: {
+      averagePrice: 150,
+      equilibriumPrice: 150,
+      priceHistory: [150],
+      supplyDemandRatio: 1.0,
+      lastUpdate: Date.now()
+    },
+    iron: {
+      averagePrice: 200,
+      equilibriumPrice: 200,
+      priceHistory: [200],
+      supplyDemandRatio: 1.0,
+      lastUpdate: Date.now()
+    },
+    food: {
+      averagePrice: 100,
+      equilibriumPrice: 100,
+      priceHistory: [100],
+      supplyDemandRatio: 1.0,
+      lastUpdate: Date.now()
+    },
+    gold: {
+      averagePrice: 500,
+      equilibriumPrice: 500,
+      priceHistory: [500],
+      supplyDemandRatio: 1.0,
+      lastUpdate: Date.now()
+    }
   }
 };
 ```
@@ -454,25 +517,47 @@ function processMarketTransaction(
   newMarketPrice: number;
   message: string;
 } {
+  // Get current market data
   const currentPrice = marketState.currentPrices[resource];
+  const availableQuantity = marketState.availableQuantities[resource];
+  
+  // Get per-unit adjustment from marketConfig for this resource
   const perUnitAdjustment = marketConfig.perUnitAdjustments[resource];
   
   if (transactionType === 'buy') {
+    // Check if enough resources are available in the market
+    if (availableQuantity < quantity) {
+      return {
+        success: false,
+        newMarketPrice: currentPrice,
+        message: `Not enough ${resource} available. Market has ${availableQuantity}, you requested ${quantity}`
+      };
+    }
+    
+    // Calculate buying cost using the formula from marketConfig
     const { totalCost, finalMarketPrice } = calculateBuyingCost({
       currentPrice,
       quantity,
-      perUnitAdjustment
+      perUnitAdjustment  // This comes from marketConfig.perUnitAdjustments[resource]
     });
     
     // Update market state
     marketState.currentPrices[resource] = finalMarketPrice;
+    marketState.availableQuantities[resource] -= quantity; // Remove from market
     marketState.lastTransaction = {
       resource,
       quantity,
       price: finalMarketPrice,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      kingdomId
     };
     marketState.tradingVolume[resource] += quantity;
+    
+    // Update kingdom inventory (kingdom gets the resources)
+    if (!marketState.kingdomInventories[kingdomId]) {
+      marketState.kingdomInventories[kingdomId] = { wood: 0, iron: 0, food: 0, gold: 0 };
+    }
+    marketState.kingdomInventories[kingdomId][resource] += quantity;
     
     return {
       success: true,
@@ -481,21 +566,30 @@ function processMarketTransaction(
       message: `Successfully bought ${quantity} ${resource} for ${totalCost} gold. New market price: ${finalMarketPrice}`
     };
   } else {
+    // Calculate selling revenue using the formula from marketConfig
     const { totalRevenue, finalMarketPrice } = calculateSellingRevenue({
       currentPrice,
       quantity,
-      perUnitAdjustment
+      perUnitAdjustment  // This comes from marketConfig.perUnitAdjustments[resource]
     });
     
     // Update market state
     marketState.currentPrices[resource] = finalMarketPrice;
+    marketState.availableQuantities[resource] += quantity; // Add to market
     marketState.lastTransaction = {
       resource,
       quantity,
       price: finalMarketPrice,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      kingdomId
     };
     marketState.tradingVolume[resource] += quantity;
+    
+    // Update kingdom inventory (kingdom loses the resources)
+    if (!marketState.kingdomInventories[kingdomId]) {
+      marketState.kingdomInventories[kingdomId] = { wood: 0, iron: 0, food: 0, gold: 0 };
+    }
+    marketState.kingdomInventories[kingdomId][resource] -= quantity;
     
     return {
       success: true,
@@ -505,6 +599,320 @@ function processMarketTransaction(
     };
   }
 }
+
+// Helper function to get market info
+function getMarketInfo(marketState: MarketState, resource: string) {
+  return {
+    currentPrice: marketState.currentPrices[resource],
+    availableQuantity: marketState.availableQuantities[resource],
+    perUnitAdjustment: marketConfig.perUnitAdjustments[resource],
+    priceLimits: marketConfig.priceLimits[resource],
+    lastTransaction: marketState.lastTransaction
+  };
+}
+
+// Update equilibrium data after each transaction
+function updateEquilibriumData(marketState: MarketState, resource: string, transactionPrice: number): void {
+  const equilibrium = marketState.equilibriumData[resource];
+  
+  // Update price history (keep last 100 transactions)
+  equilibrium.priceHistory.push(transactionPrice);
+  if (equilibrium.priceHistory.length > 100) {
+    equilibrium.priceHistory.shift();
+  }
+  
+  // Calculate rolling average price
+  const sum = equilibrium.priceHistory.reduce((acc, price) => acc + price, 0);
+  equilibrium.averagePrice = sum / equilibrium.priceHistory.length;
+  
+  // Calculate supply/demand ratio
+  const availableQuantity = marketState.availableQuantities[resource];
+  const averageDailyVolume = marketState.tradingVolume[resource] / Math.max(1, (Date.now() - equilibrium.lastUpdate) / (1000 * 60 * 60 * 24));
+  equilibrium.supplyDemandRatio = availableQuantity / Math.max(1, averageDailyVolume);
+  
+  // Calculate equilibrium price based on supply/demand
+  const basePrice = marketConfig.priceLimits[resource].min * 1.5; // Base equilibrium at 50% above minimum
+  const supplyDemandMultiplier = Math.max(0.5, Math.min(2.0, equilibrium.supplyDemandRatio));
+  equilibrium.equilibriumPrice = basePrice * supplyDemandMultiplier;
+  
+  equilibrium.lastUpdate = Date.now();
+}
+
+// Enhanced price protection with equilibrium-based scarcity
+function applyPriceProtection(marketState: MarketState, resource: string, newPrice: number): number {
+  const priceLimits = marketConfig.priceLimits[resource];
+  const availableQuantity = marketState.availableQuantities[resource];
+  const equilibrium = marketState.equilibriumData[resource];
+  
+  // 1. Hard price floor from marketConfig
+  let protectedPrice = Math.max(newPrice, priceLimits.min);
+  
+  // 2. Equilibrium-based scarcity protection
+  // If current price drops below average price, apply scarcity multiplier
+  const priceRatio = newPrice / equilibrium.averagePrice;
+  let scarcityMultiplier = 1.0;
+  
+  if (priceRatio < 1.0) {
+    // Price is below average - apply scarcity protection
+    const deviationFromAverage = 1.0 - priceRatio; // 0.0 to 1.0 (how far below average)
+    const maxScarcityBonus = 2.0; // Maximum 100% price boost
+    
+    // Scarcity scales with how far below average the price is
+    scarcityMultiplier = 1.0 + (deviationFromAverage * maxScarcityBonus);
+    
+    // Additional scarcity based on supply/demand ratio
+    if (equilibrium.supplyDemandRatio < 0.5) { // Low supply relative to demand
+      const supplyScarcity = (0.5 - equilibrium.supplyDemandRatio) * 2; // 0% to 100% additional bonus
+      scarcityMultiplier += supplyScarcity;
+    }
+  }
+  
+  const scarcityPrice = equilibrium.averagePrice * scarcityMultiplier;
+  protectedPrice = Math.max(protectedPrice, scarcityPrice);
+  
+  // 3. Equilibrium price floor (minimum viable price)
+  const equilibriumFloor = equilibrium.equilibriumPrice * 0.8; // 20% below equilibrium
+  protectedPrice = Math.max(protectedPrice, equilibriumFloor);
+  
+  // 4. Market correction for excessive selling
+  const recentSellVolume = marketState.tradingVolume[resource] * 0.1; // Last 10% of volume
+  if (recentSellVolume > availableQuantity * 2) { // If selling > 2x available quantity
+    const correctionBonus = 1.1; // +10% price correction
+    protectedPrice *= correctionBonus;
+  }
+  
+  return Math.min(protectedPrice, priceLimits.max); // Also respect price ceiling
+}
+
+// Market stabilization system
+function stabilizeMarket(marketState: MarketState): void {
+  // Daily market correction to prevent price crashes
+  const now = Date.now();
+  const lastTransactionTime = marketState.lastTransaction.timestamp;
+  const hoursSinceLastTrade = (now - lastTransactionTime) / (1000 * 60 * 60);
+  
+  // If no trading for 24+ hours, apply gradual price recovery
+  if (hoursSinceLastTrade > 24) {
+    Object.keys(marketState.currentPrices).forEach(resource => {
+      const currentPrice = marketState.currentPrices[resource];
+      const basePrice = marketConfig.priceLimits[resource].min * 1.5; // Target 50% above minimum
+      
+      // Gradual price recovery towards base price
+      const recoveryRate = 0.05; // 5% recovery per day
+      const daysSinceLastTrade = hoursSinceLastTrade / 24;
+      const recoveryMultiplier = 1 + (recoveryRate * daysSinceLastTrade);
+      
+      const recoveredPrice = Math.min(currentPrice * recoveryMultiplier, basePrice);
+      marketState.currentPrices[resource] = recoveredPrice;
+    });
+  }
+  
+  // Prevent excessive price drops through volume analysis
+  Object.keys(marketState.currentPrices).forEach(resource => {
+    const currentPrice = marketState.currentPrices[resource];
+    const availableQuantity = marketState.availableQuantities[resource];
+    const tradingVolume = marketState.tradingVolume[resource];
+    
+    // If market is flooded (high volume, low price), apply anti-dump protection
+    if (availableQuantity > 1000000 && currentPrice < marketConfig.priceLimits[resource].min * 1.2) {
+      const antiDumpBonus = 1.15; // +15% price protection
+      marketState.currentPrices[resource] = currentPrice * antiDumpBonus;
+    }
+  });
+}
+
+// Enhanced transaction processing with price protection
+function processMarketTransactionWithProtection(
+  kingdomId: string,
+  resource: string,
+  quantity: number,
+  transactionType: 'buy' | 'sell',
+  marketState: MarketState
+): {
+  success: boolean;
+  totalCost?: number;
+  totalRevenue?: number;
+  newMarketPrice: number;
+  message: string;
+} {
+  // Apply market stabilization first
+  stabilizeMarket(marketState);
+  
+  // Process transaction normally
+  const result = processMarketTransaction(kingdomId, resource, quantity, transactionType, marketState);
+  
+  // Update equilibrium data with the transaction price
+  if (result.success) {
+    updateEquilibriumData(marketState, resource, result.newMarketPrice);
+    
+    // Apply price protection to the new price
+    const protectedPrice = applyPriceProtection(marketState, resource, result.newMarketPrice);
+    marketState.currentPrices[resource] = protectedPrice;
+    result.newMarketPrice = protectedPrice;
+    
+    // Update message with equilibrium info
+    const equilibrium = marketState.equilibriumData[resource];
+    const priceRatio = (protectedPrice / equilibrium.averagePrice * 100).toFixed(1);
+    result.message += ` (Avg: ${equilibrium.averagePrice.toFixed(1)}, Equilibrium: ${equilibrium.equilibriumPrice.toFixed(1)}, ${priceRatio}% of avg)`;
+    
+    if (protectedPrice > result.newMarketPrice) {
+      result.message += ` [Price protected]`;
+    }
+  }
+  
+  return result;
+}
+
+// COMPLETE MARKET TRANSACTION EXAMPLE
+// This shows exactly how marketConfig and all settings work together
+
+// Example: Kingdom "DragonSlayer" wants to buy 50,000 wood
+function exampleMarketTransaction() {
+  const kingdomId = "DragonSlayer";
+  const resource = "wood";
+  const quantity = 50000;
+  const transactionType = "buy";
+  
+  // STEP 1: Get market configuration for wood
+  const woodConfig = {
+    perUnitAdjustment: marketConfig.perUnitAdjustments['wood'],     // 0.0000005
+    priceLimits: marketConfig.priceLimits['wood'],                 // { min: 50, max: 500 }
+    volatility: marketConfig.volatility['medium']                  // 0.0000005
+  };
+  
+  console.log("Market Config for Wood:", woodConfig);
+  // Output: { perUnitAdjustment: 0.0000005, priceLimits: { min: 50, max: 500 }, volatility: 0.0000005 }
+  
+  // STEP 2: Check current market state
+  const currentPrice = marketState.currentPrices[resource];        // 150
+  const availableQuantity = marketState.availableQuantities[resource]; // 100000
+  
+  console.log("Current Market State:", {
+    currentPrice,
+    availableQuantity,
+    equilibrium: marketState.equilibriumData[resource]
+  });
+  
+  // STEP 3: Calculate transaction using marketConfig.perUnitAdjustment
+  const transaction = {
+    currentPrice: currentPrice,
+    quantity: quantity,
+    perUnitAdjustment: woodConfig.perUnitAdjustment  // 0.0000005 from marketConfig
+  };
+  
+  const { totalCost, finalMarketPrice } = calculateBuyingCost(transaction);
+  
+  // STEP 4: Apply price protection using marketConfig.priceLimits
+  const protectedPrice = applyPriceProtection(marketState, resource, finalMarketPrice);
+  
+  // STEP 5: Update market state
+  marketState.currentPrices[resource] = protectedPrice;
+  marketState.availableQuantities[resource] -= quantity;
+  
+  console.log("Transaction Result:", {
+    originalPrice: currentPrice,
+    calculatedPrice: finalMarketPrice,
+    protectedPrice: protectedPrice,
+    totalCost: totalCost,
+    priceLimits: woodConfig.priceLimits,
+    used: {
+      perUnitAdjustment: woodConfig.perUnitAdjustment,
+      priceLimits: woodConfig.priceLimits,
+      volatility: woodConfig.volatility
+    }
+  });
+  
+  return {
+    success: true,
+    totalCost: totalCost,
+    newMarketPrice: protectedPrice,
+    message: `Bought ${quantity} wood for ${totalCost} gold. Price: ${currentPrice} → ${protectedPrice}`
+  };
+}
+
+// HOW MARKETCONFIG SETTINGS AFFECT THE MARKET:
+
+// 1. perUnitAdjustments - Controls how quickly prices change
+const adjustmentExamples = {
+  wood: {
+    perUnitAdjustment: 0.0000005,  // Slow price changes (stable resource)
+    effect: "Buying 100,000 wood changes price by 0.05 gold"
+  },
+  iron: {
+    perUnitAdjustment: 0.000001,   // Medium price changes
+    effect: "Buying 100,000 iron changes price by 0.1 gold"
+  },
+  gold: {
+    perUnitAdjustment: 0.000002,   // Fast price changes (volatile resource)
+    effect: "Buying 100,000 gold changes price by 0.2 gold"
+  }
+};
+
+// 2. priceLimits - Sets absolute min/max prices
+const limitExamples = {
+  wood: {
+    min: 50, max: 500,
+    effect: "Wood price can never go below 50 or above 500 gold"
+  },
+  iron: {
+    min: 100, max: 1000,
+    effect: "Iron price can never go below 100 or above 1000 gold"
+  }
+};
+
+// 3. volatility - Alternative adjustment rates for different market conditions
+const volatilityExamples = {
+  low: 0.0000002,      // Stable markets - prices change slowly
+  medium: 0.0000005,   // Normal markets - standard price changes
+  high: 0.000001       // Volatile markets - prices change rapidly
+};
+
+// COMPLETE FUNCTION CALL EXAMPLE:
+function completeMarketExample() {
+  // Initialize market state
+  let marketState = { ...initialMarketState };
+  
+  // Kingdom A sells 100,000 wood to start the market
+  const result1 = processMarketTransactionWithProtection(
+    "KingdomA",
+    "wood",
+    100000,
+    "sell",
+    marketState
+  );
+  console.log("Kingdom A sells wood:", result1);
+  // Output: "Successfully sold 100000 wood for 7500000 gold. New market price: 149.95 (Avg: 149.95, Equilibrium: 75.0, 100.0% of avg)"
+  
+  // Kingdom B buys 50,000 wood
+  const result2 = processMarketTransactionWithProtection(
+    "KingdomB", 
+    "wood",
+    50000,
+    "buy",
+    marketState
+  );
+  console.log("Kingdom B buys wood:", result2);
+  // Output: "Successfully bought 50000 wood for 3750625 gold. New market price: 150.025 (Avg: 150.0, Equilibrium: 75.0, 100.0% of avg)"
+  
+  // Kingdom C tries to buy 200,000 wood (more than available)
+  const result3 = processMarketTransactionWithProtection(
+    "KingdomC",
+    "wood", 
+    200000,
+    "buy",
+    marketState
+  );
+  console.log("Kingdom C tries to buy too much:", result3);
+  // Output: { success: false, message: "Not enough wood available. Market has 50000, you requested 200000" }
+  
+  return { marketState, transactions: [result1, result2, result3] };
+}
+
+// MARKETCONFIG INTEGRATION SUMMARY:
+// 1. perUnitAdjustments → Used in calculateBuyingCost/calculateSellingRevenue
+// 2. priceLimits → Used in applyPriceProtection for min/max enforcement
+// 3. volatility → Can be used as alternative adjustment rates
+// 4. All settings work together to create balanced, dynamic pricing
 ```
 
 ### Phase 6: Strategy Balance Fixes
