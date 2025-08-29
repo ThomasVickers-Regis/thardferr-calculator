@@ -8,9 +8,8 @@
 1. [Critical Balance Issues](#critical-balance-issues)
 2. [Detailed Unit Analysis](#detailed-unit-analysis)
 3. [Proposed Balance Fixes](#proposed-balance-fixes)
-4. [Implementation Phases](#implementation-phases)
-5. [Comprehensive Changes Table](#comprehensive-changes-table)
-6. [Balance Impact Analysis](#balance-impact-analysis)
+4. [Comprehensive Changes Table](#comprehensive-changes-table)
+5. [Balance Impact Analysis](#balance-impact-analysis)
 
 ---
 
@@ -82,6 +81,36 @@
 - **Post-Battle Healing**: Medical Centers heal 20% of losses if centers/land ≥ 1, 10% if ≥ 0.5
 - **Building Cap**: Currently 10 buildings per land (too restrictive)
 - **Impact**: Buildings are effective but limited by per-unit caps and restrictive building limits
+
+### 11. Thievery System Integration
+**Proposed System**: Espionage system mirroring the existing magic system
+- **Thieves**: Dedicated espionage units (like wizards for magic)
+- **Thieves Guilds**: Infrastructure buildings that increase efficiency (like Schools)
+- **Security Buildings**: Defensive buildings that counter thievery (like wizards for counterspelling)
+- **Mission Types**: Various thievery operations with different costs and effects
+- **Racial Modifiers**: Different races have varying thievery effectiveness
+- **Impact**: Adds new strategic layer to warfare beyond direct combat
+
+### 12. Magic System Balance Issues
+**Current Problems**: Magic is nearly unusable for most races due to cost and racial penalties
+- **Wizard Costs**: 225g-500g base cost with 3g-10g gold upkeep (very expensive)
+- **Racial Penalties**: Dwarves -50%, Gnomes -37.5%, Orcs -15% success rates
+- **Gate Spell**: Overpowered instant troop return (bypasses 18-24 hour travel time)
+- **Upkeep Burden**: Wizard upkeep competes with military upkeep, making magic unaffordable
+- **School Requirements**: 1 School per land needed for 75% success (expensive infrastructure)
+- **Spell Duration Crisis**: 6-12 hour durations vs 18-24 hour wizard recovery (massive imbalance)
+- **Wizard Recovery**: 3 wizards per 2 Schools per day (too slow for spell durations)
+- **5:1 School Ratios**: Players build excessive Schools to compensate for broken recovery rates
+- **Impact**: Only Elves and Humans can effectively use magic, other races are locked out
+
+### 13. Protection System Issues
+**Current Problems**: Protection system creates slow gameplay and weakens defense
+- **Fixed Protection Times**: 24h/15h protection doesn't account for army rebuilding time (24-60 hours)
+- **Army Loss Reality**: Battles can wipe 80-100% of armies, but protection ends before rebuilding
+- **Defense Vulnerability**: 0 hours protection after successful defense allows endless attacks
+- **No Scaling**: Protection doesn't scale with actual losses suffered
+- **Winner Takes All**: Design philosophy conflicts with protection system
+- **Impact**: Gameplay becomes slow and defensive, kingdoms left vulnerable after battles
 
 ---
 
@@ -624,43 +653,735 @@ if (phaseType === 'short' && defenderBuildings['Barricades'] && isBattleDefender
 // This allows 12 buildings per land minus castles, creating more strategic choices
 ```
 
----
+### Phase 10: Thievery System Implementation
 
-## 📅 IMPLEMENTATION PHASES
+#### Core Thievery Mechanics
+```typescript
+// Thievery success depends on:
+// 1. Number of thieves committed
+// 2. Number of Thieves Guilds (like Schools for magic)
+// 3. Target's land size (more land = harder to infiltrate)
+// 4. Target's security buildings (like wizards for counterspelling)
 
-### Priority 1 (Critical) - Immediate
-1. ✅ Fix heavy armor technology (level 5 max - premium scaling)
-2. ✅ Fix Undead economic advantage (add food costs)
-3. ✅ Fix Mage cost (reduce by 37%)
-4. ✅ Fix Caragous infinite scaling and base stats
+// Thief recovery after missions:
+// Base: 3 thieves per 2 Thieves Guilds per day
+// With "Stealth Training" technology: 2 thieves per Thieves Guild per day
 
-### Priority 2 (High) - Next Sprint
-1. ✅ Add armor types to units missing them
-2. ✅ Implement guard house slot system in code
-3. ✅ Reduce range phase lethality
+// Racial thievery modifiers (mirroring magic system)
+const racialThieveryModifiers = {
+  'elf': 1.15,      // +15% success (premier infiltrators)
+  'human': 1.0,     // 0% (neutral, reliable generalists)
+  'orc': 0.85,      // -15% success (too loud/obvious)
+  'gnome': 0.625,   // -37.5% success, 35% detection resistance
+  'dwarf': 0.5,     // -50% success, 40% detection resistance (excellent security)
+  'undead': 1.1     // +10% success (ethereal spies)
+}
+```
 
-### Priority 3 (Medium) - Future Sprint
-1. ✅ Add multi-phase damage system
-2. ✅ Balance upkeep across all races
-3. ✅ Adjust production rates
+#### Thievery Infrastructure Buildings
+```typescript
+// In buildingData.ts - Thievery infrastructure
+"Thieves Guild": {
+  cost: { gold: 1500, iron: 30, wood: 80 },
+  effect: 'Trains thieves and increases thievery efficiency. Base: 1 thief per day.',
+  race: 'all',
+  production: { thief: 1 },
+  thievery_bonus: { efficiency: 1.0 } // Like Schools for magic
+},
+"Underground Network": {
+  cost: { gold: 2500, iron: 50, wood: 120 },
+  effect: 'Advanced thievery operations. 2 thieves per day, +20% efficiency.',
+  race: 'all',
+  production: { thief: 2 },
+  thievery_bonus: { efficiency: 1.2 }
+},
+"Espionage Center": {
+  cost: { gold: 4000, iron: 80, wood: 200 },
+  effect: 'Elite thievery operations. 3 thieves per day, +40% efficiency.',
+  race: 'all',
+  production: { thief: 3 },
+  thievery_bonus: { efficiency: 1.4 }
+}
+```
 
-### Priority 4 (Medium) - Strategy & Technology
-1. ✅ Fix strategy balance issues (Quick Retreat, Elf Energy Gathering, etc.)
-2. ✅ Implement new dual-strategy system (positioning + combat)
-3. ✅ Improve technology scaling (Sharper Blades, Improve Bow Range)
-4. ✅ Rebalance equipment costs to be meaningful
+#### Thievery Missions (Like Spells)
+```typescript
+// In strategyData.ts - Thievery missions
+const thieveryMissions = {
+  "Gold Heist": {
+    effect: "Steals gold from target kingdom",
+    duration: "0 days",
+    thieves_needed: 8, // Like "7 wizards" for Growing Crop
+    tech_level: 0,
+    success_rate: 0.75, // Base 75% like magic
+    notes: "Yield scales with thieves used"
+  },
+  "Resource Theft": {
+    effect: "Steals iron, wood, or food from target",
+    duration: "0 days", 
+    thieves_needed: 10,
+    tech_level: 0,
+    success_rate: 0.70,
+    notes: "Amount stolen scales with thieves used"
+  },
+  "Food Poisoning": {
+    effect: "Destroys target's food stores",
+    duration: "0 days",
+    thieves_needed: 12,
+    tech_level: 1,
+    success_rate: 0.65,
+    notes: "Destroys 25% of target's food"
+  },
+  "Troop Assassination": {
+    effect: "Kills small percentage of target's troops",
+    duration: "0 days",
+    thieves_needed: 15,
+    tech_level: 1,
+    success_rate: 0.60,
+    notes: "Kills 10% of target's troops. Always loses thieves."
+  },
+  "Intelligence Gathering": {
+    effect: "Reveals details about target kingdom",
+    duration: "N/A",
+    thieves_needed: 5,
+    tech_level: 0,
+    success_rate: 0.80,
+    notes: "Precision depends on thieves used and tech level"
+  },
+  "Building Sabotage": {
+    effect: "Destroys target's buildings",
+    duration: "0 days",
+    thieves_needed: 20,
+    tech_level: 2,
+    success_rate: 0.55,
+    notes: "Destroys buildings. May backfire and destroy your buildings."
+  },
+  "Economic Sabotage": {
+    effect: "Reduces target's production by 10%",
+    duration: "8 days",
+    thieves_needed: 18,
+    tech_level: 2,
+    success_rate: 0.60,
+    notes: "Reduces all production (wood, food, iron, gold)"
+  },
+  "Security Breach": {
+    effect: "Temporarily disables target's security",
+    duration: "6 days",
+    thieves_needed: 25,
+    tech_level: 3,
+    success_rate: 0.50,
+    notes: "Reduces target's detection abilities by 50%"
+  },
+  "Mass Infiltration": {
+    effect: "Large-scale coordinated theft operation",
+    duration: "0 days",
+    thieves_needed: 30,
+    tech_level: 3,
+    success_rate: 0.45,
+    notes: "Steals multiple resources. High risk, high reward."
+  },
+  "Shadow Network": {
+    effect: "Creates permanent spy network in target kingdom",
+    duration: "Permanent",
+    thieves_needed: 40,
+    tech_level: 4,
+    success_rate: 0.40,
+    notes: "Permanent intelligence gathering. Cannot be removed easily."
+  }
+}
+```
 
-### Priority 5 (Medium) - Systems Balance
-1. ✅ Fix unit weight system (tank units should tank)
-2. ✅ Increase building mitigation effectiveness
-3. ✅ Balance production rates
-4. ✅ Implement new building system (Barricades, Training Grounds, etc.)
-5. ✅ Adjust building cap to 12 per land minus castles
+#### Thievery Technology Tree
+```typescript
+// In technologyData.ts - Thievery technologies
+"Stealth Training": {
+  description: "Improves thief stealth and recovery rate",
+  stat: 'stealth',
+  flat_bonus: 0.1, // +10% stealth per level
+  maxLevel: 5,
+  cost: 100000,
+  researchTime: 30,
+  effects: {
+    thief_recovery_rate: 1.5, // Like Insight technology for magic
+    capture_rate_reduction: 0.05 // -5% capture rate per level
+  }
+},
+"Advanced Infiltration": {
+  description: "Improves mission success rates",
+  stat: 'infiltration', 
+  flat_bonus: 0.1, // +10% success per level
+  maxLevel: 3,
+  cost: 150000,
+  researchTime: 45,
+  effects: {
+    mission_success_bonus: 0.1 // +10% success rate per level
+  }
+},
+"Silent Operations": {
+  description: "Reduces detection and improves escape",
+  stat: 'stealth',
+  flat_bonus: 0.15, // +15% stealth per level
+  maxLevel: 3,
+  cost: 200000,
+  researchTime: 60,
+  effects: {
+    detection_resistance: 0.2, // 20% chance to avoid detection
+    escape_rate: 0.3 // 30% chance to escape if caught
+  }
+}
+```
 
-### Priority 6 (Low) - Polish
-1. ✅ Fine-tune unit costs
-2. ✅ Balance equipment amounts
-3. ✅ Adjust race passives
+#### Security Buildings (Counter-Thievery)
+```typescript
+// In buildingData.ts - Security buildings
+"Guard Posts": {
+  cost: { gold: 800, iron: 20, wood: 60 },
+  effect: 'Increases detection of thieves and reduces mission success rates.',
+  race: 'all',
+  security_bonus: { 
+    detection: 1.2, // Like wizards for counterspelling
+    success_rate_reduction: 0.9 // -10% success rate
+  }
+},
+"Security Network": {
+  cost: { gold: 2000, iron: 40, wood: 100 },
+  effect: 'Advanced security that significantly reduces thievery effectiveness.',
+  race: 'all',
+  security_bonus: { 
+    detection: 1.4,
+    success_rate_reduction: 0.8,
+    capture_rate: 1.3
+  }
+},
+"Intelligence Agency": {
+  cost: { gold: 3500, iron: 60, wood: 150 },
+  effect: 'Elite security operations with maximum protection.',
+  race: 'all',
+  security_bonus: { 
+    detection: 1.6,
+    success_rate_reduction: 0.7,
+    capture_rate: 1.5,
+    retaliation: 1.2 // Can retaliate against failed thievery attempts
+  }
+}
+```
+
+#### Success Rate Calculation
+```typescript
+// Thievery success calculation (mirroring magic system)
+function calculateThieverySuccess(attackerThieves, attackerGuilds, targetLand, targetSecurity) {
+  // Base success rate (like magic's 75%)
+  let baseSuccess = 0.75;
+  
+  // Thieves efficiency (like wizards per land)
+  const thievesPerLand = attackerThieves / attackerGuilds;
+  const efficiencyBonus = Math.min(thievesPerLand / 1.0, 0.5); // Cap at +50%
+  
+  // Target land penalty (more land = harder to infiltrate)
+  const landPenalty = Math.min(targetLand / 10, 0.3); // Cap at -30%
+  
+  // Target security penalty (like wizards for counterspelling)
+  const securityPenalty = Math.min(targetSecurity / 20, 0.4); // Cap at -40%
+  
+  // Racial modifier
+  const racialModifier = racialThieveryModifiers[attackerRace];
+  
+  // Final success rate
+  const finalSuccess = (baseSuccess + efficiencyBonus - landPenalty - securityPenalty) * racialModifier;
+  
+  return Math.max(0.05, Math.min(0.95, finalSuccess)); // Clamp between 5% and 95%
+}
+
+### Phase 11: Magic System Balance Implementation
+
+#### Core Magic System Mechanics
+```typescript
+// Magic success depends on:
+// 1. Number of wizards committed
+// 2. Number of Schools (infrastructure)
+// 3. Target's land size (more land = harder to affect)
+// 4. Target's wizards + Schools (counterspelling)
+
+// Wizard recovery after casting:
+// Base: 3 wizards per 2 Schools per day
+// With "Insight" technology: 2 wizards per School per day
+
+// Racial magic modifiers (current system)
+const racialMagicModifiers = {
+  'elf': 1.15,      // +15% success (premier casters)
+  'human': 1.0,     // 0% (neutral, reliable generalists)
+  'orc': 0.85,      // -15% success (too loud/obvious)
+  'gnome': 0.625,   // -37.5% success, 35% magic resistance
+  'dwarf': 0.5,     // -50% success, 40% magic resistance
+  'undead': 1.05    // +5% success (ethereal magic affinity)
+}
+```
+
+#### Fix Wizard Costs and Upkeep
+```typescript
+// In unitData.ts - Reduce wizard costs across all races
+// Current costs are too high, making magic unaffordable
+
+// ELF WIZARDS (baseline - keep current)
+"Wizard": {
+  base_gold_cost: 225, // Keep current (baseline)
+  upkeep: { gold: 3, food: 1 } // Keep current
+}
+
+// HUMAN WIZARDS (slight increase from elf)
+"Wizard": {
+  base_gold_cost: 275, // Keep current
+  upkeep: { gold: 4, food: 1 } // Keep current
+}
+
+// UNDEAD WIZARDS (new - between elf and human)
+"Wizard": {
+  base_gold_cost: 250, // New cost
+  upkeep: { gold: 3.5, food: 1 } // New upkeep
+}
+
+// ORC WIZARDS (reduce from current)
+"Wizard": {
+  base_gold_cost: 200, // Reduce from 300
+  upkeep: { gold: 3, food: 1 } // Reduce from 5g
+}
+
+// GNOME WIZARDS (reduce from current)
+"Wizard": {
+  base_gold_cost: 300, // Reduce from 450
+  upkeep: { gold: 6, food: 2 } // Reduce from 10g/3f
+}
+
+// DWARF WIZARDS (reduce from current)
+"Wizard": {
+  base_gold_cost: 350, // Reduce from 500
+  upkeep: { gold: 7, food: 2 } // Reduce from 10g/4f
+}
+```
+
+#### Fix Gate Spell (Overpowered)
+```typescript
+// In strategyData.ts - Nerf Gate spell
+"Gate": {
+  effect: "Summon troops back to castles (reduced effectiveness)",
+  duration: "0 days",
+  wizards_needed: "Always successful",
+  tech_level: 4,
+  notes: "Each wizard can summon up to 1.5 men (reduced from 3). 25% chance of troop loss (increased from base). Cannot summon generals. Breaks protection.",
+  new_mechanics: {
+    troops_per_wizard: 1.5, // Reduced from 3
+    loss_chance: 0.25, // Increased risk
+    travel_time_reduction: 0.75, // 75% faster return instead of instant
+    cooldown: "24 hours" // Cannot be cast repeatedly
+  }
+}
+```
+
+#### Add Magic Infrastructure Buildings
+```typescript
+// In buildingData.ts - Magic infrastructure buildings
+"Magic Academy": {
+  cost: { gold: 1200, iron: 20, wood: 60 },
+  effect: 'Increases wizard training efficiency and reduces upkeep costs.',
+  race: 'all',
+  magic_bonus: { 
+    wizard_upkeep_reduction: 0.2, // -20% wizard upkeep
+    training_efficiency: 1.2 // +20% training speed
+  }
+},
+"Arcane Library": {
+  cost: { gold: 2000, iron: 30, wood: 100 },
+  effect: 'Advanced magical research facility. Reduces spell research time.',
+  race: 'all',
+  magic_bonus: { 
+    research_speed: 1.3, // +30% research speed
+    spell_power: 1.1 // +10% spell effectiveness
+  }
+},
+"Magical Nexus": {
+  cost: { gold: 3500, iron: 50, wood: 150 },
+  effect: 'Elite magical facility. Significantly improves all magical operations.',
+  race: 'all',
+  magic_bonus: { 
+    wizard_upkeep_reduction: 0.3, // -30% wizard upkeep
+    spell_success: 1.15, // +15% spell success rate
+    recovery_rate: 1.2 // +20% wizard recovery rate
+  }
+}
+```
+
+#### Add Magic Technology Tree
+```typescript
+// In technologyData.ts - Magic technologies
+"Insight": {
+  description: "Improves wizard recovery rate and spell efficiency",
+  stat: 'magic',
+  flat_bonus: 0.1, // +10% efficiency per level
+  maxLevel: 5,
+  cost: 100000,
+  researchTime: 30,
+  effects: {
+    wizard_recovery_rate: 1.5, // Like current Insight
+    spell_efficiency: 1.1 // +10% spell power per level
+  }
+},
+"Arcane Mastery": {
+  description: "Improves spell success rates and reduces costs",
+  stat: 'magic',
+  flat_bonus: 0.15, // +15% success per level
+  maxLevel: 3,
+  cost: 150000,
+  researchTime: 45,
+  effects: {
+    spell_success_bonus: 0.15, // +15% success rate per level
+    wizard_upkeep_reduction: 0.1 // -10% upkeep per level
+  }
+},
+"Magical Resonance": {
+  description: "Improves counterspelling and magical defense",
+  stat: 'magic',
+  flat_bonus: 0.2, // +20% defense per level
+  maxLevel: 3,
+  cost: 200000,
+  researchTime: 60,
+  effects: {
+    counterspell_power: 1.2, // +20% counterspell effectiveness
+    magic_resistance: 0.1 // +10% magic resistance per level
+  }
+}
+```
+
+#### Racial Magic Balance Adjustments
+```typescript
+// Adjust racial modifiers to make magic more accessible
+const newRacialMagicModifiers = {
+  'elf': 1.20,      // +20% success (premier casters, slight buff)
+  'human': 1.0,     // 0% (neutral, reliable generalists)
+  'undead': 1.10,   // +10% success (ethereal magic affinity)
+  'orc': 0.90,      // -10% success (reduced penalty from -15%)
+  'gnome': 0.75,    // -25% success (reduced penalty from -37.5%)
+  'dwarf': 0.65     // -35% success (reduced penalty from -50%)
+}
+
+// Add racial magic specialties
+const racialMagicSpecialties = {
+  'elf': {
+    specialty: 'Nature Magic',
+    bonus: '+25% success with growth/production spells',
+    spells: ['Growing Crop', 'Natural Growth', 'Blessing', 'God Blessing']
+  },
+  'human': {
+    specialty: 'Balanced Magic',
+    bonus: '+15% success with all spells when cast on self',
+    spells: 'All spells'
+  },
+  'undead': {
+    specialty: 'Death Magic',
+    bonus: '+30% success with offensive/destructive spells',
+    spells: ['Fireball', 'Famine', 'Earthquake', 'Wraith\'s Temptation']
+  },
+  'orc': {
+    specialty: 'War Magic',
+    bonus: '+25% success with combat-related spells',
+    spells: ['Fireball', 'Firewall', 'Freeze']
+  },
+  'gnome': {
+    specialty: 'Technical Magic',
+    bonus: '+20% success with transformation spells',
+    spells: ['Iron to Gold', 'Wood to Food', 'Truesight']
+  },
+  'dwarf': {
+    specialty: 'Protective Magic',
+    bonus: '+30% success with defensive spells',
+    spells: ['Firewall', 'Blessing', 'God Blessing']
+  }
+}
+```
+
+#### School System Improvements
+```typescript
+// Reduce School requirements to make magic more accessible
+// Old: 1 School per land for 75% success
+// New: 0.5 Schools per land for 75% success (50% reduction)
+
+// In buildingData.ts - Improve School efficiency
+"School": {
+  cost: { gold: 800, iron: 15, wood: 40 }, // Reduce from current cost
+  effect: 'Trains wizards and increases magical efficiency. Base: 1 wizard per day.',
+  race: 'all',
+  production: { wizard: 1 },
+  magic_bonus: { efficiency: 2.0 } // Double efficiency (like 2 old Schools)
+}
+
+// Add advanced School variants
+"University": {
+  cost: { gold: 1500, iron: 25, wood: 80 },
+  effect: 'Advanced magical education. 2 wizards per day, +30% efficiency.',
+  race: 'all',
+  production: { wizard: 2 },
+  magic_bonus: { efficiency: 2.6 } // 2.0 + 30%
+},
+"Grand Academy": {
+  cost: { gold: 2500, iron: 40, wood: 120 },
+  effect: 'Elite magical institution. 3 wizards per day, +50% efficiency.',
+  race: 'all',
+  production: { wizard: 3 },
+  magic_bonus: { efficiency: 3.0 } // 2.0 + 50%
+}
+```
+
+#### Spell Duration and Recovery Balance Fix
+```typescript
+// CRITICAL FIX: Spell durations are too short vs wizard recovery rates
+// Current: 6-12 hour spells vs 18-24 hour recovery = broken system
+// Solution: Extend spell durations to match recovery cycles
+
+// In strategyData.ts - Fix spell durations to match recovery rates
+const balancedSpells = {
+  "Growing Crop": {
+    effect: "Farms produce at peak efficiency; crops mature faster.",
+    duration: "24 hours", // Increase from 6 days (was too long)
+    wizards_needed: 5, // Reduce from 7
+    tech_level: 0,
+    notes: "Yield scales with wizards used. Duration matches recovery cycle."
+  },
+  "Natural Growth": {
+    effect: "Population becomes extremely fertile. Birth rate surges; cancels Famine.",
+    duration: "36 hours", // Increase from 8 days (was too long)
+    wizards_needed: 12, // Reduce from 15
+    tech_level: 0,
+    notes: "Cancels Famine spell. Duration matches recovery cycle."
+  },
+  "Iron to Gold": {
+    effect: "Convert iron to gold. Yield scales with wizards used.",
+    duration: "0 days", // Keep instant
+    wizards_needed: 10, // Reduce from 12
+    tech_level: 0,
+    notes: "1 iron = 2 gold base conversion"
+  },
+  "Fireball": {
+    effect: "Kills population and reduces production.",
+    duration: "0 days", // Keep instant
+    wizards_needed: 8, // Add requirement (was N/A)
+    tech_level: 0,
+    notes: "Breaks protection, grants retaliation. Kills 5% population per wizard."
+  },
+  "Blessing": {
+    effect: "Increases population productivity by 10%.",
+    duration: "48 hours", // Increase from 12 days (was too long)
+    wizards_needed: 10, // Reduce from 12
+    tech_level: 0,
+    notes: "Increases income by 10%. Duration matches recovery cycle."
+  },
+  "Truesight": {
+    effect: "Reveals enemy kingdom details.",
+    duration: "N/A", // Keep instant
+    wizards_needed: 3, // Add requirement (was 0)
+    tech_level: 0,
+    notes: "Precision depends on wizards used and tech level"
+  },
+  "Wood to Food": {
+    effect: "Convert wood to food (1:10 ratio).",
+    duration: "0 days", // Keep instant
+    wizards_needed: 10, // Reduce from 12
+    tech_level: 1,
+    notes: "Amount converted depends on wizards used"
+  },
+  "Farseeing": {
+    effect: "Increases exploration rate by 2.",
+    duration: "48 hours", // Increase from 12 days (was too long)
+    wizards_needed: 6, // Reduce from 7
+    tech_level: 1,
+    notes: "Faster exploration. Duration matches recovery cycle."
+  },
+  "Freeze": {
+    effect: "Reduces target production by 10% and building rate by 66%.",
+    duration: "36 hours", // Increase from 8 days (was too long)
+    wizards_needed: 15, // Add requirement (was N/A)
+    tech_level: 2,
+    notes: "Affects wood, food, iron, gold production. Duration matches recovery cycle."
+  },
+  "Famine": {
+    effect: "Reduces population growth to -0.02% per day.",
+    duration: "72 hours", // Increase from 15 days (was too long)
+    wizards_needed: 18, // Add requirement (was N/A)
+    tech_level: 2,
+    notes: "Cannot reduce population below 65%. Cancelled by Natural Growth. Duration matches recovery cycle."
+  },
+  "Earthquake": {
+    effect: "Destroys enemy buildings (max 15%).",
+    duration: "0 days", // Keep instant
+    wizards_needed: 25, // Add requirement (was N/A)
+    tech_level: 3,
+    notes: "May destroy your buildings too. Breaks protection, grants retaliation."
+  },
+  "Firewall": {
+    effect: "Increases damage to attacking units by 8%.",
+    duration: "72 hours", // Increase from 15 days (was too long)
+    wizards_needed: 15, // Reduce from 20
+    tech_level: 3,
+    notes: "May destroy your buildings due to heat. Duration matches recovery cycle."
+  },
+  "Gate": {
+    effect: "Summon troops back to castles (reduced effectiveness).",
+    duration: "0 days", // Keep instant
+    wizards_needed: "Always successful",
+    tech_level: 4,
+    notes: "1.5 troops per wizard, 25% loss chance, 75% faster return, 24h cooldown."
+  },
+  "God Blessing": {
+    effect: "Increases all production by 10%, negates crime effects.",
+    duration: "60 hours", // Increase from 11 days (was too long)
+    wizards_needed: 20, // Reduce from 25
+    tech_level: 4,
+    notes: "Failing causes population distrust and crime increase. Duration matches recovery cycle."
+  }
+}
+
+// IMPROVED WIZARD RECOVERY SYSTEM
+// Current: 3 wizards per 2 Schools per day (too slow)
+// New: 2 wizards per School per day (50% faster recovery)
+// With Insight tech: 3 wizards per School per day (100% faster recovery)
+
+// In calculateMagicRecovery.ts
+function calculateWizardRecovery(schools: number, insightLevel: number): number {
+  const baseRecovery = schools * 2; // 2 wizards per School per day (was 1.5)
+  const insightBonus = schools * insightLevel * 1; // +1 wizard per School per level
+  return Math.floor(baseRecovery + insightBonus);
+}
+
+// ELIMINATE 5:1 SCHOOL RATIOS
+// The new recovery rates make excessive School building unnecessary
+// Players can now maintain spells with reasonable School:Land ratios (1:1 to 2:1)
+```
+
+#### Success Rate Calculation Improvements
+```typescript
+// Improved magic success calculation
+function calculateMagicSuccess(attackerWizards, attackerSchools, targetLand, targetWizards, targetSchools, attackerRace) {
+  // Base success rate (like current 75%)
+  let baseSuccess = 0.75;
+  
+  // Wizards efficiency (like current system)
+  const wizardsPerSchool = attackerWizards / attackerSchools;
+  const efficiencyBonus = Math.min(wizardsPerSchool / 1.0, 0.5); // Cap at +50%
+  
+  // Target land penalty (more land = harder to affect)
+  const landPenalty = Math.min(targetLand / 10, 0.3); // Cap at -30%
+  
+  // Target counterspelling penalty (wizards + schools)
+  const targetMagicPower = targetWizards + (targetSchools * 2); // Schools count double
+  const counterspellPenalty = Math.min(targetMagicPower / 20, 0.4); // Cap at -40%
+  
+  // Racial modifier (adjusted for balance)
+  const racialModifier = newRacialMagicModifiers[attackerRace];
+  
+  // Final success rate
+  const finalSuccess = (baseSuccess + efficiencyBonus - landPenalty - counterspellPenalty) * racialModifier;
+  
+  return Math.max(0.05, Math.min(0.95, finalSuccess)); // Clamp between 5% and 95%
+}
+
+### Phase 12: Protection System Scaling Implementation
+
+#### Core Protection Scaling Mechanics
+```typescript
+// Protection system that scales with army losses
+// Accounts for the reality that battles can wipe 80-100% of armies
+// Protection should last long enough for meaningful rebuilding
+
+const protectionSystem = {
+  "Attack Success": {
+    base_protection: 8, // 8 hours base protection
+    army_loss_bonus: 2, // +2 hours per 20% army lost
+    max_protection: 24, // Cap at 24 hours
+    calculation: "8h + (2h × army_loss_percentage / 20%)"
+  },
+  "Defense Failure": {
+    base_protection: 6, // 6 hours base protection
+    army_loss_bonus: 2, // +2 hours per 20% army lost
+    max_protection: 20, // Cap at 20 hours
+    calculation: "6h + (2h × army_loss_percentage / 20%)"
+  },
+  "Successful Defense": {
+    base_protection: 4, // 4 hours base protection
+    army_loss_bonus: 1, // +1 hour per 20% army lost (less scaling)
+    max_protection: 12, // Cap at 12 hours
+    calculation: "4h + (1h × army_loss_percentage / 20%)"
+  },
+  "Failed Attack": {
+    base_protection: 2, // 2 hours base protection
+    army_loss_bonus: 1, // +1 hour per 20% army lost
+    max_protection: 8, // Cap at 8 hours
+    calculation: "2h + (1h × army_loss_percentage / 20%)"
+  }
+}
+
+// Example Calculations:
+// If you lose 80% of your army:
+// - Attack success: 8h + (4 × 2h) = 16 hours protection
+// - Defense failure: 6h + (4 × 2h) = 14 hours protection
+// - Successful defense: 4h + (4 × 1h) = 8 hours protection
+// - Failed attack: 2h + (4 × 1h) = 6 hours protection
+
+// If you lose 40% of your army:
+// - Attack success: 8h + (2 × 2h) = 12 hours protection
+// - Defense failure: 6h + (2 × 2h) = 10 hours protection
+// - Successful defense: 4h + (2 × 1h) = 6 hours protection
+// - Failed attack: 2h + (2 × 1h) = 4 hours protection
+```
+
+#### Protection Calculation Function
+```typescript
+// Calculate protection time based on battle outcome and army losses
+function calculateProtectionTime(battleOutcome: string, armyLossPercentage: number): number {
+  const system = protectionSystem[battleOutcome];
+  
+  if (!system) {
+    return 0; // No protection for unknown outcomes
+  }
+  
+  // Calculate bonus protection based on army losses
+  const lossMultiplier = Math.floor(armyLossPercentage / 20); // Every 20% = 1 bonus
+  const bonusProtection = lossMultiplier * system.army_loss_bonus;
+  
+  // Total protection time
+  const totalProtection = system.base_protection + bonusProtection;
+  
+  // Cap at maximum protection
+  return Math.min(totalProtection, system.max_protection);
+}
+
+// Usage examples:
+// calculateProtectionTime("Attack Success", 80) // Returns 16 hours
+// calculateProtectionTime("Defense Failure", 60) // Returns 12 hours
+// calculateProtectionTime("Successful Defense", 40) // Returns 6 hours
+// calculateProtectionTime("Failed Attack", 20) // Returns 3 hours
+```
+
+#### Activity Penalty System
+```typescript
+// Activity penalty to encourage engagement
+const activityPenalty = {
+  "Active Player": {
+    protection_reduction: 0.1, // 10% less protection
+    definition: "Player who has attacked or been attacked in last 24 hours"
+  },
+  "Inactive Player": {
+    protection_reduction: 0, // No penalty
+    definition: "Player who hasn't been in combat for 24+ hours"
+  }
+}
+
+// Apply activity penalty to final protection time
+function applyActivityPenalty(protectionTime: number, isActivePlayer: boolean): number {
+  if (isActivePlayer) {
+    return protectionTime * 0.9; // 10% reduction
+  }
+  return protectionTime; // No reduction
+}
+```
+
 
 ---
 
@@ -780,6 +1501,89 @@ if (phaseType === 'short' && defenderBuildings['Barricades'] && isBattleDefender
 | **Combat** | Tactical Flexibility | +10% all stats | Balanced approach |
 | **Combat** | Phase Mastery | +50% random phase, -10% defense | Focus on one phase |
 
+### New Thievery System
+| Component | Details | Effect |
+|-----------|---------|--------|
+| **Thieves Guild** | 1500g, 30i, 80w | Trains 1 thief/day, increases efficiency |
+| **Underground Network** | 2500g, 50i, 120w | Trains 2 thieves/day, +20% efficiency |
+| **Espionage Center** | 4000g, 80i, 200w | Trains 3 thieves/day, +40% efficiency |
+| **Guard Posts** | 800g, 20i, 60w | +20% detection, -10% success rate |
+| **Security Network** | 2000g, 40i, 100w | +40% detection, -20% success rate |
+| **Intelligence Agency** | 3500g, 60i, 150w | +60% detection, -30% success rate |
+| **Gold Heist** | 8 thieves needed | Steals gold, 75% success rate |
+| **Resource Theft** | 10 thieves needed | Steals resources, 70% success rate |
+| **Food Poisoning** | 12 thieves needed | Destroys 25% food, 65% success rate |
+| **Troop Assassination** | 15 thieves needed | Kills 10% troops, 60% success rate |
+| **Intelligence Gathering** | 5 thieves needed | Reveals kingdom details, 80% success rate |
+| **Building Sabotage** | 20 thieves needed | Destroys buildings, 55% success rate |
+| **Economic Sabotage** | 18 thieves needed | -10% production for 8 days, 60% success rate |
+| **Security Breach** | 25 thieves needed | -50% detection for 6 days, 50% success rate |
+| **Mass Infiltration** | 30 thieves needed | Multiple thefts, 45% success rate |
+| **Shadow Network** | 40 thieves needed | Permanent spy network, 40% success rate |
+
+### New Magic System Balance
+| Component | Old Value | New Value | Effect |
+|-----------|-----------|-----------|--------|
+| **Elf Wizard** | 225g, 3g/1f | 225g, 3g/1f | Baseline (unchanged) |
+| **Human Wizard** | 275g, 4g/1f | 275g, 4g/1f | Baseline (unchanged) |
+| **Undead Wizard** | N/A | 250g, 3.5g/1f | New race option |
+| **Orc Wizard** | 300g, 5g/1f | 200g, 3g/1f | -33% cost, -40% upkeep |
+| **Gnome Wizard** | 450g, 10g/3f | 300g, 6g/2f | -33% cost, -40% upkeep |
+| **Dwarf Wizard** | 500g, 10g/4f | 350g, 7g/2f | -30% cost, -30% upkeep |
+| **School Efficiency** | 1.0 | 2.0 | Double efficiency (50% fewer needed) |
+| **School Cost** | Current | 800g, 15i, 40w | Reduced cost |
+| **Gate Spell** | 3 troops/wizard | 1.5 troops/wizard | -50% effectiveness |
+| **Gate Risk** | Base | 25% loss chance | Increased risk |
+| **Gate Travel** | Instant | 75% faster | No longer instant |
+| **Wizard Recovery** | 1.5 per School/day | 2 per School/day | 33% faster recovery |
+| **Insight Recovery** | 2 per School/day | 3 per School/day | 50% faster with tech |
+| **Spell Durations** | 6-15 days | 24-72 hours | Match recovery cycles |
+| **School Ratios** | 5:1 excessive | 1:1 to 2:1 | Eliminate broken ratios |
+| **Elf Magic** | +15% success | +20% success | Slight buff |
+| **Orc Magic** | -15% success | -10% success | Reduced penalty |
+| **Gnome Magic** | -37.5% success | -25% success | Reduced penalty |
+| **Dwarf Magic** | -50% success | -35% success | Reduced penalty |
+| **Undead Magic** | N/A | +10% success | New race option |
+
+### Universal Spells System
+| Spell | Wizards | Tech Level | Effect | Duration |
+|-------|---------|------------|--------|----------|
+| **Rally the Troops** | 10 | 1 | +20% melee/short/range damage for all units | 6 hours |
+| **Fortify Defenses** | 12 | 2 | +25% defense for all units | 8 hours |
+| **Scout's Vision** | 6 | 0 | Reveals army composition and protection status | Instant |
+| **Mana Surge** | 15 | 3 | Doubles wizard recovery rate | 12 hours |
+| **Dispel Magic** | 20 | 3 | Removes all active spells from target | Instant |
+| **Time Warp** | 25 | 4 | Reduces all timers by 25% | 24 hours |
+| **Mass Teleport** | 30 | 4 | Instant troop movement (50% loss chance) | Instant |
+| **Protection Breach** | 12 | 2 | Reduces target protection by 50% | Instant |
+| **Shield of Valor** | 8 | 1 | Grants 8h protection after successful defense | 8 hours |
+| **Reality Anchor** | 18 | 3 | Blocks teleportation and protection manipulation | 12 hours |
+
+### Race-Specific Spells System
+| Race | Spell | Wizards | Tech Level | Effect | Duration |
+|------|-------|---------|------------|--------|----------|
+| **Elf** | **Nature's Wrath** | 15 | 2 | +30% melee/short/range damage to all units, +50% to archers | 8 hours |
+| **Elf** | **Forest Camouflage** | 8 | 1 | +40% defense to all units, +20% to archers | 12 hours |
+| **Dwarf** | **Stone Skin** | 12 | 2 | +40% defense to all units, +60% to heavy armor units | 10 hours |
+| **Dwarf** | **Mountain's Fury** | 18 | 3 | +25% melee damage, +35% to hammer/axe units | 6 hours |
+| **Human** | **Inspiration** | 10 | 1 | +15% to all stats (melee/short/range/defense), +25% production speed | 12 hours |
+| **Human** | **Tactical Mastery** | 14 | 2 | +20% to unit weights, +30% strategy effectiveness | 8 hours |
+| **Orc** | **Blood Rage** | 12 | 2 | +40% melee damage, +20% short damage, -20% defense | 6 hours |
+| **Orc** | **Pack Tactics** | 10 | 1 | +25% damage when outnumbered, +15% to mounted units | 8 hours |
+| **Gnome** | **Mechanical Genius** | 16 | 3 | +30% to siege units, +40% building speed, +25% equipment efficiency | 10 hours |
+| **Gnome** | **Precision Engineering** | 12 | 2 | +20% range damage, +30% to all units, +15% defense | 8 hours |
+| **Undead** | **Death's Embrace** | 14 | 2 | +25% to all undead units, +40% post-battle healing | 10 hours |
+| **Undead** | **Soul Harvest** | 18 | 3 | Kills 5% of enemy troops, converts 10% to your side | Instant |
+
+### Protection System Rebalancing
+| Component | Old Value | New Value | Effect |
+|-----------|-----------|-----------|--------|
+| **Attack Success** | 24 hours | 8h base + 2h per 20% army lost (max 24h) | Scales with army losses, max 24 hours |
+| **Defense Failure** | 15 hours | 6h base + 2h per 20% army lost (max 20h) | Scales with army losses, max 20 hours |
+| **Successful Defense** | 0 hours | 4h base + 1h per 20% army lost (max 12h) | Rewards good defense, scales with losses |
+| **Failed Attack** | 0 hours | 2h base + 1h per 20% army lost (max 8h) | Penalizes bad attacks, minimal protection |
+| **Activity Penalty** | N/A | -10% protection | Active players get less protection |
+
 ---
 
 ## ⚖️ BALANCE IMPACT ANALYSIS
@@ -819,6 +1623,56 @@ if (phaseType === 'short' && defenderBuildings['Barricades'] && isBattleDefender
 - **Impact**: Creates unique strategic unit that rewards careful army composition
 - **Benefit**: Makes Elves more viable with scaling-focused gameplay
 
+#### 7. Thievery System Integration
+- **Effect**: New espionage system mirroring magic mechanics
+- **Thieves**: Dedicated espionage units with recovery system
+- **Infrastructure**: Thieves Guilds provide efficiency (like Schools for magic)
+- **Security**: Counter-thievery buildings provide defense (like wizards for counterspelling)
+- **Missions**: 10 different thievery operations with varying costs and effects
+- **Racial Modifiers**: Different races have varying thievery effectiveness
+- **Impact**: Adds new strategic layer to warfare beyond direct combat
+- **Benefit**: Creates economic warfare, intelligence gathering, and sabotage options
+
+#### 8. Magic System Balance Overhaul
+- **Effect**: Comprehensive magic system rebalancing to make it accessible to all races
+- **Wizard Costs**: Reduced costs for Orcs (-33%), Gnomes (-33%), Dwarves (-30%)
+- **Wizard Upkeep**: Reduced upkeep for all disadvantaged races (-30% to -40%)
+- **School Efficiency**: Doubled efficiency (50% fewer Schools needed for same effect)
+- **Racial Penalties**: Reduced penalties for Orcs (-15%→-10%), Gnomes (-37.5%→-25%), Dwarves (-50%→-35%)
+- **Gate Spell**: Nerfed from 3 troops/wizard to 1.5, added 25% loss chance, 75% faster return instead of instant
+- **Spell Duration Crisis**: Fixed 6-15 day durations → 24-72 hours to match recovery cycles
+- **Wizard Recovery**: Increased from 1.5 to 2 per School/day (33% faster), Insight tech gives 3 per School/day
+- **5:1 School Ratios**: Eliminated broken system, now 1:1 to 2:1 School:Land ratios work properly
+- **Racial Specialties**: Added unique magic specialties for each race (Nature, Death, War, Technical, Protective, Balanced)
+- **Infrastructure**: Added Magic Academy, Arcane Library, Magical Nexus buildings
+- **Technology**: Added Insight, Arcane Mastery, Magical Resonance technologies
+- **Impact**: Makes magic viable for all races while maintaining racial identity
+- **Benefit**: Creates strategic diversity and makes magic a core gameplay element for all races
+
+#### 9. Enhanced Magic System Integration
+- **Effect**: 22 total new spells (10 universal + 12 race-specific) adding strategic depth
+- **Universal Spells**: Combat bonuses (melee/short/range/defense), utility, movement, and protection manipulation
+- **Race-Specific Spells**: Each race gets 2 unique thematic spells using real game mechanics
+  - **Elf**: Nature's Wrath (+30% damage, +50% archer boost), Forest Camouflage (+40% defense, +20% archer defense)
+  - **Dwarf**: Stone Skin (+40% defense, +60% heavy armor), Mountain's Fury (+25% melee, +35% hammer/axe)
+  - **Human**: Inspiration (+15% all stats, +25% production), Tactical Mastery (+20% unit weights, +30% strategy)
+  - **Orc**: Blood Rage (+40% melee, +20% short, -20% defense), Pack Tactics (+25% when outnumbered, +15% mounted)
+  - **Gnome**: Mechanical Genius (+30% siege, +40% building, +25% equipment), Precision Engineering (+20% range, +30% all units, +15% defense)
+  - **Undead**: Death's Embrace (+25% undead, +40% healing), Soul Harvest (kills 5% enemy, converts 10%)
+- **Impact**: Expands magical toolkit with both universal and race-specific tactical options using only real game mechanics
+- **Benefit**: Creates more strategic depth while maintaining racial identity and making magic engaging for all players
+
+#### 10. Protection System Scaling Overhaul
+- **Effect**: Protection system that scales with actual army losses suffered
+- **Core Problem Solved**: Fixed protection times didn't account for army rebuilding time (24-60 hours)
+- **Scaling Protection**: 8h base + 2h per 20% army lost for attack success (max 24h), 6h base + 2h per 20% army lost for defense failure (max 20h)
+- **Defense Rewards**: Successful defense gets 4h base + 1h per 20% army lost (max 12h)
+- **Attack Penalties**: Failed attacks get 2h base + 1h per 20% army lost (max 8h)
+- **Activity Penalty**: Active players get 10% less protection to encourage engagement
+- **Removed Systems**: Alliance War and Challenge System removed (too complex/illogical)
+- **Impact**: Protection now matches actual rebuilding needs, prevents endless attacks on weakened kingdoms
+- **Benefit**: Creates fair, predictable protection that scales with battle intensity and encourages strategic play
+
 ### Race Balance Shifts
 
 | Race | Overall Change | Key Buffs | Key Nerfs |
@@ -850,37 +1704,8 @@ if (phaseType === 'short' && defenderBuildings['Barricades'] && isBattleDefender
 4. **Economic advantages should be balanced across all races**
 5. **Guard house slot system fundamentally changes unit efficiency calculations**
 
----
-
-## 🎯 FINAL RECOMMENDATIONS
-
-### Immediate Actions (This Sprint)
-1. ✅ Implement heavy armor technology fix
-2. ✅ Fix Undead unit costs and add food upkeep
-3. ✅ Reduce Mage cost by 37%
-
-### Next Sprint
-1. ✅ Add missing armor types to units
-2. ✅ Implement range damage reductions
-3. ✅ Add multi-phase damage system
-
-### Future Sprints
-1. ✅ Implement guard house slot system in code
-2. ✅ Balance production rates
-3. ✅ Fine-tune unit costs and upkeep
-
-### Success Metrics
-- **Combat Balance**: All three phases contribute meaningfully
-- **Race Balance**: No race has overwhelming economic or combat advantage
-- **Technology Balance**: Heavy armor scales better than light armor (premium vs basic)
-- **Unit Diversity**: All unit types have clear roles and viability
-- **Strategy Balance**: All strategies are viable and not overpowered
-- **Building Relevance**: Buildings provide effective damage mitigation with appropriate scaling
-- **Building Diversity**: Multiple strategic building options for different playstyles
-- **Equipment Impact**: Equipment costs are a significant part of unit costs
-- **Tank Mechanics**: Tank units actually absorb damage effectively
-
 This comprehensive balance plan addresses all major issues while maintaining race uniqueness and strategic depth.
+
 
 
 
